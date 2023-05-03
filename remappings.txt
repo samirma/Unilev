@@ -2,5 +2,6 @@
 @std=lib/forge-std/src/
 @clones=lib/clones-with-immutable-args/src/
 @chainlink/=lib/chainlink-brownie-contracts/
-@openzeppelin/=lib/openzepplin-contracts/
+@openzeppelin/=lib/openzeppelin-contracts/
+@uniswapV3/=lib/v3-core/
 forge-std/=lib/forge-std/src/
