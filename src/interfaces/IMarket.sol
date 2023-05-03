@@ -4,31 +4,20 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@uniswapV3/contracts/interfaces/IUniswapV3Pool.sol";
 
+/*
+ * @title IMarket interface
+ * @notice Interface for the Market contract
+ * @dev Market will be the only entry point to interact with the protocol
+ * @dev Since functions name are straightforward, no need to add NatSpec comments
+ **/
 interface IMarket {
-    enum PositionStatus {
-        OPEN,
-        CLOSED,
-        LIQUIDATED
-    }
-
-    struct PositionParams {
-        IUniswapV3Pool v3Pool; // pool to trade
-        IERC20 token; // token to trade => should be token0 or token1 of v3Pool
-        uint256 value; // amount of token to trade
-        bool isShort; // true if short, false if long
-        uint8 leverage; // leverage of position => 0 if no leverage
-        uint256 limitPrice; // limit order price => 0 if no limit order
-        uint256 stopLossPrice; // stop loss price => 0 if no stop loss
-        PositionStatus status; // status of position
-    }
-
     // --------------- Trader Zone ---------------
     function openPosition(
         address _v3Pool,
         address _token,
-        uint256 _value,
         bool _isShort,
         uint8 _leverage,
+        uint256 _value,
         uint256 _limitPrice,
         uint256 _stopLossPrice
     ) external;
@@ -42,14 +31,13 @@ interface IMarket {
     ) external;
 
     // --------------- Liquidity Provider Zone ---------------
-    function addLiquidity(address _poolAdd) external;
+    function addLiquidity(address _poolAdd, uint256 _value) external;
 
-    function removeLiquidity(address _poolAdd) external;
+    function removeLiquidity(address _poolAdd, uint256 _value) external;
 
     // --------------- Liquidator/Keeper Zone ---------------
-    function liquidatePosition(uint256 _posId) external;
 
-    function batchLiquidatePosition(uint256[] memory _posIds) external;
+    function liquidatePositions(uint256[] memory _posIds) external;
 
     function getLiquidablePositions() external view returns (uint256[] memory);
 
@@ -77,12 +65,14 @@ interface IMarket {
     );
     event LiquidityAdded(
         address indexed poolAdd,
-        address indexed liquidityProvider
+        address indexed liquidityProvider,
+        uint256 value
     );
     event LiquidityRemoved(
         address indexed poolAdd,
-        address indexed liquidityProvider
+        address indexed liquidityProvider,
+        uint256 value
     );
     event PositionLiquidated(uint256 indexed posId, address indexed liquidator);
-    event LiquidityPoolCreated(address indexed poolAdd);
+    event LiquidityPoolCreated(address indexed poolAdd, address sender);
 }
