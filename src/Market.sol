@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@uniswapV3/contracts/interfaces/IUniswapV3Pool.sol";
-
 import "./interfaces/IMarket.sol";
 import "./Positions.sol";
 import "./LiquidityPool.sol";
 import "./LiquidityPoolFactory.sol";
 
 contract Market is IMarket {
-    Positions positions;
-    LiquidityPoolFactory liquidityPoolFactory;
+    Positions private positions;
+    LiquidityPoolFactory private liquidityPoolFactory;
 
     constructor(address _positions, address _liquidityPoolFactory) {
         positions = Positions(_positions);
@@ -70,28 +67,37 @@ contract Market is IMarket {
         );
     }
 
+    function getTraderPositions(
+        address _traderAdd
+    ) external view returns (uint256[] memory) {
+        return positions.getTraderPositions(_traderAdd);
+    }
+
     // --------------- Liquidity Provider Zone ---------------
-    function addLiquidity(address _poolAdd, uint256 _value) external {
-        LiquidityPool(_poolAdd).addLiquidity(msg.sender, _value);
-        emit LiquidityAdded(_poolAdd, msg.sender, _value);
+    /** @notice provide a simple interface to deal with pools.
+     *          Of course a user can interact directly with the
+     *          pool contract if he wants through deposit/withdraw
+     *          and mint/redeem functions
+     */
+    function addLiquidity(address _poolAdd, uint256 _assets) external {
+        LiquidityPool(_poolAdd).deposit(_assets, msg.sender);
+        emit LiquidityAdded(_poolAdd, msg.sender, _assets);
     }
 
-    function removeLiquidity(address _poolAdd, uint256 _value) external {
-        LiquidityPool(_poolAdd).removeLiquidity(msg.sender, _value);
-        emit LiquidityRemoved(_poolAdd, msg.sender, _value);
+    function removeLiquidity(address _poolAdd, uint256 _shares) external {
+        LiquidityPool(_poolAdd).redeem(_shares, msg.sender, msg.sender);
+        emit LiquidityRemoved(_poolAdd, msg.sender, _shares);
     }
 
-    // --------------- Liquidator/Keeper Zone ---------------
-
+    // --------------- Liquidator/Keeper Zone ----------------
     function liquidatePositions(uint256[] memory _posIds) external {
         uint256 len = _posIds.length;
 
         for (uint256 i; i < len; ++i) {
             // Is that safe ?
-            try positions.liquidatePosition(_posIds[i]) {} catch {
-                continue;
-            }
-            emit PositionLiquidated(_posIds[i], msg.sender);
+            try positions.liquidatePosition(_posIds[i]) {
+                emit PositionLiquidated(_posIds[i], msg.sender);
+            } catch {}
         }
     }
 
@@ -100,8 +106,8 @@ contract Market is IMarket {
     }
 
     // --------------- Admin Zone ---------------
-    function createLiquidityPool(IUniswapV3Pool _v3Pool) external {
-        liquidityPoolFactory.createLiquidityPool(_v3Pool);
-        emit LiquidityPoolCreated(address(_v3Pool), msg.sender);
+    function createLiquidityPool(address _token) external {
+        liquidityPoolFactory.createLiquidityPool(_token);
+        emit LiquidityPoolCreated(_token, msg.sender);
     }
 }

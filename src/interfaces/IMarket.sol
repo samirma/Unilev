@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@solmate/tokens/ERC20.sol";
 import "@uniswapV3/contracts/interfaces/IUniswapV3Pool.sol";
 
 /*
@@ -30,6 +30,10 @@ interface IMarket {
         uint256 _newLstopLossPrice
     ) external;
 
+    function getTraderPositions(
+        address _traderAdd
+    ) external view returns (uint256[] memory);
+
     // --------------- Liquidity Provider Zone ---------------
     function addLiquidity(address _poolAdd, uint256 _value) external;
 
@@ -42,7 +46,7 @@ interface IMarket {
     function getLiquidablePositions() external view returns (uint256[] memory);
 
     // --------------- Admin Zone ---------------
-    function createLiquidityPool(IUniswapV3Pool _v3Pool) external;
+    function createLiquidityPool(address _token) external;
 
     // Events
     event PositionOpened(
@@ -66,12 +70,12 @@ interface IMarket {
     event LiquidityAdded(
         address indexed poolAdd,
         address indexed liquidityProvider,
-        uint256 value
+        uint256 assets
     );
     event LiquidityRemoved(
         address indexed poolAdd,
         address indexed liquidityProvider,
-        uint256 value
+        uint256 shares
     );
     event PositionLiquidated(uint256 indexed posId, address indexed liquidator);
     event LiquidityPoolCreated(address indexed poolAdd, address sender);
