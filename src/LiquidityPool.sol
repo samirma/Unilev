@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import "@solmate/mixins/ERC4626.sol";
+import "@solmate/tokens/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 // Errors
@@ -74,6 +75,6 @@ contract LiquidityPool is ERC4626, Ownable {
     }
 
     function borrowCapacityLeft() public view returns (uint256) {
-        return (totalAssets() * MAX_BORROW_RATIO) / 10000 - borrowedFunds;
+        return ((totalAssets() * MAX_BORROW_RATIO) / 10000) - borrowedFunds;
     }
 }
