@@ -49,7 +49,7 @@ contract Market is IMarket {
     }
 
     function closePosition(uint256 _posId) external {
-        positions.closePosition(_posId, msg.sender);
+        positions.closePosition(msg.sender, _posId);
         emit PositionClosed(_posId, msg.sender);
     }
 
@@ -58,7 +58,12 @@ contract Market is IMarket {
         uint256 _newLimitPrice,
         uint256 _newLstopLossPrice
     ) external {
-        positions.editPosition(_posId, _newLimitPrice, _newLstopLossPrice);
+        positions.editPosition(
+            msg.sender,
+            _posId,
+            _newLimitPrice,
+            _newLstopLossPrice
+        );
         emit PositionEdited(
             _posId,
             msg.sender,

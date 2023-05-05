@@ -12,7 +12,7 @@ contract LiquidityPoolFactory is Ownable {
     address public immutable market;
     address public immutable positions;
 
-    mapping(address => address) public liquidityPools;
+    mapping(address => address) private tokenToLiquidityPools;
 
     constructor(address _positions, address _market) {
         market = _market;
@@ -28,7 +28,7 @@ contract LiquidityPoolFactory is Ownable {
     function createLiquidityPool(
         address _asset
     ) external onlyOwner returns (address) {
-        address cachedLiquidityPools = liquidityPools[_asset];
+        address cachedLiquidityPools = tokenToLiquidityPools[_asset];
 
         if (cachedLiquidityPools != address(0))
             revert LiquidityPoolFactory__POOL_ALREADY_EXIST(
@@ -39,7 +39,13 @@ contract LiquidityPoolFactory is Ownable {
             new LiquidityPool(ERC20(_asset), positions)
         );
 
-        liquidityPools[_asset] = _liquidityPool;
+        tokenToLiquidityPools[_asset] = _liquidityPool;
         return _liquidityPool;
+    }
+
+    function getTokenToLiquidityPools(
+        address _token
+    ) external view returns (address) {
+        return tokenToLiquidityPools[_token];
     }
 }

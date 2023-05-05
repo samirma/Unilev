@@ -6,63 +6,79 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@uniswapV3/contracts/interfaces/IUniswapV3Pool.sol";
 
+import "./PriceFeedL1.sol";
+import "./LiquidityPoolFactory.sol";
+
 contract Positions is ERC721, Ownable {
     // Structs and Enums
-
-    enum PositionStatus {
-        OPEN,
-        CLOSED,
-        LIQUIDATED
-    }
-
     struct PositionParams {
         IUniswapV3Pool v3Pool; // pool to trade
-        IERC20 token; // token to trade => should be token0 or token1 of v3Pool
+        IERC20 baseToken; // token to trade => should be token0 or token1 of v3Pool
+        IERC20 quoteToken; // token to trade => should be the other token of v3Pool
         uint256 value; // amount of token to trade
+        uint64 timestamp; // timestamp of position creation
         bool isShort; // true if short, false if long
         uint8 leverage; // leverage of position => 0 if no leverage
+        uint256 breakEvenLimit; //  => 0 if no leverage or short
         uint256 limitPrice; // limit order price => 0 if no limit order
         uint256 stopLossPrice; // stop loss price => 0 if no stop loss
-        PositionStatus status; // status of position
     }
 
     // Variables
+    uint256 public constant LIQUIDATION_THRESHOLD = 1000; // 10% of margin
+    uint256 public constant MIN_POSITION_VALUE_IN_USD = 100; // To avoid DOS attack
+    uint256 public constant MAX_LEVERAGE = 5;
+    uint256 public constant BORROW_FEE_OPENING = 20; // 0.2% when opening a position
+    uint256 public constant BORROW_FEE_EVERY_HOURS = 1; // 0.01% : assets borrowed/total assets in pool * 0.01%
+
+    LiquidityPoolFactory public immutable liquidityPoolFactory;
+    PriceFeedL1 public immutable priceFeed;
+    address public immutable liquidityPoolFactoryUniswapV3;
 
     uint256 public posId;
-    mapping(uint256 => PositionParams) public positions;
-
-    // Events
-
-    event PositionOpened(
-        uint256 indexed posId,
-        address indexed trader,
-        address indexed v3Pool,
-        address token,
-        uint256 value,
-        bool isShort,
-        uint8 leverage,
-        uint256 limitPrice,
-        uint256 stopLossPrice
-    );
-    event PositionClosed(uint256 indexed posId, address indexed trader);
-    event PositionEdited(
-        uint256 indexed posId,
-        address indexed trader,
-        uint256 newLimitPrice,
-        uint256 newStopLossPrice
-    );
-    event PositionLiquidated(
-        uint256 indexed posId,
-        address indexed trader,
-        uint256 liquidationPrice
-    );
+    mapping(uint256 => PositionParams) public openPositions;
 
     // Errors
+    error Positions__POSITION_NOT_OPEN();
+    error Positions__POSITION_NOT_OWNED(address _trader, uint256 _posId);
+    error Positions__POOL_NOT_OFFICIAL(address _v3Pool);
+    error Positions__TOKEN_NOT_SUPPORTED(address _token);
+    error Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(address _token);
+    error Positions__LEVERAGE_NOT_IN_RANGE(uint8 _leverage);
+    error Positions__VALUE_TO_SMALL(uint256 _value);
+    error Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
+        uint256 _limitPrice,
+        uint256 _value
+    );
+    error Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(
+        uint256 _stopLossPrice,
+        uint256 _value
+    );
 
-    error PositionNotOpen();
-
-    constructor(address _market) ERC721("Uniswap-MAX", "UNIMAX") {
+    constructor(
+        address _market,
+        address _priceFeed,
+        address _liquidityPoolFactory,
+        address _liquidityPoolFactoryUniswapV3
+    ) ERC721("Uniswap-MAX", "UNIMAX") {
         transferOwnership(_market);
+        liquidityPoolFactoryUniswapV3 = _liquidityPoolFactoryUniswapV3;
+        liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
+        priceFeed = PriceFeedL1(_priceFeed);
+    }
+
+    modifier isPositionOpen(uint256 _posId) {
+        if (ownerOf(_posId) == address(0)) {
+            revert Positions__POSITION_NOT_OPEN();
+        }
+        _;
+    }
+
+    modifier isPositionOwned(address _trader, uint256 _posId) {
+        if (ownerOf(_posId) != _trader) {
+            revert Positions__POSITION_NOT_OWNED(_trader, _posId);
+        }
+        _;
     }
 
     // --------------- ERC721 Zone ---------------
@@ -79,7 +95,6 @@ contract Positions is ERC721, Ownable {
     }
 
     // --------------- Trader Zone ---------------
-    
     function openPosition(
         address _trader,
         address _v3Pool,
@@ -89,113 +104,240 @@ contract Positions is ERC721, Ownable {
         uint256 _value,
         uint256 _limitPrice,
         uint256 _stopLossPrice
-    ) external returns (uint256) {
-        // TODO : check parameters
+    ) external onlyOwner returns (uint256) {
+        (
+            uint256 price,
+            address baseToken,
+            address quoteToken
+        ) = checkPositionParams(
+                _v3Pool,
+                _token,
+                _isShort,
+                _leverage,
+                _value,
+                _limitPrice,
+                _stopLossPrice
+            );
 
-        uint256 _posId = safeMint(_trader);
-        positions[_posId] = PositionParams(
+        uint256 _breakEvenLimit;
+
+        // Compute parameters
+        if (_leverage != 1) {
+            if (_isShort) {
+                _breakEvenLimit = price * _leverage;
+            } else {
+                _breakEvenLimit = price / _leverage;
+            }
+        } else {
+            _breakEvenLimit = 0;
+        }
+
+        openPositions[posId + 1] = PositionParams(
             IUniswapV3Pool(_v3Pool),
-            IERC20(_token),
+            IERC20(baseToken),
+            IERC20(quoteToken),
             _value,
+            uint64(block.timestamp),
             _isShort,
             _leverage,
+            _breakEvenLimit,
             _limitPrice,
-            _stopLossPrice,
-            PositionStatus.OPEN
+            _stopLossPrice
         );
-        return _posId;
-    }
 
-    function closePosition(uint256 _posId, address _trader) external {
-        // TODO : check access control
-        // TODO : apply rewards
-
-        if(positions[_posId].status != PositionStatus.OPEN) {
-            revert PositionNotOpen();
-        }
-
-        safeBurn(_posId);
-        positions[_posId].status = PositionStatus.CLOSED;
-    }
-
-    function getTraderPositions(
-        address _traderAdd
-    ) external view returns (uint256[] memory) {
-        uint256[] memory _traderPositions = new uint256[](balanceOf(_traderAdd));
-        uint256 _posId = 0;
-
-        for (uint256 i = 0; i < posId; ) {
-            if (ownerOf(i) == _traderAdd) {
-                _traderPositions[_posId] = i;
-
-                unchecked {
-                    ++_posId;
-                }
+        // fees computation
+        uint256 openingFees = (_value * BORROW_FEE_OPENING) / 10000;
+        // TODO uint256 hourlyFees = $$$;
+        // do the trade on Uniswap
+        if (_isShort) {
+            if (_leverage != 1) {
+                // TODO : borrow, take fees, send reward to LP, do the trade
+            } else {
+                // TODO : do the trade
             }
-
-            unchecked {
-                ++i;
+            if (_limitPrice != 0) {
+                // TODO : do the limit order
+            }
+        } else {
+            if (_leverage != 1) {
+                // TODO : borrow, take fees, send reward to LP, do the trade
+            } else {
+                // TODO : do the trade
+            }
+            if (_limitPrice != 0) {
+                // TODO : do the limit order
             }
         }
 
-        return _traderPositions;
+        return safeMint(_trader);
     }
 
-    function editPosition(
-        uint256 _posId,
-        uint256 _newLimitPrice,
-        uint256 _newLstopLossPrice
-    ) external {
-        // TODO : check access control
+    function checkPositionParams(
+        address _v3Pool,
+        address _token,
+        bool _isShort,
+        uint8 _leverage,
+        uint256 _value,
+        uint256 _limitPrice,
+        uint256 _stopLossPrice
+    ) private view returns (uint256, address, address) {
+        address baseToken = _token;
 
-        if(positions[_posId].status != PositionStatus.OPEN) {
-            revert PositionNotOpen();
+        if (
+            IUniswapV3Pool(_v3Pool).factory() != liquidityPoolFactoryUniswapV3
+        ) {
+            revert Positions__POOL_NOT_OFFICIAL(_v3Pool);
         }
-
-        positions[_posId].limitPrice = _newLimitPrice;
-        positions[_posId].stopLossPrice = _newLstopLossPrice;
-    }
-
-    // --------------- Liquidator Zone ---------------
-
-    function liquidatePosition(uint256 _posId) external {
-        // TODO : check if liquidable
-        // TODO : send liquidation reward
-
-        if(positions[_posId].status != PositionStatus.OPEN) {
-            revert PositionNotOpen();
+        // check token
+        if (
+            IUniswapV3Pool(_v3Pool).token0() != baseToken &&
+            IUniswapV3Pool(_v3Pool).token1() != baseToken
+        ) {
+            revert Positions__TOKEN_NOT_SUPPORTED(baseToken);
         }
+        address quoteToken = (baseToken == IUniswapV3Pool(_v3Pool).token0())
+            ? IUniswapV3Pool(_v3Pool).token1()
+            : IUniswapV3Pool(_v3Pool).token0();
 
-        safeBurn(_posId);
-        positions[_posId].status = PositionStatus.LIQUIDATED;
-    }
+        uint256 price = PriceFeedL1(priceFeed).getLatestPrice(
+            baseToken,
+            quoteToken
+        );
 
-    function isLiquidable(uint256 _posId) public view returns (bool) {
-        // TODO
-        return positions[_posId].status == PositionStatus.OPEN && false;
-    }
-
-    function getLiquidablePositions() external view returns (uint256[] memory) {
-        uint256[] memory _liquidablePositions = new uint256[](posId);
-        uint256 _posId = 0;
-        for(uint256 i = 0; i < posId; ) {
-            if(isLiquidable(i)) {
-                _liquidablePositions[_posId] = i;
-
-                unchecked {
-                    ++_posId;
-                }
-            }
-
-            unchecked {
-                ++i;
+        // check leverage
+        if (_leverage < 1 || _leverage > MAX_LEVERAGE) {
+            revert Positions__LEVERAGE_NOT_IN_RANGE(_leverage);
+        }
+        // when margin position check if token is supported by a LiquidityPool
+        if (_leverage != 1 || _isShort) {
+            if (
+                LiquidityPoolFactory(liquidityPoolFactory)
+                    .getTokenToLiquidityPools(quoteToken) == address(0)
+            ) {
+                revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(quoteToken);
             }
         }
-        
-        assembly { 
-            mstore(_liquidablePositions, sub(mload(_liquidablePositions), sub(sload(posId.slot), _posId))) 
-        }
 
-        return _liquidablePositions;
+        // check value
+        if (_value < MIN_POSITION_VALUE_IN_USD) {
+            revert Positions__VALUE_TO_SMALL(_value);
+        }
+        if (_isShort) {
+            if (_limitPrice > price) {
+                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
+                    _limitPrice,
+                    _value
+                );
+            }
+            if (_stopLossPrice < price) {
+                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(
+                    _stopLossPrice,
+                    _value
+                );
+            }
+        } else {
+            if (_limitPrice < price) {
+                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
+                    _limitPrice,
+                    _value
+                );
+            }
+            if (_stopLossPrice > price) {
+                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(
+                    _stopLossPrice,
+                    _value
+                );
+            }
+        }
+        return (price, baseToken, quoteToken);
     }
+
+    // function closePosition(
+    //     address _trader,
+    //     uint256 _posId
+    // ) external onlyOwner isPositionOwned(_trader, _posId) {
+    //     // TODO : check access control
+    //     // TODO : apply rewards
+
+    //     safeBurn(_posId);
+    //     delete openPositions[_posId];
+    // }
+
+    // function getTraderPositions(
+    //     address _traderAdd
+    // ) external view returns (uint256[] memory) {
+    //     uint256[] memory _traderPositions = new uint256[](
+    //         balanceOf(_traderAdd)
+    //     );
+    //     uint256 _posId = 0;
+
+    //     for (uint256 i = 0; i < posId; ) {
+    //         if (ownerOf(i) == _traderAdd) {
+    //             _traderPositions[_posId] = i;
+
+    //             unchecked {
+    //                 ++_posId;
+    //             }
+    //         }
+
+    //         unchecked {
+    //             ++i;
+    //         }
+    //     }
+
+    //     return _traderPositions;
+    // }
+
+    // function editPosition(
+    //     address _trader,
+    //     uint256 _posId,
+    //     uint256 _newLimitPrice,
+    //     uint256 _newLstopLossPrice
+    // ) external onlyOwner {
+    //     // TODO : check access control
+
+    //     openPositions[_posId].limitPrice = _newLimitPrice;
+    //     openPositions[_posId].stopLossPrice = _newLstopLossPrice;
+    // }
+
+    // // --------------- Liquidator Zone ---------------
+
+    // function liquidatePosition(uint256 _posId) external {
+    //     // TODO : check if liquidable
+    //     // TODO : send liquidation reward
+
+    //     safeBurn(_posId);
+    //     delete openPositions[_posId];
+    // }
+
+    // function isLiquidable(uint256 _posId) public view returns (bool) {
+    //     // TODO
+    // }
+
+    // function getLiquidablePositions() external view returns (uint256[] memory) {
+    //     uint256[] memory _liquidablePositions = new uint256[](posId);
+    //     uint256 _posId = 0;
+    //     for (uint256 i = 0; i < posId; ) {
+    //         if (isLiquidable(i)) {
+    //             _liquidablePositions[_posId] = i;
+
+    //             unchecked {
+    //                 ++_posId;
+    //             }
+    //         }
+
+    //         unchecked {
+    //             ++i;
+    //         }
+    //     }
+
+    //     assembly {
+    //         mstore(
+    //             _liquidablePositions,
+    //             sub(mload(_liquidablePositions), sub(sload(posId.slot), _posId))
+    //         )
+    //     }
+
+    //     return _liquidablePositions;
+    // }
 }
