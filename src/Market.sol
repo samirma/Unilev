@@ -58,7 +58,7 @@ contract Market is IMarket {
         uint256 _newLimitPrice,
         uint256 _newLstopLossPrice
     ) external {
-        positions.editPosition(_posId, _newLimitPrice, _newLstopLossPrice);
+        positions.editPosition(_posId, _newLimitPrice, _newLstopLossPrice, msg.sender);
         emit PositionEdited(
             _posId,
             msg.sender,

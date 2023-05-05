@@ -31,35 +31,10 @@ contract Positions is ERC721, Ownable {
     uint256 public posId;
     mapping(uint256 => PositionParams) public positions;
 
-    // Events
-
-    event PositionOpened(
-        uint256 indexed posId,
-        address indexed trader,
-        address indexed v3Pool,
-        address token,
-        uint256 value,
-        bool isShort,
-        uint8 leverage,
-        uint256 limitPrice,
-        uint256 stopLossPrice
-    );
-    event PositionClosed(uint256 indexed posId, address indexed trader);
-    event PositionEdited(
-        uint256 indexed posId,
-        address indexed trader,
-        uint256 newLimitPrice,
-        uint256 newStopLossPrice
-    );
-    event PositionLiquidated(
-        uint256 indexed posId,
-        address indexed trader,
-        uint256 liquidationPrice
-    );
-
     // Errors
 
-    error PositionNotOpen();
+    error PositionNotOpen(uint256 position);
+    error NotOwnerOfPosition(uint256 position);
 
     constructor(address _market) ERC721("Uniswap-MAX", "UNIMAX") {
         transferOwnership(_market);
@@ -89,7 +64,7 @@ contract Positions is ERC721, Ownable {
         uint256 _value,
         uint256 _limitPrice,
         uint256 _stopLossPrice
-    ) external returns (uint256) {
+    ) external onlyOwner returns (uint256) {
         // TODO : check parameters
 
         uint256 _posId = safeMint(_trader);
@@ -106,16 +81,20 @@ contract Positions is ERC721, Ownable {
         return _posId;
     }
 
-    function closePosition(uint256 _posId, address _trader) external {
-        // TODO : check access control
+    function closePosition(uint256 _posId, address _trader) external onlyOwner {
         // TODO : apply rewards
 
-        if(positions[_posId].status != PositionStatus.OPEN) {
-            revert PositionNotOpen();
+        if(ownerOf(_posId) != _trader) {
+            revert NotOwnerOfPosition(_posId);
         }
 
-        safeBurn(_posId);
+        if(positions[_posId].status != PositionStatus.OPEN) {
+            revert PositionNotOpen(_posId);
+        }
+
         positions[_posId].status = PositionStatus.CLOSED;
+
+        safeBurn(_posId);
     }
 
     function getTraderPositions(
@@ -144,12 +123,15 @@ contract Positions is ERC721, Ownable {
     function editPosition(
         uint256 _posId,
         uint256 _newLimitPrice,
-        uint256 _newLstopLossPrice
-    ) external {
-        // TODO : check access control
+        uint256 _newLstopLossPrice,
+        address _trader
+    ) external onlyOwner {
+        if(ownerOf(_posId) != _trader) {
+            revert NotOwnerOfPosition(_posId);
+        }
 
         if(positions[_posId].status != PositionStatus.OPEN) {
-            revert PositionNotOpen();
+            revert PositionNotOpen(_posId);
         }
 
         positions[_posId].limitPrice = _newLimitPrice;
@@ -158,16 +140,17 @@ contract Positions is ERC721, Ownable {
 
     // --------------- Liquidator Zone ---------------
 
-    function liquidatePosition(uint256 _posId) external {
+    function liquidatePosition(uint256 _posId) external onlyOwner {
         // TODO : check if liquidable
         // TODO : send liquidation reward
 
         if(positions[_posId].status != PositionStatus.OPEN) {
-            revert PositionNotOpen();
+            revert PositionNotOpen(_posId);
         }
 
-        safeBurn(_posId);
         positions[_posId].status = PositionStatus.LIQUIDATED;
+
+        safeBurn(_posId);
     }
 
     function isLiquidable(uint256 _posId) public view returns (bool) {
