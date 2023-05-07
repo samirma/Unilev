@@ -4,31 +4,42 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@uniswapV3/contracts/interfaces/IUniswapV3Pool.sol";
 
 import "./PriceFeedL1.sol";
 import "./LiquidityPoolFactory.sol";
 
-contract Positions is ERC721, Ownable {
+contract Positions is ERC721, Ownable, ReentrancyGuard {
     // Structs and Enums
+    enum positionState {
+        OPEN,
+        CLOSED_WITH_LIMIT_ORDER,
+        CLOSED_WITH_STOP_LOSS,
+        CLOSED_BY_LIQUIDATOR
+    }
+
     struct PositionParams {
         IUniswapV3Pool v3Pool; // pool to trade
         IERC20 baseToken; // token to trade => should be token0 or token1 of v3Pool
         IERC20 quoteToken; // token to trade => should be the other token of v3Pool
-        uint256 value; // amount of token to trade
+        uint256 amount; // amount of token to trade
+        uint256 initialPrice; // price of the token when the position was opened
         uint64 timestamp; // timestamp of position creation
         bool isShort; // true if short, false if long
         uint8 leverage; // leverage of position => 0 if no leverage
-        uint256 breakEvenLimit; //  => 0 if no leverage or short
+        uint256 totalBorrow; // Total borrow in baseToken if long or quoteToken if short
+        uint256 hourlyFees; // fees to pay every hour on the borrowed amount => 0 if no leverage
+        uint256 breakEvenLimit; // After this limit the posiiton is undercollateralize => 0 if no leverage or short
         uint256 limitPrice; // limit order price => 0 if no limit order
         uint256 stopLossPrice; // stop loss price => 0 if no stop loss
     }
 
     // Variables
     uint256 public constant LIQUIDATION_THRESHOLD = 1000; // 10% of margin
-    uint256 public constant MIN_POSITION_VALUE_IN_USD = 100; // To avoid DOS attack
+    uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 100; // To avoid DOS attack
     uint256 public constant MAX_LEVERAGE = 5;
-    uint256 public constant BORROW_FEE_OPENING = 20; // 0.2% when opening a position
+    uint256 public constant BORROW_FEE = 20; // 0.2% when opening a position
     uint256 public constant BORROW_FEE_EVERY_HOURS = 1; // 0.01% : assets borrowed/total assets in pool * 0.01%
 
     LiquidityPoolFactory public immutable liquidityPoolFactory;
@@ -44,15 +55,16 @@ contract Positions is ERC721, Ownable {
     error Positions__POOL_NOT_OFFICIAL(address _v3Pool);
     error Positions__TOKEN_NOT_SUPPORTED(address _token);
     error Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(address _token);
+    error Positions__NO_PRICE_FEED(address _token0, address _token1);
     error Positions__LEVERAGE_NOT_IN_RANGE(uint8 _leverage);
-    error Positions__VALUE_TO_SMALL(uint256 _value);
+    error Positions__amount_TO_SMALL(uint256 _amount);
     error Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
         uint256 _limitPrice,
-        uint256 _value
+        uint256 _amount
     );
     error Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(
         uint256 _stopLossPrice,
-        uint256 _value
+        uint256 _amount
     );
 
     constructor(
@@ -101,10 +113,14 @@ contract Positions is ERC721, Ownable {
         address _token,
         bool _isShort,
         uint8 _leverage,
-        uint256 _value,
+        uint256 _amount,
         uint256 _limitPrice,
         uint256 _stopLossPrice
-    ) external onlyOwner returns (uint256) {
+    ) external onlyOwner /* nonReentrant */ returns (uint256) {
+        // transfer funds to the contract (trader need to approve first)
+        IERC20(_token).transferFrom(_trader, address(this), _amount);
+
+        // Check params
         (
             uint256 price,
             address baseToken,
@@ -114,40 +130,44 @@ contract Positions is ERC721, Ownable {
                 _token,
                 _isShort,
                 _leverage,
-                _value,
+                _amount,
                 _limitPrice,
                 _stopLossPrice
             );
 
-        uint256 _breakEvenLimit;
-
         // Compute parameters
-        if (_leverage != 1) {
-            if (_isShort) {
-                _breakEvenLimit = price * _leverage;
-            } else {
-                _breakEvenLimit = price / _leverage;
-            }
+        uint256 _breakEvenLimit;
+        uint256 _totalBorrow;
+        uint256 hourlyFees;
+
+        if (_isShort) {
+            _breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
+            _totalBorrow = _amount * (_leverage - 1); // Borrow quoteTokene
         } else {
-            _breakEvenLimit = 0;
+            _totalBorrow = _amount * (_leverage - 1) * price; // Borrow baseToken
+            _breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
         }
 
-        openPositions[posId + 1] = PositionParams(
-            IUniswapV3Pool(_v3Pool),
-            IERC20(baseToken),
-            IERC20(quoteToken),
-            _value,
-            uint64(block.timestamp),
-            _isShort,
-            _leverage,
-            _breakEvenLimit,
-            _limitPrice,
-            _stopLossPrice
-        );
+        if (_isShort || _leverage != 1) {
+            _totalBorrow += (_totalBorrow * BORROW_FEE) / 10000;
 
-        // fees computation
-        uint256 openingFees = (_value * BORROW_FEE_OPENING) / 10000;
-        // TODO uint256 hourlyFees = $$$;
+            address cacheLiquidityPoolToUse = LiquidityPoolFactory(
+                liquidityPoolFactory
+            ).getTokenToLiquidityPools(_isShort ? quoteToken : baseToken);
+
+            // fees computation
+            hourlyFees =
+                ((_totalBorrow /
+                    LiquidityPool(cacheLiquidityPoolToUse).rawTotalAsset()) *
+                    BORROW_FEE_EVERY_HOURS) /
+                10000;
+
+            // Borrow funds from the pool
+            LiquidityPool(cacheLiquidityPoolToUse).borrow(_totalBorrow);
+        } else {
+            hourlyFees = 0;
+        }
+
         // do the trade on Uniswap
         if (_isShort) {
             if (_leverage != 1) {
@@ -169,6 +189,22 @@ contract Positions is ERC721, Ownable {
             }
         }
 
+        openPositions[posId + 1] = PositionParams(
+            IUniswapV3Pool(_v3Pool),
+            IERC20(baseToken),
+            IERC20(quoteToken),
+            _amount,
+            price,
+            uint64(block.timestamp),
+            _isShort,
+            _leverage,
+            _totalBorrow,
+            hourlyFees,
+            _breakEvenLimit,
+            _limitPrice,
+            _stopLossPrice
+        );
+
         return safeMint(_trader);
     }
 
@@ -177,7 +213,7 @@ contract Positions is ERC721, Ownable {
         address _token,
         bool _isShort,
         uint8 _leverage,
-        uint256 _value,
+        uint256 _amount,
         uint256 _limitPrice,
         uint256 _stopLossPrice
     ) private view returns (uint256, address, address) {
@@ -199,6 +235,11 @@ contract Positions is ERC721, Ownable {
             ? IUniswapV3Pool(_v3Pool).token1()
             : IUniswapV3Pool(_v3Pool).token0();
 
+        // check if pair is supported by PriceFeed
+        if (!PriceFeedL1(priceFeed).isPairSupported(baseToken, quoteToken)) {
+            revert Positions__NO_PRICE_FEED(baseToken, quoteToken);
+        }
+
         uint256 price = PriceFeedL1(priceFeed).getLatestPrice(
             baseToken,
             quoteToken
@@ -209,59 +250,84 @@ contract Positions is ERC721, Ownable {
             revert Positions__LEVERAGE_NOT_IN_RANGE(_leverage);
         }
         // when margin position check if token is supported by a LiquidityPool
-        if (_leverage != 1 || _isShort) {
+        if (_leverage != 1) {
             if (
+                _isShort &&
                 LiquidityPoolFactory(liquidityPoolFactory)
-                    .getTokenToLiquidityPools(quoteToken) == address(0)
+                    .getTokenToLiquidityPools(baseToken) ==
+                address(0)
+            ) {
+                revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(quoteToken);
+            }
+            if (
+                !_isShort &&
+                LiquidityPoolFactory(liquidityPoolFactory)
+                    .getTokenToLiquidityPools(quoteToken) ==
+                address(0)
             ) {
                 revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(quoteToken);
             }
         }
 
-        // check value
-        if (_value < MIN_POSITION_VALUE_IN_USD) {
-            revert Positions__VALUE_TO_SMALL(_value);
+        // check amount
+        if (_amount < MIN_POSITION_AMOUNT_IN_USD) {
+            revert Positions__amount_TO_SMALL(_amount);
         }
         if (_isShort) {
             if (_limitPrice > price) {
                 revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
                     _limitPrice,
-                    _value
+                    _amount
                 );
             }
             if (_stopLossPrice < price) {
                 revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(
                     _stopLossPrice,
-                    _value
+                    _amount
                 );
             }
         } else {
             if (_limitPrice < price) {
                 revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
                     _limitPrice,
-                    _value
+                    _amount
                 );
             }
             if (_stopLossPrice > price) {
                 revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(
                     _stopLossPrice,
-                    _value
+                    _amount
                 );
             }
         }
         return (price, baseToken, quoteToken);
     }
 
-    // function closePosition(
-    //     address _trader,
-    //     uint256 _posId
-    // ) external onlyOwner isPositionOwned(_trader, _posId) {
-    //     // TODO : check access control
-    //     // TODO : apply rewards
+    function closePosition(
+        address _trader,
+        uint256 _posId
+    ) external onlyOwner isPositionOwned(_trader, _posId) {
+        PositionParams memory posParms = openPositions[_posId];
 
-    //     safeBurn(_posId);
-    //     delete openPositions[_posId];
-    // }
+        // check the position state
+
+        uint256 borrowFees = (posParms.totalBorrow * BORROW_FEE) / 10000;
+
+        // Close position
+        if (posParms.limitPrice != 0) {
+            // TODO : close the limit order
+        }
+        if (posParms.isShort || posParms.leverage != 1) {
+            // TODO : close the position
+        } else {
+            IERC20(posParms.baseToken).transfer(_trader, posParms.amount);
+        }
+
+        // refund LiquidityPool + Fees
+
+        safeBurn(_posId);
+        delete openPositions[_posId];
+    }
 
     // function getTraderPositions(
     //     address _traderAdd

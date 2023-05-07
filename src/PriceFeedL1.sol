@@ -80,6 +80,7 @@ contract PriceFeedL1 is Ownable {
         if (address(tokenToPriceFeed[_token1]) == address(0)) {
             return false;
         }
+        return true;
     }
 
     // Events

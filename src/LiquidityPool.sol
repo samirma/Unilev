@@ -33,34 +33,34 @@ contract LiquidityPool is ERC4626, Ownable {
     /**
      * @notice Borrow funds from the pool to open a leveraged position
      * @dev Only the owner (the Positions contract) can borrow funds
-     * @param _valueToBorrow value to borrow
+     * @param _amountToBorrow amount to borrow
      */
-    function borrow(uint256 _valueToBorrow) external onlyOwner {
+    function borrow(uint256 _amountToBorrow) external onlyOwner {
         uint256 borrowCapacity = borrowCapacityLeft();
-        if (_valueToBorrow > borrowCapacity)
+        if (_amountToBorrow > borrowCapacity)
             revert LiquidityPool__NOT_ENOUGH_LIQUIDITY(borrowCapacity);
-        borrowedFunds += _valueToBorrow;
-        asset.safeTransfer(msg.sender, _valueToBorrow);
+        borrowedFunds += _amountToBorrow;
+        asset.safeTransfer(msg.sender, _amountToBorrow);
     }
 
     /**
      * @notice Refund funds from the pool once the position is closed
      * @dev Positions contract will need to approve the LiquidityPool to transfer funds
-     * @param _valueBorrowed value that was borrowed
+     * @param _amountBorrowed amount that was borrowed
      * @param _interests interest to earned with fees
      * @param _losses losses when a postion was not liquidated in time
      */
     function refund(
-        uint256 _valueBorrowed,
+        uint256 _amountBorrowed,
         uint256 _interests,
         uint256 _losses
     ) external onlyOwner {
         // Losses are taken by the pool
-        borrowedFunds -= (_valueBorrowed - _losses);
+        borrowedFunds -= (_amountBorrowed - _losses);
         asset.safeTransferFrom(
             msg.sender,
             address(this),
-            _valueBorrowed + _interests - _losses
+            _amountBorrowed + _interests - _losses
         );
     }
 
@@ -68,6 +68,10 @@ contract LiquidityPool is ERC4626, Ownable {
 
     function totalAssets() public view override returns (uint256) {
         return asset.balanceOf(address(this)) + borrowedFunds;
+    }
+
+    function rawTotalAsset() public view returns (uint256) {
+        return asset.balanceOf(address(this));
     }
 
     function getBorrowedFund() external view returns (uint256) {

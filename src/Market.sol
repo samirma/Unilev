@@ -1,18 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+
 import "./interfaces/IMarket.sol";
 import "./Positions.sol";
 import "./LiquidityPool.sol";
 import "./LiquidityPoolFactory.sol";
 
-contract Market is IMarket {
+// TODO deal with pause
+contract Market is IMarket, Ownable, Pausable {
     Positions private positions;
     LiquidityPoolFactory private liquidityPoolFactory;
 
-    constructor(address _positions, address _liquidityPoolFactory) {
+    constructor(
+        address _positions,
+        address _liquidityPoolFactory,
+        address _owner
+    ) {
         positions = Positions(_positions);
         liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
+        transferOwnership(_owner);
     }
 
     // --------------- Trader Zone ---------------
@@ -21,7 +30,7 @@ contract Market is IMarket {
         address _token,
         bool _isShort,
         uint8 _leverage,
-        uint256 _value,
+        uint256 _amount,
         uint256 _limitPrice,
         uint256 _stopLossPrice
     ) external {
@@ -31,7 +40,7 @@ contract Market is IMarket {
             _token,
             _isShort,
             _leverage,
-            _value,
+            _amount,
             _limitPrice,
             _stopLossPrice
         );
@@ -40,7 +49,7 @@ contract Market is IMarket {
             msg.sender,
             _v3Pool,
             _token,
-            _value,
+            _amount,
             _isShort,
             _leverage,
             _limitPrice,
