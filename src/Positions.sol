@@ -6,21 +6,13 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@solmate/tokens/ERC20.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@uniswapV3/contracts/interfaces/IUniswapV3Pool.sol";
 
 import "./PriceFeedL1.sol";
 import "./LiquidityPoolFactory.sol";
 
-contract Positions is ERC721, Ownable, ReentrancyGuard {
-    // Structs and Enums
-    enum PositionState {
-        OPEN,
-        CLOSED_WITH_LIMIT_ORDER,
-        CLOSED_WITH_STOP_LOSS,
-        CLOSED_BY_LIQUIDATOR
-    }
-
+contract Positions is ERC721, Ownable {
+    // Structs
     struct PositionParams {
         IUniswapV3Pool v3Pool; // pool to trade
         ERC20 baseToken; // token to trade => should be token0 or token1 of v3Pool
@@ -35,7 +27,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 breakEvenLimit; // After this limit the posiiton is undercollateralize => 0 if no leverage or short
         uint256 limitPrice; // limit order price => 0 if no limit order
         uint256 stopLossPrice; // stop loss price => 0 if no stop loss
-        PositionState state; // state of the position
     }
 
     // Variables
@@ -62,7 +53,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     error Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(address _token);
     error Positions__NO_PRICE_FEED(address _token0, address _token1);
     error Positions__LEVERAGE_NOT_IN_RANGE(uint8 _leverage);
-    error Positions__amount_TO_SMALL(uint256 _amount);
+    error Positions__AMOUNT_TO_SMALL(uint256 _amount);
     error Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
         uint256 _limitPrice,
         uint256 _amount
@@ -85,7 +76,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     }
 
     modifier isPositionOpen(uint256 _posId) {
-        if (ownerOf(_posId) == address(0)) {
+        if (_exists(_posId)) {
             revert Positions__POSITION_NOT_OPEN(_posId);
         }
         _;
@@ -111,11 +102,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         _burn(_posId);
     }
 
-    function tokenURI(uint256 _tokenId) public view virtual override returns (string memory) {
-        if(_tokenId >= posId) {
-            revert Positions__POSITION_NOT_OPEN(_tokenId);
-        }
-
+    function tokenURI(uint256 _tokenId) public view virtual override isPositionOpen(_tokenId) returns (string memory) {
         string memory json = Base64.encode(
             bytes(
             string.concat(tokenURIIntro(_tokenId),
@@ -147,10 +134,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             string.concat(
                 '"}, { "trait_type": "Limit Price", "value": "', Strings.toString(_position.limitPrice),
                 '"}, { "trait_type": "Stop Loss Price", "value": "', Strings.toString(_position.stopLossPrice),
-                '"}, { "trait_type": "Status", "value": "', _position.state == PositionState.OPEN ? "Open" : 
-                    _position.state == PositionState.CLOSED_WITH_LIMIT_ORDER 
-                    || _position.state == PositionState.CLOSED_WITH_STOP_LOSS ? "Closed" 
-                    : "Liquidated",
                 '"}]}'
             )
         ];
@@ -174,7 +157,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 _amount,
         uint256 _limitPrice,
         uint256 _stopLossPrice
-    ) external onlyOwner /* nonReentrant */ returns (uint256) {
+    ) external onlyOwner returns (uint256) {
         // transfer funds to the contract (trader need to approve first)
         ERC20(_token).transferFrom(_trader, address(this), _amount);
 
@@ -260,8 +243,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             hourlyFees,
             _breakEvenLimit,
             _limitPrice,
-            _stopLossPrice,
-            PositionState.OPEN
+            _stopLossPrice
         );
 
         return safeMint(_trader);
@@ -418,16 +400,15 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 _posId,
         uint256 _newLimitPrice,
         uint256 _newLstopLossPrice
-    ) external onlyOwner {
-        // TODO : check access control
-
+    ) external onlyOwner isPositionOwned(_trader, _posId) {
+        // TODO : check params
         openPositions[_posId].limitPrice = _newLimitPrice;
         openPositions[_posId].stopLossPrice = _newLstopLossPrice;
     }
 
     // --------------- Liquidator Zone ---------------
 
-    function liquidatePosition(uint256 _posId) external {
+    function liquidatePosition(uint256 _posId) external onlyOwner isPositionOpen(_posId) {
         // TODO : check if liquidable
         // TODO : send liquidation reward
 
