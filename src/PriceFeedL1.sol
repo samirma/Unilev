@@ -40,7 +40,7 @@ contract PriceFeedL1 is Ownable {
     function getLatestPrice(
         address _token0,
         address _token1
-    ) public view returns (int256) {
+    ) public view returns (uint256) {
         if (address(tokenToPriceFeed[_token0]) == address(0)) {
             revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token0);
         }
@@ -66,13 +66,21 @@ contract PriceFeedL1 is Ownable {
             /*uint80 answeredInRound*/
         ) = AggregatorV3Interface(tokenToPriceFeed[_token1]).latestRoundData();
         return
-            int256(
-                (
-                    ((uint256(priceToken0) *
-                        uint256(ERC20(_token1).decimals())) /
-                        uint256(priceToken1))
-                )
-            );
+            (uint256(priceToken0) * uint256(ERC20(_token1).decimals())) /
+            uint256(priceToken1);
+    }
+
+    function isPairSupported(
+        address _token0,
+        address _token1
+    ) public view returns (bool) {
+        if (address(tokenToPriceFeed[_token0]) == address(0)) {
+            return false;
+        }
+        if (address(tokenToPriceFeed[_token1]) == address(0)) {
+            return false;
+        }
+        return true;
     }
 
     // Events

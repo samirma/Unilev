@@ -17,7 +17,7 @@ interface IMarket {
         address _token,
         bool _isShort,
         uint8 _leverage,
-        uint256 _value,
+        uint256 _amount,
         uint256 _limitPrice,
         uint256 _stopLossPrice
     ) external;
@@ -35,9 +35,9 @@ interface IMarket {
     ) external view returns (uint256[] memory);
 
     // --------------- Liquidity Provider Zone ---------------
-    function addLiquidity(address _poolAdd, uint256 _value) external;
+    function addLiquidity(address _poolAdd, uint256 _amount) external;
 
-    function removeLiquidity(address _poolAdd, uint256 _value) external;
+    function removeLiquidity(address _poolAdd, uint256 _amount) external;
 
     // --------------- Liquidator/Keeper Zone ---------------
 
@@ -54,7 +54,7 @@ interface IMarket {
         address indexed trader,
         address indexed v3Pool,
         address token,
-        uint256 value,
+        uint256 amount,
         bool isShort,
         uint8 leverage,
         uint256 limitPrice,
