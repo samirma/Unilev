@@ -456,10 +456,11 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             }
         }
 
-        assembly {
+        assembly ("memory-safe") {
+            let tosub := sub(sload(posId.slot), _posId)
             mstore(
                 _liquidablePositions,
-                sub(mload(_liquidablePositions), sub(sload(posId.slot), _posId))
+                sub(mload(_liquidablePositions), tosub)
             )
         }
 
