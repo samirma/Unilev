@@ -17,8 +17,8 @@ interface IMarket {
         address _token,
         bool _isShort,
         uint8 _leverage,
-        uint256 _amount,
-        uint256 _limitPrice,
+        uint128 _amount,
+        uint160 _limitPrice,
         uint256 _stopLossPrice
     ) external;
 
@@ -26,7 +26,7 @@ interface IMarket {
 
     function editPosition(
         uint256 _posId,
-        uint256 _newLimitPrice,
+        uint160 _newLimitPrice,
         uint256 _newLstopLossPrice
     ) external;
 

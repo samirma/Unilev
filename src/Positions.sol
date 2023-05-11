@@ -7,7 +7,7 @@ import "@solmate/tokens/ERC20.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@uniswapV3/contracts/interfaces/IUniswapV3Pool.sol";
-
+import "@uniswapV3/contracts/libraries/TickMath.sol";
 import "./PriceFeedL1.sol";
 import "./LiquidityPoolFactory.sol";
 
@@ -17,16 +17,18 @@ contract Positions is ERC721, Ownable {
         IUniswapV3Pool v3Pool; // pool to trade
         ERC20 baseToken; // token to trade => should be token0 or token1 of v3Pool
         ERC20 quoteToken; // token to trade => should be the other token of v3Pool
-        uint256 amount; // amount of token to trade
+        uint128 amount; // amount of token to trade
         uint256 initialPrice; // price of the token when the position was opened
         uint64 timestamp; // timestamp of position creation
         bool isShort; // true if short, false if long
         uint8 leverage; // leverage of position => 0 if no leverage
         uint256 totalBorrow; // Total borrow in baseToken if long or quoteToken if short
         uint256 hourlyFees; // fees to pay every hour on the borrowed amount => 0 if no leverage
-        uint256 breakEvenLimit; // After this limit the posiiton is undercollateralize => 0 if no leverage or short
-        uint256 limitPrice; // limit order price => 0 if no limit order
+        uint256 breakEvenLimit; // After this limit the position is undercollateralize => 0 if no leverage or short
+        uint160 limitPrice; // limit order price => 0 if no limit order
         uint256 stopLossPrice; // stop loss price => 0 if no stop loss
+        int24 tickLower; // tick lower of the range => 0 if no range
+        int24 tickUpper; // tick upper of the range => 0 if no range
     }
 
     // Variables
@@ -62,6 +64,7 @@ contract Positions is ERC721, Ownable {
         uint256 _stopLossPrice,
         uint256 _amount
     );
+    error Positions__NOT_LIQUIDABLE(uint256 _posId);
 
     constructor(
         address _market,
@@ -154,8 +157,8 @@ contract Positions is ERC721, Ownable {
         address _token,
         bool _isShort,
         uint8 _leverage,
-        uint256 _amount,
-        uint256 _limitPrice,
+        uint128 _amount,
+        uint160 _limitPrice,
         uint256 _stopLossPrice
     ) external onlyOwner returns (uint256) {
         // transfer funds to the contract (trader need to approve first)
@@ -183,7 +186,7 @@ contract Positions is ERC721, Ownable {
 
         if (_isShort) {
             _breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
-            _totalBorrow = _amount * (_leverage - 1); // Borrow quoteTokene
+            _totalBorrow = _amount * (_leverage - 1); // Borrow quoteToken
         } else {
             _totalBorrow = _amount * (_leverage - 1) * price; // Borrow baseToken
             _breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
@@ -209,6 +212,9 @@ contract Positions is ERC721, Ownable {
             hourlyFees = 0;
         }
 
+        int24 _tickLower = TickMath.getTickAtSqrtRatio(_limitPrice);
+        int24 _tickUpper = _tickLower + 1;      //TODO to refine
+
         // do the trade on Uniswap
         if (_isShort) {
             if (_leverage != 1) {
@@ -218,19 +224,34 @@ contract Positions is ERC721, Ownable {
             }
             if (_limitPrice != 0) {
                 // TODO : do the limit order
+                IUniswapV3Pool(_v3Pool).mint(
+                    address(this),
+                    _tickLower,
+                    _tickUpper,
+                    _amount + uint128(_totalBorrow),
+                    abi.encode()
+                );
             }
         } else {
             if (_leverage != 1) {
                 // TODO : borrow, take fees, send reward to LP, do the trade
             } else {
                 // TODO : do the trade
+               
             }
             if (_limitPrice != 0) {
                 // TODO : do the limit order
+                IUniswapV3Pool(_v3Pool).mint(
+                    address(this),
+                    _tickLower,
+                    _tickUpper,
+                    _amount + uint128(_totalBorrow),
+                    abi.encode()
+                );
             }
         }
 
-        openPositions[posId + 1] = PositionParams(
+        openPositions[posId] = PositionParams(
             IUniswapV3Pool(_v3Pool),
             ERC20(baseToken),
             ERC20(quoteToken),
@@ -243,7 +264,9 @@ contract Positions is ERC721, Ownable {
             hourlyFees,
             _breakEvenLimit,
             _limitPrice,
-            _stopLossPrice
+            _stopLossPrice,
+            _tickLower,
+            _tickUpper
         );
 
         return safeMint(_trader);
@@ -312,7 +335,7 @@ contract Positions is ERC721, Ownable {
 
         // check amount
         if (_amount < MIN_POSITION_AMOUNT_IN_USD) {
-            revert Positions__amount_TO_SMALL(_amount);
+            revert Positions__AMOUNT_TO_SMALL(_amount);
         }
         if (_isShort) {
             if (_limitPrice > price) {
@@ -348,6 +371,13 @@ contract Positions is ERC721, Ownable {
         address _trader,
         uint256 _posId
     ) external onlyOwner isPositionOwned(_trader, _posId) {
+        _closePosition(_trader, _posId);
+    }
+
+    function _closePosition(
+        address _trader,
+        uint256 _posId
+    ) internal {
         PositionParams memory posParms = openPositions[_posId];
 
         // check the position state
@@ -357,6 +387,33 @@ contract Positions is ERC721, Ownable {
         // Close position
         if (posParms.limitPrice != 0) {
             // TODO : close the limit order
+            (uint256 amount0, uint256 amount1) = posParms.v3Pool.burn(
+                posParms.tickLower,
+                posParms.tickUpper,
+                posParms.amount + uint128(posParms.totalBorrow)
+            );
+
+            if (address(posParms.quoteToken) == posParms.v3Pool.token1() && amount0 != 0) {
+                posParms.v3Pool.swap(
+                    address(this),
+                    false,
+                    int256(amount0),
+                    0,  //TODO define slippage here
+                    abi.encode()
+                );
+            }
+
+            if (address(posParms.quoteToken) == posParms.v3Pool.token0() && amount1 != 0) {
+                posParms.v3Pool.swap(
+                    address(this),
+                    true,
+                    int256(amount1),
+                    0,  //TODO define slippage here
+                    abi.encode()
+                );
+            }
+
+            posParms.quoteToken.transfer(_trader, address(posParms.quoteToken) == posParms.v3Pool.token0() ? amount0 : amount1);
         }
         if (posParms.isShort || posParms.leverage != 1) {
             // TODO : close the position
@@ -398,26 +455,94 @@ contract Positions is ERC721, Ownable {
     function editPosition(
         address _trader,
         uint256 _posId,
-        uint256 _newLimitPrice,
+        uint160 _newLimitPrice,
         uint256 _newLstopLossPrice
     ) external onlyOwner isPositionOwned(_trader, _posId) {
-        // TODO : check params
+        PositionParams memory posParms = openPositions[_posId];
+        checkPositionParams(
+            address(posParms.v3Pool), 
+            address(posParms.baseToken), 
+            posParms.isShort,
+            posParms.leverage, 
+            posParms.amount,
+            _newLimitPrice, 
+            _newLstopLossPrice
+        );
         openPositions[_posId].limitPrice = _newLimitPrice;
         openPositions[_posId].stopLossPrice = _newLstopLossPrice;
     }
 
     // --------------- Liquidator Zone ---------------
 
-    function liquidatePosition(uint256 _posId) external onlyOwner isPositionOpen(_posId) {
-        // TODO : check if liquidable
-        // TODO : send liquidation reward
+    function liquidatePosition(address _liquidator, uint256 _posId) external onlyOwner isPositionOpen(_posId) {
+        if (!isLiquidable(_posId)) {
+            revert Positions__NOT_LIQUIDABLE(_posId);
+        }
 
-        safeBurn(_posId);
-        delete openPositions[_posId];
+        _closePosition(ownerOf(_posId), _posId);
+
+        // TODO send reward to liquidator
+        PositionParams memory posParms = openPositions[_posId];
+        uint256 _price = PriceFeedL1(priceFeed).getLatestPrice(
+            address(posParms.baseToken),
+            address(posParms.quoteToken)
+        );
+
+        uint256 _breakEventPrice = (posParms.breakEvenLimit ** 2) / (2 ** 192);
+        
+        uint256 _reward;
+        if (posParms.isShort) {
+            if (_price > _breakEventPrice) {
+                _reward = 0;    // TODO define reward in the case of a loss for the protocol
+            } else {
+                _reward = _breakEventPrice / _price * posParms.amount;
+            }
+        } else {
+            if (_price < _breakEventPrice) {
+                _reward = 0;    // TODO define reward in the case of a loss for the protocol
+            } else {
+                _reward = _breakEventPrice / _price * posParms.amount;
+            }
+        }
+
+        posParms.quoteToken.transfer(_liquidator, _reward);
+
+        if (_reward < posParms.amount) {
+            posParms.quoteToken.transfer(ownerOf(_posId), posParms.amount - _reward);
+        }
     }
 
     function isLiquidable(uint256 _posId) public view returns (bool) {
-        // TODO
+        PositionParams memory posParms = openPositions[_posId];
+        uint256 _price = PriceFeedL1(priceFeed).getLatestPrice(
+            address(posParms.baseToken),
+            address(posParms.quoteToken)
+        );
+
+        // liquidable because of stop loss
+        uint256 _thresholdStopLoss = (posParms.stopLossPrice * LIQUIDATION_THRESHOLD) / 10000;
+        if (posParms.isShort) {
+            if (_price > posParms.stopLossPrice + _thresholdStopLoss) {
+                return true;
+            }
+        } else {
+            if (_price < posParms.stopLossPrice - _thresholdStopLoss) {
+                return true;
+            }
+        }
+
+        // liquidable because of take profit
+        if (posParms.isShort) {
+            if (_price < posParms.limitPrice) {
+                return true;
+            }
+        } else {
+            if (_price > posParms.limitPrice) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     function getLiquidablePositions() external view returns (uint256[] memory) {

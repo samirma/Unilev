@@ -30,8 +30,8 @@ contract Market is IMarket, Ownable, Pausable {
         address _token,
         bool _isShort,
         uint8 _leverage,
-        uint256 _amount,
-        uint256 _limitPrice,
+        uint128 _amount,
+        uint160 _limitPrice,
         uint256 _stopLossPrice
     ) external {
         uint256 posId = positions.openPosition(
@@ -64,7 +64,7 @@ contract Market is IMarket, Ownable, Pausable {
 
     function editPosition(
         uint256 _posId,
-        uint256 _newLimitPrice,
+        uint160 _newLimitPrice,
         uint256 _newLstopLossPrice
     ) external {
         positions.editPosition(
@@ -109,7 +109,7 @@ contract Market is IMarket, Ownable, Pausable {
 
         for (uint256 i; i < len; ++i) {
             // Is that safe ?
-            try positions.liquidatePosition(_posIds[i]) {
+            try positions.liquidatePosition(msg.sender, _posIds[i]) {
                 emit PositionLiquidated(_posIds[i], msg.sender);
             } catch {}
         }
