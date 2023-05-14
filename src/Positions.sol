@@ -186,15 +186,13 @@ contract Positions is ERC721, Ownable {
 
         if (_isShort) {
             _breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
-            _totalBorrow = _amount * (_leverage - 1); // Borrow quoteToken
+            _totalBorrow = _amount * _leverage; // Borrow quoteToken
         } else {
             _totalBorrow = _amount * (_leverage - 1) * price; // Borrow baseToken
             _breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
         }
 
         if (_isShort || _leverage != 1) {
-            _totalBorrow += (_totalBorrow * BORROW_FEE) / 10000;
-
             address cacheLiquidityPoolToUse = LiquidityPoolFactory(
                 liquidityPoolFactory
             ).getTokenToLiquidityPools(_isShort ? quoteToken : baseToken);
@@ -217,11 +215,6 @@ contract Positions is ERC721, Ownable {
 
         // do the trade on Uniswap
         if (_isShort) {
-            if (_leverage != 1) {
-                // TODO : borrow, take fees, send reward to LP, do the trade
-            } else {
-                // TODO : do the trade
-            }
             if (_limitPrice != 0) {
                 // TODO : do the limit order
                 IUniswapV3Pool(_v3Pool).mint(
@@ -233,14 +226,7 @@ contract Positions is ERC721, Ownable {
                 );
             }
         } else {
-            if (_leverage != 1) {
-                // TODO : borrow, take fees, send reward to LP, do the trade
-            } else {
-                // TODO : do the trade
-               
-            }
             if (_limitPrice != 0) {
-                // TODO : do the limit order
                 IUniswapV3Pool(_v3Pool).mint(
                     address(this),
                     _tickLower,
@@ -382,11 +368,9 @@ contract Positions is ERC721, Ownable {
 
         // check the position state
 
-        uint256 borrowFees = (posParms.totalBorrow * BORROW_FEE) / 10000;
 
         // Close position
         if (posParms.limitPrice != 0) {
-            // TODO : close the limit order
             (uint256 amount0, uint256 amount1) = posParms.v3Pool.burn(
                 posParms.tickLower,
                 posParms.tickUpper,
@@ -412,14 +396,24 @@ contract Positions is ERC721, Ownable {
                     abi.encode()
                 );
             }
-
-            posParms.quoteToken.transfer(_trader, address(posParms.quoteToken) == posParms.v3Pool.token0() ? amount0 : amount1);
         }
         if (posParms.isShort || posParms.leverage != 1) {
-            // TODO : close the position
-        } else {
-            posParms.baseToken.transfer(_trader, posParms.amount);
+            // TODO what if there is a loss ?
+
+            // pay back the loan
+                
+            address liquidityPool = LiquidityPoolFactory(liquidityPoolFactory).getTokenToLiquidityPools(
+                address(posParms.isShort ? posParms.baseToken : posParms.quoteToken));
+
+            LiquidityPool(liquidityPool).refund(
+                posParms.totalBorrow, 
+                (block.timestamp - posParms.timestamp) / (60 * 60) * posParms.hourlyFees + (posParms.totalBorrow * BORROW_FEE) / 10000,
+                0 // TODO compute loss
+            );
         }
+
+        // TODO what if there is a loss ?
+        posParms.baseToken.transfer(_trader, posParms.amount);
 
         // refund LiquidityPool + Fees
 
