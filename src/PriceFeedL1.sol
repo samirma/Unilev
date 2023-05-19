@@ -37,15 +37,21 @@ contract PriceFeedL1 is Ownable {
      * @param _token1 token 1 address
      * @return int256 price of token 0 in terms of token 1
      */
-    function getLatestPrice(
+    function getPairLatestPrice(
         address _token0,
         address _token1
     ) public view returns (uint256) {
-        if (address(tokenToPriceFeed[_token0]) == address(0)) {
-            revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token0);
-        }
-        if (address(tokenToPriceFeed[_token1]) == address(0)) {
-            revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token1);
+        return
+            (getTokenLatestPriceInUSD(_token0) *
+                uint256(ERC20(_token1).decimals())) /
+            getTokenLatestPriceInUSD(_token1);
+    }
+
+    function getTokenLatestPriceInUSD(
+        address _token
+    ) public view returns (uint256) {
+        if (address(tokenToPriceFeed[_token]) == address(0)) {
+            revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
         }
 
         // prettier-ignore
@@ -55,19 +61,9 @@ contract PriceFeedL1 is Ownable {
             /*uint startedAt*/,
             /*uint timeStamp*/,
             /*uint80 answeredInRound*/
-        ) = AggregatorV3Interface(tokenToPriceFeed[_token0]).latestRoundData();
+        ) = AggregatorV3Interface(tokenToPriceFeed[_token]).latestRoundData();
 
-        // prettier-ignore
-        (
-            /* uint80 roundID */,
-            int256 priceToken1,
-            /*uint startedAt*/,
-            /*uint timeStamp*/,
-            /*uint80 answeredInRound*/
-        ) = AggregatorV3Interface(tokenToPriceFeed[_token1]).latestRoundData();
-        return
-            (uint256(priceToken0) * uint256(ERC20(_token1).decimals())) /
-            uint256(priceToken1);
+        return uint256(priceToken0);
     }
 
     function isPairSupported(
