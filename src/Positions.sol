@@ -7,8 +7,8 @@ import "@solmate/tokens/ERC20.sol";
 import "@solmate/utils/FixedPointMathLib.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "@uniswapV3/contracts/interfaces/IUniswapV3Pool.sol";
-import "@uniswapV3/contracts/libraries/TickMath.sol";
+import "@uniswapCore/contracts/interfaces/IUniswapV3Pool.sol";
+import "@uniswapCore/contracts/libraries/TickMath.sol";
 import "./PriceFeedL1.sol";
 import "./LiquidityPoolFactory.sol";
 
@@ -20,8 +20,8 @@ contract Positions is ERC721, Ownable {
         IUniswapV3Pool v3Pool; // pool to trade
         ERC20 baseToken; // token to trade => should be token0 or token1 of v3Pool
         ERC20 quoteToken; // token to trade => should be the other token of v3Pool
-        uint128 amount; // amount of token to trade
         uint256 initialPrice; // price of the token when the position was opened
+        uint128 amount; // amount of token to trade
         uint64 timestamp; // timestamp of position creation
         bool isShort; // true if short, false if long
         uint8 leverage; // leverage of position => 0 if no leverage
@@ -219,18 +219,18 @@ contract Positions is ERC721, Ownable {
         ERC20(_token).transferFrom(_trader, address(this), _amount);
 
         // Compute parameters
-        uint256 _breakEvenLimit;
-        uint256 _totalBorrow;
-        uint256 _hourlyFees;
+        uint256 breakEvenLimit;
+        uint256 totalBorrow;
+        uint256 hourlyFees;
 
         if (_isShort) {
-            _breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
-            _totalBorrow =
+            breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
+            totalBorrow =
                 ((_amount * ERC20(quoteToken).decimals()) / price) *
                 _leverage; // Borrow baseToken
         } else {
-            _breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
-            _totalBorrow =
+            breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
+            totalBorrow =
                 (_amount * (_leverage - 1) * price) /
                 (10 ** ERC20(baseToken).decimals()); // Borrow quoteToken
         }
@@ -244,16 +244,16 @@ contract Positions is ERC721, Ownable {
             uint256 decTokenBorrowed = _isShort
                 ? ERC20(baseToken).decimals()
                 : ERC20(quoteToken).decimals();
-            _hourlyFees =
-                (((_totalBorrow * decTokenBorrowed) /
+            hourlyFees =
+                (((totalBorrow * decTokenBorrowed) /
                     LiquidityPool(cacheLiquidityPoolToUse).rawTotalAsset()) *
                     BORROW_FEE_EVERY_HOURS) /
                 10000;
 
             // Borrow funds from the pool
-            LiquidityPool(cacheLiquidityPoolToUse).borrow(_totalBorrow);
+            LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
         } else {
-            _hourlyFees = 0;
+            hourlyFees = 0;
         }
 
         int24 _tickLower = TickMath.getTickAtSqrtRatio(_limitPrice);
@@ -261,11 +261,13 @@ contract Positions is ERC721, Ownable {
 
         // do the trade on Uniswap
         if (_isShort) {
-            uint256 _baseAmountReceived = ERC20(baseToken).balanceOf(address(this));
+            uint256 _baseAmountReceived = ERC20(baseToken).balanceOf(
+                address(this)
+            );
             IUniswapV3Pool(_v3Pool).swap(
                 address(this),
                 !isBaseToken0,
-                int256(_totalBorrow),
+                int256(totalBorrow),
                 0, //TODO define slippage here
                 abi.encode()
             );
@@ -290,7 +292,7 @@ contract Positions is ERC721, Ownable {
                 IUniswapV3Pool(_v3Pool).swap(
                     address(this),
                     isBaseToken0,
-                    int256(_totalBorrow),
+                    int256(totalBorrow),
                     0, //TODO define slippage here
                     abi.encode()
                 );
@@ -313,14 +315,14 @@ contract Positions is ERC721, Ownable {
             IUniswapV3Pool(_v3Pool),
             ERC20(baseToken),
             ERC20(quoteToken),
-            _amount,
             price,
+            _amount,
             uint64(block.timestamp),
             _isShort,
             _leverage,
-            _totalBorrow,
-            _hourlyFees,
-            _breakEvenLimit,
+            totalBorrow,
+            hourlyFees,
+            breakEvenLimit,
             _limitPrice,
             _stopLossPrice,
             _tickLower,
