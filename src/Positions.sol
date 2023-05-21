@@ -260,58 +260,53 @@ contract Positions is ERC721, Ownable {
             hourlyFees = 0;
         }
 
-        int24 _tickUpper = TickMath.getTickAtSqrtRatio(_limitPrice);
-        int24 _tickLower = _tickUpper + 1; //TODO to refine
+        int24 _tickUpper = TickMath.getTickAtSqrtRatio(
+            uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, 1)
+        ); // todo convert price to sqrt ratiow
+        int24 _tickLower = _tickUpper + 1;
 
         // do the trade on Uniswap
+        uint256 tokenIdLiquidity;
+        uint256 amount0;
+        uint256 amount1;
+        uint256 amountOut;
+
         if (_isShort) {
-            uint256 amountOut = uniswapV3Helper.swapExactInputSingle(
-                isBaseToken0 ? quoteToken : baseToken,
-                isBaseToken0 ? baseToken : quoteToken,
+            amountOut = uniswapV3Helper.swapExactInputSingle(
+                baseToken,
+                quoteToken,
                 UniswapV3Pool(_v3Pool).fee(),
                 totalBorrow
             );
 
             if (_limitPrice != 0) {
-                // (
-                //     uint256 tokenId,
-                //     uint128 liquidity,
-                //     uint256 amount0,
-                //     uint256 amount1
-                // ) = uniswapV3Helper.mintPosition(
-                //         _addToken0,
-                //         _addToken1,
-                //         _amount0ToMint,
-                //         _amount1ToMint,
-                //         _tickLower,
-                //         _tickUpper,
-                //         _v3Pool.fee()
-                //     );
+                (tokenIdLiquidity, , amount0, amount1) = uniswapV3Helper
+                    .mintPosition(
+                        UniswapV3Pool(_v3Pool),
+                        isBaseToken0 ? 0 : amountOut,
+                        isBaseToken0 ? amountOut : 0,
+                        _tickLower,
+                        _tickUpper
+                    );
             }
         } else {
             if (_leverage != 0) {
-                uint256 _quoteAmountReceived = ERC20(baseToken).balanceOf(
-                    address(this)
+                amountOut = uniswapV3Helper.swapExactInputSingle(
+                    quoteToken,
+                    baseToken,
+                    UniswapV3Pool(_v3Pool).fee(),
+                    totalBorrow
                 );
-                UniswapV3Pool(_v3Pool).swap(
-                    address(this),
-                    isBaseToken0,
-                    int256(totalBorrow),
-                    0, //TODO define slippage here
-                    abi.encode()
-                );
-                _quoteAmountReceived =
-                    ERC20(baseToken).balanceOf(address(this)) -
-                    _quoteAmountReceived;
             }
             if (_limitPrice != 0) {
-                // UniswapV3Pool(_v3Pool).mint(
-                //     address(this),
-                //     _tickLower,
-                //     _tickUpper,
-                //     _amount + uint128(_totalBorrow),
-                //     abi.encode()
-                // );
+                (tokenIdLiquidity, , amount0, amount1) = uniswapV3Helper
+                    .mintPosition(
+                        UniswapV3Pool(_v3Pool),
+                        isBaseToken0 ? amountOut + _amount : 0,
+                        isBaseToken0 ? 0 : amountOut + _amount,
+                        _tickLower,
+                        _tickUpper
+                    );
             }
         }
 
@@ -329,9 +324,8 @@ contract Positions is ERC721, Ownable {
             breakEvenLimit,
             _limitPrice,
             _stopLossPrice,
-            0
+            tokenIdLiquidity
         );
-
         return safeMint(_trader);
     }
 

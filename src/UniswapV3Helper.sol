@@ -5,18 +5,18 @@ import "@uniswapCore/contracts/libraries/FullMath.sol";
 import "@uniswapPeriphery/contracts/libraries/TransferHelper.sol";
 import "@uniswapPeriphery/contracts/interfaces/INonfungiblePositionManager.sol";
 import "@uniswapPeriphery/contracts/interfaces/ISwapRouter.sol";
+import {UniswapV3Pool} from "@uniswapCore/contracts/UniswapV3Pool.sol";
 
 // TODO we need to add slippage control
 contract UniswapV3Helper {
     ISwapRouter public immutable swapRouter;
     INonfungiblePositionManager public immutable nonfungiblePositionManager;
 
-    constructor(
-        INonfungiblePositionManager _nonfungiblePositionManager,
-        ISwapRouter _swapRouter
-    ) {
-        nonfungiblePositionManager = _nonfungiblePositionManager;
-        swapRouter = _swapRouter;
+    constructor(address _nonfungiblePositionManager, address _swapRouter) {
+        nonfungiblePositionManager = INonfungiblePositionManager(
+            _nonfungiblePositionManager
+        );
+        swapRouter = ISwapRouter(_swapRouter);
     }
 
     /** @dev Swap Helper */
@@ -53,34 +53,32 @@ contract UniswapV3Helper {
 
     /** @dev Liquidity Helper */
     function mintPosition(
-        address _addToken0,
-        address _addToken1,
+        UniswapV3Pool _v3Pool,
         uint256 _amount0ToMint,
         uint256 _amount1ToMint,
         int24 _tickLower,
-        int24 _tickUpper,
-        uint24 _poolFee
+        int24 _tickUpper
     )
         external
         returns (uint tokenId, uint128 liquidity, uint amount0, uint amount1)
     {
         // Approve the position manager
         TransferHelper.safeApprove(
-            _addToken0,
+            _v3Pool.token0(),
             address(nonfungiblePositionManager),
             _amount0ToMint
         );
         TransferHelper.safeApprove(
-            _addToken1,
+            _v3Pool.token1(),
             address(nonfungiblePositionManager),
             _amount1ToMint
         );
 
         INonfungiblePositionManager.MintParams
             memory params = INonfungiblePositionManager.MintParams({
-                token0: _addToken0,
-                token1: _addToken1,
-                fee: _poolFee,
+                token0: _v3Pool.token0(),
+                token1: _v3Pool.token1(),
+                fee: _v3Pool.fee(),
                 tickLower: _tickLower,
                 tickUpper: _tickUpper,
                 amount0Desired: _amount0ToMint,
@@ -99,22 +97,22 @@ contract UniswapV3Helper {
         // Remove allowance and refund in both assets.
         if (amount0 < _amount0ToMint) {
             TransferHelper.safeApprove(
-                _addToken0,
+                _v3Pool.token0(),
                 address(nonfungiblePositionManager),
                 0
             );
             uint refund0 = _amount0ToMint - amount0;
-            TransferHelper.safeTransfer(_addToken0, msg.sender, refund0);
+            TransferHelper.safeTransfer(_v3Pool.token0(), msg.sender, refund0);
         }
 
         if (amount1 < _amount1ToMint) {
             TransferHelper.safeApprove(
-                _addToken1,
+                _v3Pool.token1(),
                 address(nonfungiblePositionManager),
                 0
             );
             uint refund1 = _amount1ToMint - amount1;
-            TransferHelper.safeTransfer(_addToken1, msg.sender, refund1);
+            TransferHelper.safeTransfer(_v3Pool.token1(), msg.sender, refund1);
         }
     }
 
@@ -173,12 +171,20 @@ contract UniswapV3Helper {
         return liquidity;
     }
 
-    function sqrtPriceX96ToUint(
+    // TODO:
+    function sqrtPriceX96ToPrice(
         uint160 sqrtPriceX96,
         uint8 decimalsToken0
-    ) internal pure returns (uint256) {
+    ) public pure returns (uint160) {
         uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
         uint256 numerator2 = 10 ** decimalsToken0;
-        return FullMath.mulDiv(numerator1, numerator2, 1 << 192);
+        return uint160(FullMath.mulDiv(numerator1, numerator2, 1 << 192));
+    }
+
+    function priceToSqrtPriceX96(
+        uint160 price,
+        uint8 decimalsToken0
+    ) public pure returns (uint160) {
+        return price;
     }
 }
