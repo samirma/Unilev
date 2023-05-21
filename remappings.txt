@@ -3,7 +3,7 @@
 @clones=lib/clones-with-immutable-args/src/
 @chainlink/=lib/chainlink-brownie-contracts/
 @openzeppelin/=lib/openzeppelin-contracts/
-@uniswapCore/=lib/v3-core/
-@uniswap/v3-core/=lib/v3-core/
-@uniswapPeriphery/=lib/v3-periphery/  
+@uniswapCore/=src/libraries/v3-core/
+@uniswap/v3-core/=src/libraries/v3-core/
+@uniswapPeriphery/=src/libraries/v3-periphery/
 forge-std/=lib/forge-std/src/
