@@ -1,22 +1,19 @@
 {
-  "name": "foundry-starter-kit",
+  "name": "uniswap-max",
   "version": "1.0.0",
-  "description": "Minimal Template for Foundry Projects",
-  "author": "Patrick Collins",
+  "description": "UniswapMAX",
+  "author": "Los Byzantinos",
   "license": "MIT",
   "files": [
     "src/**/*.sol"
   ],
   "devDependencies": {
-    "prettier": "^2.7.1",
+    "prettier": "^2.8.8",
     "prettier-plugin-solidity": "^1.0.0-beta.19"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/smartcontractkit/foundry-starter-kit.git"
-  },
-  "bugs": {
-    "url": "https://github.com/smartcontractkit/foundry-starter-kit/issues"
+    "url": "https://github.com/Los-Byzantinos/Uniswap-Max"
   },
   "scripts": {
     "setup": "make clean && make build",

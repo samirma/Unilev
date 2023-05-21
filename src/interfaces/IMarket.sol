@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import "@solmate/tokens/ERC20.sol";
-import "@uniswapV3/contracts/interfaces/IUniswapV3Pool.sol";
+import "@uniswapCore/contracts/interfaces/IUniswapV3Pool.sol";
 
 /*
  * @title IMarket interface

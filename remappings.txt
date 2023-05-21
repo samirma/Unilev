@@ -4,5 +4,6 @@
 @chainlink/=lib/chainlink-brownie-contracts/
 @openzeppelin/=lib/openzeppelin-contracts/
 @uniswapCore/=lib/v3-core/
+@uniswap/v3-core/=lib/v3-core/
 @uniswapPeriphery/=lib/v3-periphery/
 forge-std/=lib/forge-std/src/
