@@ -14,11 +14,7 @@ contract Market is IMarket, Ownable, Pausable {
     Positions private positions;
     LiquidityPoolFactory private liquidityPoolFactory;
 
-    constructor(
-        address _positions,
-        address _liquidityPoolFactory,
-        address _owner
-    ) {
+    constructor(address _positions, address _liquidityPoolFactory, address _owner) {
         positions = Positions(_positions);
         liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
         transferOwnership(_owner);
@@ -62,28 +58,12 @@ contract Market is IMarket, Ownable, Pausable {
         emit PositionClosed(_posId, msg.sender);
     }
 
-    function editPosition(
-        uint256 _posId,
-        uint160 _newLimitPrice,
-        uint256 _newLstopLossPrice
-    ) external {
-        positions.editPosition(
-            msg.sender,
-            _posId,
-            _newLimitPrice,
-            _newLstopLossPrice
-        );
-        emit PositionEdited(
-            _posId,
-            msg.sender,
-            _newLimitPrice,
-            _newLstopLossPrice
-        );
+    function editPosition(uint256 _posId, uint256 _newLstopLossPrice) external {
+        positions.editPosition(msg.sender, _posId, _newLstopLossPrice);
+        emit PositionEdited(_posId, msg.sender, _newLstopLossPrice);
     }
 
-    function getTraderPositions(
-        address _traderAdd
-    ) external view returns (uint256[] memory) {
+    function getTraderPositions(address _traderAdd) external view returns (uint256[] memory) {
         return positions.getTraderPositions(_traderAdd);
     }
 

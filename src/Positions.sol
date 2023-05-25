@@ -7,6 +7,7 @@ import "@solmate/tokens/ERC20.sol";
 import "@solmate/utils/FixedPointMathLib.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@uniswapCore/contracts/libraries/TickMath.sol";
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
 import "./PriceFeedL1.sol";
@@ -14,34 +15,39 @@ import "./LiquidityPoolFactory.sol";
 
 import {UniswapV3Helper} from "./UniswapV3Helper.sol";
 
-contract Positions is ERC721, Ownable {
+contract Positions is ERC721, Ownable, ReentrancyGuard {
     using FixedPointMathLib for uint256;
+    using SafeTransferLib for ERC20;
 
     // Structs
+    // prettier-ignore
     struct PositionParams {
-        UniswapV3Pool v3Pool; // pool to trade
-        ERC20 baseToken; // token to trade => should be token0 or token1 of v3Pool
-        ERC20 quoteToken; // token to trade => should be the other token of v3Pool
-        uint256 initialPrice; // price of the token when the position was opened
-        uint128 amount; // amount of token to trade
-        uint64 timestamp; // timestamp of position creation
-        bool isShort; // true if short, false if long
-        uint8 leverage; // leverage of position => 0 if no leverage
-        uint256 totalBorrow; // Total borrow in baseToken if long or quoteToken if short
-        uint256 hourlyFees; // fees to pay every hour on the borrowed amount => 0 if no leverage
-        uint256 breakEvenLimit; // After this limit the position is undercollateralize => 0 if no leverage or short
-        uint160 limitPrice; // limit order price => 0 if no limit order
-        uint256 stopLossPrice; // stop loss price => 0 if no stop loss
-        uint256 tokenIdLiquidity; // tokenId of the liquidity position NFT => 0 if no liquidity position
+        UniswapV3Pool v3Pool;      // Pool to trade
+        ERC20 baseToken;           // Token to trade => should be token0 or token1 of v3Pool
+        ERC20 quoteToken;          // Token to trade => should be the other token of v3Pool
+        uint128 collateralSize;    // Total collateral for the position
+        uint128 positionSize;      // Amount (in baseToken if long / quoteToken if short) of token traded
+        uint128 liquidationReward; // Amount (in baseToken if long / quoteToken if short) of token to pay to the liquidator, refund if no liquidation
+        uint64 timestamp;          // Timestamp of position creation
+        bool isShort;              // True if short, false if long
+        bool isBaseToken0;         // True if the baseToken is the token0 (in the uniswapV3Pool) 
+        uint8 leverage;            // Leverage of position => 0 if no leverage
+        uint256 totalBorrow;       // Total borrow in baseToken if long or quoteToken if short
+        uint256 hourlyFees;        // Fees to pay every hour on the borrowed amount => 0 if no leverage
+        uint256 breakEvenLimit;    // After this limit the position is undercollateralize => 0 if no leverage or short
+        uint160 limitPrice;        // Limit order price => 0 if no limit order
+        uint256 stopLossPrice;     // Stop loss price => 0 if no stop loss
+        uint256 tokenIdLiquidity;  // TokenId of the liquidity position NFT => 0 if no liquidity position
     }
 
     // Variables
     uint256 public constant LIQUIDATION_THRESHOLD = 1000; // 10% of margin
     uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 100; // To avoid DOS attack
-    uint256 public constant MAX_LEVERAGE = 5;
+    uint256 public constant MAX_LEVERAGE = 3;
     uint256 public constant BORROW_FEE = 20; // 0.2% when opening a position
     uint256 public constant BORROW_FEE_EVERY_HOURS = 1; // 0.01% : assets borrowed/total assets in pool * 0.01%
-    uint256 public constant ORACLE_DECIMALS = 10 ** 8; // Chainlink decimals for USD
+    uint256 public constant ORACLE_DECIMALS = 10e8; // Chainlink decimals for USD
+    uint256 public immutable LIQUIDATION_REWARD; // 10 USD : //! to be changed depending of the blockchain average gas price
 
     LiquidityPoolFactory public immutable liquidityPoolFactory;
     PriceFeedL1 public immutable priceFeed;
@@ -49,6 +55,7 @@ contract Positions is ERC721, Ownable {
     address public immutable liquidityPoolFactoryUniswapV3;
 
     uint256 public posId;
+    uint256 public totalNbPos;
     mapping(uint256 => PositionParams) public openPositions;
 
     string private constant BASE_SVG =
@@ -63,28 +70,29 @@ contract Positions is ERC721, Ownable {
     error Positions__NO_PRICE_FEED(address _token0, address _token1);
     error Positions__LEVERAGE_NOT_IN_RANGE(uint8 _leverage);
     error Positions__AMOUNT_TO_SMALL(uint256 _amount);
-    error Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
-        uint256 _limitPrice,
-        uint256 _amount
-    );
-    error Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(
-        uint256 _stopLossPrice,
-        uint256 _amount
-    );
+    error Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(uint256 _limitPrice);
+    error Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(uint256 _stopLossPrice);
     error Positions__NOT_LIQUIDABLE(uint256 _posId);
+    error Positions__WAIT_FOR_LIMIT_ORDER_TO_COMPLET(uint256 _posId);
+    error Positions__TOKEN_RECEIVED_NOT_CONCISTENT(
+        address addTokenBorrowed,
+        address addTokenReceived
+    );
 
     constructor(
         address _market,
         address _priceFeed,
         address _liquidityPoolFactory,
         address _liquidityPoolFactoryUniswapV3,
-        address _uniswapV3Helper
+        address _uniswapV3Helper,
+        uint256 _liquidationReward
     ) ERC721("Uniswap-MAX", "UNIMAX") {
         transferOwnership(_market);
         liquidityPoolFactoryUniswapV3 = _liquidityPoolFactoryUniswapV3;
         liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
         priceFeed = PriceFeedL1(_priceFeed);
         uniswapV3Helper = UniswapV3Helper(_uniswapV3Helper);
+        LIQUIDATION_REWARD = _liquidationReward * ORACLE_DECIMALS;
     }
 
     modifier isPositionOpen(uint256 _posId) {
@@ -116,29 +124,17 @@ contract Positions is ERC721, Ownable {
 
     function tokenURI(
         uint256 _tokenId
-    )
-        public
-        view
-        virtual
-        override
-        isPositionOpen(_tokenId)
-        returns (string memory)
-    {
+    ) public view virtual override isPositionOpen(_tokenId) returns (string memory) {
         string memory json = Base64.encode(
             bytes(
-                string.concat(
-                    tokenURIIntro(_tokenId),
-                    tokenURIAttributes(openPositions[_tokenId])
-                )
+                string.concat(tokenURIIntro(_tokenId), tokenURIAttributes(openPositions[_tokenId]))
             )
         );
 
         return string.concat("data:application/json;base64,", json);
     }
 
-    function tokenURIIntro(
-        uint256 _tokenId
-    ) private pure returns (string memory) {
+    function tokenURIIntro(uint256 _tokenId) private pure returns (string memory) {
         return
             string.concat(
                 '{"name": "Uniswap-Max Position #',
@@ -159,7 +155,7 @@ contract Positions is ERC721, Ownable {
                 "/",
                 _position.quoteToken.name(),
                 '"}, { "trait_type": "Amount", "value": "',
-                Strings.toString(_position.amount),
+                Strings.toString(_position.positionSize),
                 '"} , { "trait_type": "Direction", "value": "',
                 _position.isShort ? "Short" : "Long",
                 '"}, { "trait_type": "Leverage", "value": "',
@@ -185,11 +181,7 @@ contract Positions is ERC721, Ownable {
             "</text></svg>"
         );
 
-        return
-            string.concat(
-                "data:image/svg+xml;base64,",
-                Base64.encode(bytes(svg))
-            );
+        return string.concat("data:image/svg+xml;base64,", Base64.encode(bytes(svg)));
     }
 
     // --------------- Trader Zone ---------------
@@ -218,31 +210,41 @@ contract Positions is ERC721, Ownable {
                 _limitPrice,
                 _stopLossPrice
             );
+        bool isMargin = _leverage != 1 || _isShort;
 
         // transfer funds to the contract (trader need to approve first)
-        ERC20(_token).transferFrom(_trader, address(this), _amount);
+        ERC20(_token).safeTransferFrom(_trader, address(this), _amount);
 
         // Compute parameters
         uint256 breakEvenLimit;
         uint256 totalBorrow;
         uint256 hourlyFees;
 
-        if (_isShort) {
-            breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
-            totalBorrow =
-                ((_amount * ERC20(quoteToken).decimals()) / price) *
-                _leverage; // Borrow baseToken
-        } else {
-            breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
-            totalBorrow =
-                (_amount * (_leverage - 1) * price) /
-                (10 ** ERC20(baseToken).decimals()); // Borrow quoteToken
-        }
+        // take opening fees
+        uint128 liquidationReward = uint128(
+            (LIQUIDATION_REWARD * (10 ** uint256(ERC20(_token).decimals()))) /
+                (PriceFeedL1(priceFeed).getTokenLatestPriceInUSD(_token))
+        );
+        _amount = _amount - liquidationReward;
 
-        if (_isShort || _leverage != 1) {
-            address cacheLiquidityPoolToUse = LiquidityPoolFactory(
-                liquidityPoolFactory
-            ).getTokenToLiquidityPools(_isShort ? quoteToken : baseToken);
+        if (isMargin) {
+            if (_isShort) {
+                breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
+                totalBorrow = ((_amount * (10 ** ERC20(baseToken).decimals())) / price) * _leverage; // Borrow baseToken
+            } else {
+                breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
+                totalBorrow =
+                    (_amount * (_leverage - 1) * price) /
+                    (10 ** ERC20(baseToken).decimals()); // Borrow quoteToken
+            }
+            uint128 openingFees = (uint128(totalBorrow * BORROW_FEE)) / 10000;
+            totalBorrow = (uint128(totalBorrow * (10000 - BORROW_FEE))) / 10000;
+            address cacheLiquidityPoolToUse = LiquidityPoolFactory(liquidityPoolFactory)
+                .getTokenToLiquidityPools(_isShort ? quoteToken : baseToken);
+
+            _amount = _amount - openingFees;
+            ERC20(_token).safeApprove(cacheLiquidityPoolToUse, openingFees);
+            LiquidityPool(cacheLiquidityPoolToUse).refund(0, openingFees, 0);
 
             // fees computation
             uint256 decTokenBorrowed = _isShort
@@ -258,18 +260,17 @@ contract Positions is ERC721, Ownable {
             LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
         } else {
             hourlyFees = 0;
+            breakEvenLimit = 0;
+            totalBorrow = 0;
         }
-
-        int24 _tickUpper = TickMath.getTickAtSqrtRatio(
-            uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, 1)
-        ); // todo convert price to sqrt ratiow
-        int24 _tickLower = _tickUpper + 1;
 
         // do the trade on Uniswap
         uint256 tokenIdLiquidity;
         uint256 amount0;
         uint256 amount1;
         uint256 amountOut;
+        int24 tickUpper;
+        int24 tickLower;
 
         if (_isShort) {
             amountOut = uniswapV3Helper.swapExactInputSingle(
@@ -280,14 +281,18 @@ contract Positions is ERC721, Ownable {
             );
 
             if (_limitPrice != 0) {
-                (tokenIdLiquidity, , amount0, amount1) = uniswapV3Helper
-                    .mintPosition(
-                        UniswapV3Pool(_v3Pool),
-                        isBaseToken0 ? 0 : amountOut,
-                        isBaseToken0 ? amountOut : 0,
-                        _tickLower,
-                        _tickUpper
-                    );
+                tickUpper = TickMath.getTickAtSqrtRatio(
+                    uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, 1)
+                ); // todo convert price to sqrt ratio
+                tickLower = tickUpper + 1;
+
+                (tokenIdLiquidity, , amount0, amount1) = uniswapV3Helper.mintPosition(
+                    UniswapV3Pool(_v3Pool),
+                    isBaseToken0 ? 0 : amountOut,
+                    isBaseToken0 ? amountOut : 0,
+                    tickLower,
+                    tickUpper
+                );
             }
         } else {
             if (_leverage != 0) {
@@ -299,25 +304,40 @@ contract Positions is ERC721, Ownable {
                 );
             }
             if (_limitPrice != 0) {
-                (tokenIdLiquidity, , amount0, amount1) = uniswapV3Helper
-                    .mintPosition(
-                        UniswapV3Pool(_v3Pool),
-                        isBaseToken0 ? amountOut + _amount : 0,
-                        isBaseToken0 ? 0 : amountOut + _amount,
-                        _tickLower,
-                        _tickUpper
-                    );
+                tickUpper = TickMath.getTickAtSqrtRatio(
+                    uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, 1)
+                ); // todo convert price to sqrt ratiow
+                tickLower = tickUpper + 1;
+
+                (tokenIdLiquidity, , amount0, amount1) = uniswapV3Helper.mintPosition(
+                    UniswapV3Pool(_v3Pool),
+                    isBaseToken0 ? amountOut + _amount : 0,
+                    isBaseToken0 ? 0 : amountOut + _amount,
+                    tickLower,
+                    tickUpper
+                );
             }
+        }
+        // position size calculation
+        uint128 positionSize;
+        if (_isShort) {
+            positionSize = uint128(amountOut);
+        } else if (_leverage != 0) {
+            positionSize = uint128(_amount + amountOut);
+        } else {
+            positionSize = _amount;
         }
 
         openPositions[posId] = PositionParams(
             UniswapV3Pool(_v3Pool),
             ERC20(baseToken),
             ERC20(quoteToken),
-            price,
             _amount,
+            positionSize,
+            liquidationReward,
             uint64(block.timestamp),
             _isShort,
+            isBaseToken0,
             _leverage,
             totalBorrow,
             hourlyFees,
@@ -326,6 +346,7 @@ contract Positions is ERC721, Ownable {
             _stopLossPrice,
             tokenIdLiquidity
         );
+        ++totalNbPos;
         return safeMint(_trader);
     }
 
@@ -346,8 +367,7 @@ contract Positions is ERC721, Ownable {
         }
         // check token
         if (
-            UniswapV3Pool(_v3Pool).token0() != _token &&
-            UniswapV3Pool(_v3Pool).token1() != _token
+            UniswapV3Pool(_v3Pool).token0() != _token && UniswapV3Pool(_v3Pool).token1() != _token
         ) {
             revert Positions__TOKEN_NOT_SUPPORTED(_token);
         }
@@ -374,10 +394,7 @@ contract Positions is ERC721, Ownable {
             revert Positions__NO_PRICE_FEED(baseToken, quoteToken);
         }
 
-        uint256 price = PriceFeedL1(priceFeed).getPairLatestPrice(
-            baseToken,
-            quoteToken
-        );
+        uint256 price = PriceFeedL1(priceFeed).getPairLatestPrice(baseToken, quoteToken);
 
         // check leverage
         if (_leverage < 1 || _leverage > MAX_LEVERAGE) {
@@ -387,16 +404,14 @@ contract Positions is ERC721, Ownable {
         if (_leverage != 1) {
             if (
                 _isShort &&
-                LiquidityPoolFactory(liquidityPoolFactory)
-                    .getTokenToLiquidityPools(baseToken) ==
+                LiquidityPoolFactory(liquidityPoolFactory).getTokenToLiquidityPools(baseToken) ==
                 address(0)
             ) {
                 revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(baseToken);
             }
             if (
                 !_isShort &&
-                LiquidityPoolFactory(liquidityPoolFactory)
-                    .getTokenToLiquidityPools(quoteToken) ==
+                LiquidityPoolFactory(liquidityPoolFactory).getTokenToLiquidityPools(quoteToken) ==
                 address(0)
             ) {
                 revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(quoteToken);
@@ -405,8 +420,7 @@ contract Positions is ERC721, Ownable {
 
         // check amount
         if (
-            (_amount *
-                PriceFeedL1(priceFeed).getTokenLatestPriceInUSD(_token)) /
+            (_amount * PriceFeedL1(priceFeed).getTokenLatestPriceInUSD(_token)) /
                 ERC20(_token).decimals() <
             MIN_POSITION_AMOUNT_IN_USD * ORACLE_DECIMALS
         ) {
@@ -415,29 +429,17 @@ contract Positions is ERC721, Ownable {
 
         if (_isShort) {
             if (_limitPrice > price) {
-                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
-                    _limitPrice,
-                    _amount
-                );
+                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(_limitPrice);
             }
             if (_stopLossPrice < price) {
-                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(
-                    _stopLossPrice,
-                    _amount
-                );
+                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(_stopLossPrice);
             }
         } else {
             if (_limitPrice < price) {
-                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(
-                    _limitPrice,
-                    _amount
-                );
+                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(_limitPrice);
             }
             if (_stopLossPrice > price) {
-                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(
-                    _stopLossPrice,
-                    _amount
-                );
+                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(_stopLossPrice);
             }
         }
         return (price, baseToken, quoteToken, isBaseToken0);
@@ -446,232 +448,252 @@ contract Positions is ERC721, Ownable {
     function closePosition(
         address _trader,
         uint256 _posId
-    ) external onlyOwner isPositionOwned(_trader, _posId) {
-        _closePosition(_trader, _posId);
+    ) external onlyOwner isPositionOpen(_posId) isPositionOwned(_trader, _posId) nonReentrant {
+        _closePosition(_trader, _trader, _posId);
     }
-
-    function _closePosition(address _trader, uint256 _posId) internal {
-        PositionParams memory posParms = openPositions[_posId];
-
-        // TODO check the position state
-
-        // // Close position
-        // if (posParms.limitPrice != 0) {
-        //     (uint256 amount0, uint256 amount1) = posParms.v3Pool.burn(
-        //         posParms.tickLower,
-        //         posParms.tickUpper,
-        //         posParms.amount + uint128(posParms.totalBorrow)
-        //     );
-
-        //     if (
-        //         address(posParms.quoteToken) == posParms.v3Pool.token1() &&
-        //         amount0 != 0
-        //     ) {
-        //         posParms.v3Pool.swap(
-        //             address(this),
-        //             false,
-        //             int256(amount0),
-        //             0, //TODO define slippage here
-        //             abi.encode()
-        //         );
-        //     }
-
-        //     if (
-        //         address(posParms.quoteToken) == posParms.v3Pool.token0() &&
-        //         amount1 != 0
-        //     ) {
-        //         posParms.v3Pool.swap(
-        //             address(this),
-        //             true,
-        //             int256(amount1),
-        //             0, //TODO define slippage here
-        //             abi.encode()
-        //         );
-        //     }
-        // }
-        // if (posParms.isShort || posParms.leverage != 1) {
-        //     // TODO what if there is a loss ?
-
-        //     // pay back the loan
-
-        //     address liquidityPool = LiquidityPoolFactory(liquidityPoolFactory)
-        //         .getTokenToLiquidityPools(
-        //             address(
-        //                 posParms.isShort
-        //                     ? posParms.baseToken
-        //                     : posParms.quoteToken
-        //             )
-        //         );
-
-        //     LiquidityPool(liquidityPool).refund(
-        //         posParms.totalBorrow,
-        //         ((block.timestamp - posParms.timestamp) / (60 * 60)) *
-        //             posParms.hourlyFees +
-        //             (posParms.totalBorrow * BORROW_FEE) /
-        //             10000,
-        //         0 // TODO compute loss
-        //     );
-        // }
-
-        // // TODO what if there is a loss ?
-        // posParms.baseToken.transfer(_trader, posParms.amount);
-
-        // refund LiquidityPool + Fees
-
-        safeBurn(_posId);
-        delete openPositions[_posId];
-    }
-
-    function getTraderPositions(
-        address _traderAdd
-    ) external view returns (uint256[] memory) {
-        uint256[] memory _traderPositions = new uint256[](
-            balanceOf(_traderAdd)
-        );
-        uint256 _posId = 0;
-
-        for (uint256 i = 0; i < posId; ) {
-            if (ownerOf(i) == _traderAdd) {
-                _traderPositions[_posId] = i;
-
-                unchecked {
-                    ++_posId;
-                }
-            }
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        return _traderPositions;
-    }
-
-    function editPosition(
-        address _trader,
-        uint256 _posId,
-        uint160 _newLimitPrice,
-        uint256 _newLstopLossPrice
-    ) external onlyOwner isPositionOwned(_trader, _posId) {
-        PositionParams memory posParms = openPositions[_posId];
-        checkPositionParams(
-            address(posParms.v3Pool),
-            address(posParms.baseToken),
-            posParms.isShort,
-            posParms.leverage,
-            posParms.amount,
-            _newLimitPrice,
-            _newLstopLossPrice
-        );
-        openPositions[_posId].limitPrice = _newLimitPrice;
-        openPositions[_posId].stopLossPrice = _newLstopLossPrice;
-    }
-
-    // --------------- Liquidator Zone ---------------
 
     function liquidatePosition(
         address _liquidator,
         uint256 _posId
     ) external onlyOwner isPositionOpen(_posId) {
-        if (!isLiquidable(_posId)) {
-            revert Positions__NOT_LIQUIDABLE(_posId);
-        }
-
-        _closePosition(ownerOf(_posId), _posId);
-
-        // TODO send reward to liquidator
-        PositionParams memory posParms = openPositions[_posId];
-        uint256 _price = PriceFeedL1(priceFeed).getPairLatestPrice(
-            address(posParms.baseToken),
-            address(posParms.quoteToken)
-        );
-
-        uint256 _breakEventPrice = (posParms.breakEvenLimit ** 2) / (2 ** 192);
-
-        uint256 _reward;
-        if (posParms.isShort) {
-            if (_price > _breakEventPrice) {
-                _reward = 0; // TODO define reward in the case of a loss for the protocol
-            } else {
-                _reward = (_breakEventPrice / _price) * posParms.amount;
-            }
-        } else {
-            if (_price < _breakEventPrice) {
-                _reward = 0; // TODO define reward in the case of a loss for the protocol
-            } else {
-                _reward = (_breakEventPrice / _price) * posParms.amount;
-            }
-        }
-
-        posParms.quoteToken.transfer(_liquidator, _reward);
-
-        if (_reward < posParms.amount) {
-            posParms.quoteToken.transfer(
-                ownerOf(_posId),
-                posParms.amount - _reward
-            );
-        }
+        _closePosition(address(this), _liquidator, _posId);
     }
 
-    function isLiquidable(uint256 _posId) public view returns (bool) {
+    /**
+     * @dev Close/Liquidate a position
+     * @notice the 5 states:
+     *  - 1. The position crossed over the limit ordre
+     *  - 2. Nothing happened => just refund the trader
+     *  - 3. The position crossed over the stop loss
+     *  - 4. The position is liquidable => no bad debt
+     *  - 5. The position is liquidable => bad debt
+     */
+    function _closePosition(address _trader, address _liquidator, uint256 _posId) internal {
         PositionParams memory posParms = openPositions[_posId];
-        uint256 _price = PriceFeedL1(priceFeed).getPairLatestPrice(
-            address(posParms.baseToken),
-            address(posParms.quoteToken)
+        bool isMargin = posParms.leverage != 1 || posParms.isShort;
+        uint256 state = getPositionState(_posId);
+        LiquidityPool liquidityPoolToUse = LiquidityPool(
+            LiquidityPoolFactory(liquidityPoolFactory).getTokenToLiquidityPools(
+                posParms.isShort ? address(posParms.quoteToken) : address(posParms.baseToken)
+            )
         );
 
-        // liquidable because of stop loss
-        uint256 _thresholdStopLoss = (posParms.stopLossPrice *
-            LIQUIDATION_THRESHOLD) / 10000;
-        if (posParms.isShort) {
-            if (_price > posParms.stopLossPrice + _thresholdStopLoss) {
-                return true;
+        uint256 amount0;
+        uint256 amount1;
+        // Close position
+        if (posParms.limitPrice != 0) {
+            (amount0, amount1) = uniswapV3Helper.burnPosition(posParms.tokenIdLiquidity);
+            /* Since the liquidity position is only 1 tick wide, we can assume
+             * that this will rarely revert here. */
+            if (amount0 != 0 && amount1 != 0) {
+                revert Positions__WAIT_FOR_LIMIT_ORDER_TO_COMPLET(_posId);
             }
+        } else if (posParms.isShort) {
+            posParms.isBaseToken0 ? amount0 = 0 : amount1 = posParms.positionSize;
+            posParms.isBaseToken0 ? amount0 = posParms.positionSize : amount1 = 0;
         } else {
-            if (_price < posParms.stopLossPrice - _thresholdStopLoss) {
-                return true;
+            posParms.isBaseToken0 ? amount0 = posParms.positionSize : amount1 = 0;
+            posParms.isBaseToken0 ? amount0 = 0 : amount1 = posParms.positionSize;
+        }
+        address addTokenInitiallySupplied = posParms.isShort
+            ? address(posParms.quoteToken)
+            : address(posParms.baseToken);
+        // will be used if margin position
+        address addTokenBorrowed = posParms.isShort
+            ? address(posParms.quoteToken)
+            : address(posParms.baseToken);
+
+        uint256 amountTokenReceived = amount0 != 0 ? amount0 : amount1;
+        // prettier-ignore
+        address addTokenReceived = amount0 != 0
+            ? posParms.isBaseToken0
+                ? address(posParms.baseToken)
+                : address(posParms.quoteToken)
+            : posParms.isBaseToken0
+                ? address(posParms.quoteToken)
+                : address(posParms.baseToken);
+
+        uint256 interest = ((block.timestamp - posParms.timestamp) / 3600) * posParms.hourlyFees;
+
+        // These state assume that the oracle price and the uniswap price are CONCISTENT
+        if (state == 1) {
+            if (addTokenBorrowed != addTokenReceived) {
+                revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(addTokenBorrowed, addTokenReceived);
+            }
+            if (isMargin) {
+                // can't have loss here since the limit order is crossed
+                ERC20(addTokenBorrowed).safeApprove(
+                    address(liquidityPoolToUse),
+                    posParms.totalBorrow + interest
+                );
+                liquidityPoolToUse.refund(posParms.totalBorrow, interest, 0);
+                if (posParms.isShort) {
+                    amountTokenReceived += posParms.collateralSize;
+                }
+                ERC20(addTokenBorrowed).safeTransfer(
+                    _trader,
+                    amountTokenReceived - interest - posParms.totalBorrow
+                );
+            } else {
+                ERC20(addTokenBorrowed).safeTransfer(_trader, amountTokenReceived);
+            }
+        } else if (state == 2) {
+            if (addTokenBorrowed == addTokenReceived) {
+                revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(addTokenBorrowed, addTokenReceived);
+            }
+            if (isMargin) {
+                if (posParms.isShort) {
+                    amountTokenReceived += posParms.collateralSize;
+                }
+                // we need first to swap back to refund the pool
+                (uint256 inAmount, uint256 outAmount) = uniswapV3Helper.swapMaxTokenPossible(
+                    addTokenReceived,
+                    addTokenBorrowed,
+                    UniswapV3Pool(posParms.v3Pool).fee(),
+                    posParms.totalBorrow + interest,
+                    amountTokenReceived
+                );
+                // loss should not occur here but in case of, we refund the pool
+                int256 lossTemp = int256(outAmount - posParms.totalBorrow - interest);
+                uint256 loss = lossTemp < 0 ? uint256(-lossTemp) : uint256(0);
+                ERC20(addTokenBorrowed).safeApprove(
+                    address(liquidityPoolToUse),
+                    posParms.totalBorrow + interest - loss
+                );
+                liquidityPoolToUse.refund(posParms.totalBorrow, interest, loss);
+                if (loss == 0) {
+                    ERC20(addTokenReceived).safeTransfer(_trader, amountTokenReceived - inAmount);
+                }
+            } else {
+                ERC20(addTokenReceived).safeTransfer(_trader, amountTokenReceived);
+            }
+        }
+        // state 3, 4 and 5
+        else {
+            if (addTokenBorrowed == addTokenReceived) {
+                revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(addTokenBorrowed, addTokenReceived);
+            }
+            if (posParms.isShort) {
+                amountTokenReceived += posParms.collateralSize;
+            }
+            uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
+                addTokenReceived,
+                addTokenBorrowed,
+                UniswapV3Pool(posParms.v3Pool).fee(),
+                amountTokenReceived
+            );
+
+            if (isMargin) {
+                int256 lossTemp = int256(outAmount - posParms.totalBorrow - interest);
+                uint256 loss = lossTemp < 0 ? uint256(-lossTemp) : uint256(0);
+                ERC20(addTokenBorrowed).safeApprove(
+                    address(liquidityPoolToUse),
+                    posParms.totalBorrow + interest - loss
+                );
+                liquidityPoolToUse.refund(posParms.totalBorrow, interest, loss);
+                if (loss == 0) {
+                    ERC20(addTokenBorrowed).safeTransfer(
+                        _trader,
+                        outAmount - posParms.totalBorrow - interest
+                    );
+                }
+            } else {
+                ERC20(addTokenBorrowed).safeTransfer(_trader, outAmount);
             }
         }
 
-        // liquidable because of take profit
-        if (posParms.isShort) {
-            if (_price < posParms.limitPrice) {
-                return true;
+        --totalNbPos;
+        delete openPositions[_posId];
+        safeBurn(_posId);
+        ERC20(addTokenInitiallySupplied).safeTransfer(_liquidator, posParms.liquidationReward);
+    }
+
+    // we can only edit the stop loss price for now
+    function editPosition(
+        address _trader,
+        uint256 _posId,
+        uint256 _newStopLossPrice
+    ) external onlyOwner isPositionOwned(_trader, _posId) {
+        // check params
+        uint256 price = PriceFeedL1(priceFeed).getPairLatestPrice(
+            address(openPositions[_posId].baseToken),
+            address(openPositions[_posId].quoteToken)
+        );
+        if (openPositions[_posId].isShort) {
+            if (_newStopLossPrice < price) {
+                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(_newStopLossPrice);
             }
         } else {
-            if (_price > posParms.limitPrice) {
-                return true;
+            if (_newStopLossPrice > price) {
+                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(_newStopLossPrice);
             }
         }
+        openPositions[_posId].stopLossPrice = _newStopLossPrice;
+    }
 
-        return false;
+    /* @notice 5 states:
+     *  - 1. The position crossed over the limit ordre
+     *  - 2. Nothing happened => just refund the trader
+     *  - 3. The position crossed over the stop loss
+     *  - 4. The position is liquidable => no bad debt
+     *  - 5. The position is liquidable => bad debt
+     */
+    function getPositionState(uint256 _posId) public view returns (uint256) {
+        bool isShort = openPositions[_posId].isShort;
+        uint256 breakEvenLimit = openPositions[_posId].breakEvenLimit;
+        uint160 limitPrice = openPositions[_posId].limitPrice;
+        uint256 stopLossPrice = openPositions[_posId].stopLossPrice;
+        uint256 price = PriceFeedL1(priceFeed).getPairLatestPrice(
+            address(openPositions[_posId].baseToken),
+            address(openPositions[_posId].quoteToken)
+        );
+        uint256 lidTresh = isShort
+            ? (breakEvenLimit * (10000 - LIQUIDATION_THRESHOLD)) / 10000
+            : (breakEvenLimit * (LIQUIDATION_THRESHOLD + 10000)) / 10000;
+
+        // closable because of take profit
+        if (isShort) {
+            if (price < limitPrice) return 1;
+            if (price >= breakEvenLimit) return 5;
+            if (price >= lidTresh) return 4;
+            if (price >= stopLossPrice) return 3;
+        } else {
+            if (price > limitPrice) return 1;
+            if (price <= breakEvenLimit) return 5;
+            if (price <= lidTresh) return 4;
+            if (price <= stopLossPrice) return 3;
+        }
+        return 2;
+    }
+
+    function getTraderPositions(address _traderAdd) external view returns (uint256[] memory) {
+        uint256 nbOfPositions = balanceOf(_traderAdd);
+        uint256[] memory traderPositions = new uint256[](nbOfPositions);
+        // start form the highest posId and stop when the all positions are found
+        uint256 posId_ = 0;
+        for (uint256 i = posId; i > 0; --i) {
+            if (ownerOf(i) == _traderAdd) {
+                traderPositions[posId_] = i;
+                if (++posId_ == nbOfPositions) {
+                    break;
+                }
+            }
+        }
+        return traderPositions;
     }
 
     function getLiquidablePositions() external view returns (uint256[] memory) {
-        uint256[] memory _liquidablePositions = new uint256[](posId);
-        uint256 _posId = 0;
-        for (uint256 i = 0; i < posId; ) {
-            if (isLiquidable(i)) {
-                _liquidablePositions[_posId] = i;
-
-                unchecked {
-                    ++_posId;
+        uint256[] memory liquidablePositions;
+        // start form the highest posId and stop when the all positions are found
+        uint256 posId_ = 0;
+        for (uint256 i = posId; i > 0; --i) {
+            if (getPositionState(i) != 2) {
+                liquidablePositions[posId_] = i;
+                if (++posId_ == totalNbPos) {
+                    break;
                 }
             }
-
-            unchecked {
-                ++i;
-            }
         }
-
-        assembly ("memory-safe") {
-            let tosub := sub(sload(posId.slot), _posId)
-            mstore(
-                _liquidablePositions,
-                sub(mload(_liquidablePositions), tosub)
-            )
-        }
-
-        return _liquidablePositions;
+        return liquidablePositions;
     }
 }

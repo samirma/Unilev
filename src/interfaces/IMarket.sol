@@ -24,15 +24,9 @@ interface IMarket {
 
     function closePosition(uint256 _posId) external;
 
-    function editPosition(
-        uint256 _posId,
-        uint160 _newLimitPrice,
-        uint256 _newLstopLossPrice
-    ) external;
+    function editPosition(uint256 _posId, uint256 _newLstopLossPrice) external;
 
-    function getTraderPositions(
-        address _traderAdd
-    ) external view returns (uint256[] memory);
+    function getTraderPositions(address _traderAdd) external view returns (uint256[] memory);
 
     // --------------- Liquidity Provider Zone ---------------
     function addLiquidity(address _poolAdd, uint256 _amount) external;
@@ -61,12 +55,7 @@ interface IMarket {
         uint256 stopLossPrice
     );
     event PositionClosed(uint256 indexed posId, address indexed trader);
-    event PositionEdited(
-        uint256 indexed posId,
-        address indexed trader,
-        uint256 newLimitPrice,
-        uint256 newStopLossPrice
-    );
+    event PositionEdited(uint256 indexed posId, address indexed trader, uint256 newStopLossPrice);
     event LiquidityAdded(
         address indexed poolAdd,
         address indexed liquidityProvider,
