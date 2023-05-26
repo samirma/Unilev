@@ -9,7 +9,8 @@ import "@solmate/tokens/ERC20.sol";
 error PriceFeedL1__TOKEN_NOT_SUPPORTED(address token);
 
 contract PriceFeedL1 is Ownable {
-    mapping(address => AggregatorV3Interface) public tokenToPriceFeed;
+    mapping(address => AggregatorV3Interface) public tokenToPriceFeedETH;
+    AggregatorV3Interface public ethToUsdPriceFeed;
 
     constructor(address _market) {
         transferOwnership(_market);
@@ -24,7 +25,7 @@ contract PriceFeedL1 is Ownable {
      * @param _priceFeed price feed address
      */
     function addPriceFeed(address _token, address _priceFeed) external onlyOwner {
-        tokenToPriceFeed[_token] = AggregatorV3Interface(_priceFeed);
+        tokenToPriceFeedETH[_token] = AggregatorV3Interface(_priceFeed);
     }
 
     /**
@@ -35,32 +36,49 @@ contract PriceFeedL1 is Ownable {
      */
     function getPairLatestPrice(address _token0, address _token1) public view returns (uint256) {
         return
-            (getTokenLatestPriceInUSD(_token0) * (10 ** uint256(ERC20(_token1).decimals()))) /
-            getTokenLatestPriceInUSD(_token1);
+            (getTokenLatestPriceInETH(_token0) * (10 ** uint256(ERC20(_token1).decimals()))) /
+            getTokenLatestPriceInETH(_token1);
     }
 
-    function getTokenLatestPriceInUSD(address _token) public view returns (uint256) {
-        if (address(tokenToPriceFeed[_token]) == address(0)) {
+    function getTokenLatestPriceInETH(address _token) public view returns (uint256) {
+        if (address(tokenToPriceFeedETH[_token]) == address(0)) {
             revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
         }
 
         // prettier-ignore
         (
             /* uint80 roundID */,
-            int256 priceToken0,
+            int256 priceToken,
             /*uint startedAt*/,
             /*uint timeStamp*/,
             /*uint80 answeredInRound*/
-        ) = AggregatorV3Interface(tokenToPriceFeed[_token]).latestRoundData();
+        ) = tokenToPriceFeedETH[_token].latestRoundData();
 
-        return uint256(priceToken0);
+        return uint256(priceToken);
+    }
+
+    function getTokenLatestPriceInUSD(address _token) public view returns (uint256) {
+        if (address(tokenToPriceFeedETH[_token]) == address(0)) {
+            revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
+        }
+
+        // prettier-ignore
+        (
+            /* uint80 roundID */,
+            int256 priceEth,
+            /*uint startedAt*/,
+            /*uint timeStamp*/,
+            /*uint80 answeredInRound*/
+        ) = ethToUsdPriceFeed.latestRoundData();
+
+        return ((getTokenLatestPriceInETH(_token) * uint256(priceEth)) / 1e18);
     }
 
     function isPairSupported(address _token0, address _token1) public view returns (bool) {
-        if (address(tokenToPriceFeed[_token0]) == address(0)) {
+        if (address(tokenToPriceFeedETH[_token0]) == address(0)) {
             return false;
         }
-        if (address(tokenToPriceFeed[_token1]) == address(0)) {
+        if (address(tokenToPriceFeedETH[_token1]) == address(0)) {
             return false;
         }
         return true;
