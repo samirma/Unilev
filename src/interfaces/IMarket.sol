@@ -68,4 +68,5 @@ interface IMarket {
     );
     event PositionLiquidated(uint256 indexed posId, address indexed liquidator);
     event LiquidityPoolCreated(address indexed poolAdd, address sender);
+    event PriceFeedAdded(address token, address priceFeed);
 }

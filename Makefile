@@ -10,16 +10,16 @@ clean  :; forge clean
 # Remove modules
 remove :; rm -rf .gitmodules && rm -rf .git/modules/* && rm -rf lib && touch .gitmodules && git add . && git commit -m "modules"
 
-install :; forge install smartcontractkit/chainlink-brownie-contracts && forge install rari-capital/solmate && forge install foundry-rs/forge-std
+install :; forge install smartcontractkit/chainlink-brownie-contracts && forge install rari-capital/solmate && forge install foundry-rs/forge-std && forge install OpenZeppelin/openzeppelin-contracts
 
 # Update Dependencies
 update:; forge update
 
 build:; forge build
 
-compile:; forge compile
+compile:; forge compile --via-ir
 
-test :; forge test 
+test :; forge test -vv --via-ir
 
 snapshot :; forge snapshot
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity 0.8.19;
 
+import "@solmate/utils/FixedPointMathLib.sol";
 import "@uniswapCore/contracts/libraries/FullMath.sol";
 import "@uniswapPeriphery/contracts/libraries/TransferHelper.sol";
 import "@uniswapPeriphery/contracts/interfaces/INonfungiblePositionManager.sol";
@@ -9,6 +10,7 @@ import {UniswapV3Pool} from "@uniswapCore/contracts/UniswapV3Pool.sol";
 
 // TODO we need to add slippage control
 contract UniswapV3Helper {
+    using FixedPointMathLib for uint256;
     ISwapRouter public immutable swapRouter;
     INonfungiblePositionManager public immutable nonfungiblePositionManager;
 
@@ -197,20 +199,20 @@ contract UniswapV3Helper {
         return liquidity;
     }
 
-    // TODO:
     function sqrtPriceX96ToPrice(
         uint160 sqrtPriceX96,
-        uint8 decimalsToken0
+        uint8 decimalsToken0,
+        uint8 decimalsToken1
     ) public pure returns (uint160) {
         uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-        uint256 numerator2 = 10 ** decimalsToken0;
-        return uint160(FullMath.mulDiv(numerator1, numerator2, 1 << 192));
+        uint256 numerator2 = 10 ** (decimalsToken1 - decimalsToken0);
+        return uint160(FullMath.mulDiv(numerator1, numerator2, (1 << 192)));
     }
 
     function priceToSqrtPriceX96(
         uint160 price,
         uint8 decimalsToken0
     ) public pure returns (uint160) {
-        return price;
+        return uint160((FixedPointMathLib.sqrt(uint256(price)) << 96) / (10 ** decimalsToken0));
     }
 }

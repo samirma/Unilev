@@ -11,8 +11,8 @@ error PriceFeedL1__TOKEN_NOT_SUPPORTED(address token);
 contract PriceFeedL1 is Ownable {
     mapping(address => AggregatorV3Interface) public tokenToPriceFeed;
 
-    constructor(address _owner) {
-        transferOwnership(_owner);
+    constructor(address _market) {
+        transferOwnership(_market);
     }
 
     /**
@@ -23,12 +23,8 @@ contract PriceFeedL1 is Ownable {
      * @param _token token address
      * @param _priceFeed price feed address
      */
-    function addPriceFeed(
-        address _token,
-        address _priceFeed
-    ) external onlyOwner {
+    function addPriceFeed(address _token, address _priceFeed) external onlyOwner {
         tokenToPriceFeed[_token] = AggregatorV3Interface(_priceFeed);
-        emit PriceFeedAdded(_token, _priceFeed);
     }
 
     /**
@@ -37,19 +33,13 @@ contract PriceFeedL1 is Ownable {
      * @param _token1 token 1 address
      * @return int256 price of token 0 in terms of token 1
      */
-    function getPairLatestPrice(
-        address _token0,
-        address _token1
-    ) public view returns (uint256) {
+    function getPairLatestPrice(address _token0, address _token1) public view returns (uint256) {
         return
-            (getTokenLatestPriceInUSD(_token0) *
-                uint256(ERC20(_token1).decimals())) /
+            (getTokenLatestPriceInUSD(_token0) * (10 ** uint256(ERC20(_token1).decimals()))) /
             getTokenLatestPriceInUSD(_token1);
     }
 
-    function getTokenLatestPriceInUSD(
-        address _token
-    ) public view returns (uint256) {
+    function getTokenLatestPriceInUSD(address _token) public view returns (uint256) {
         if (address(tokenToPriceFeed[_token]) == address(0)) {
             revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
         }
@@ -66,10 +56,7 @@ contract PriceFeedL1 is Ownable {
         return uint256(priceToken0);
     }
 
-    function isPairSupported(
-        address _token0,
-        address _token1
-    ) public view returns (bool) {
+    function isPairSupported(address _token0, address _token1) public view returns (bool) {
         if (address(tokenToPriceFeed[_token0]) == address(0)) {
             return false;
         }
@@ -78,7 +65,4 @@ contract PriceFeedL1 is Ownable {
         }
         return true;
     }
-
-    // Events
-    event PriceFeedAdded(address token, address priceFeed);
 }
