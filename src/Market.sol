@@ -112,6 +112,10 @@ contract Market is IMarket, Ownable, Pausable {
         emit LiquidityPoolCreated(_token, msg.sender);
     }
 
+    function getTokenToLiquidityPools(address _token) external view returns (address) {
+        return liquidityPoolFactory.getTokenToLiquidityPools(_token);
+    }
+
     function addPriceFeed(address _token, address _priceFeed) external onlyOwner whenNotPaused {
         priceFeed.addPriceFeed(_token, _priceFeed);
         emit PriceFeedAdded(_token, _priceFeed);

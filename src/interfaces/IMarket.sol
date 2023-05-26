@@ -42,6 +42,14 @@ interface IMarket {
     // --------------- Admin Zone ---------------
     function createLiquidityPool(address _token) external;
 
+    function getTokenToLiquidityPools(address _token) external view returns (address);
+
+    function addPriceFeed(address _token, address _priceFeed) external;
+
+    function pause() external;
+
+    function unpause() external;
+
     // Events
     event PositionOpened(
         uint256 indexed posId,

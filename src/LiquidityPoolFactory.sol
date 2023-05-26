@@ -25,27 +25,19 @@ contract LiquidityPoolFactory is Ownable {
      * @param _asset address of the ERC20 token
      * @return address of the new liquidity pool
      */
-    function createLiquidityPool(
-        address _asset
-    ) external onlyOwner returns (address) {
+    function createLiquidityPool(address _asset) external onlyOwner returns (address) {
         address cachedLiquidityPools = tokenToLiquidityPools[_asset];
 
         if (cachedLiquidityPools != address(0))
-            revert LiquidityPoolFactory__POOL_ALREADY_EXIST(
-                cachedLiquidityPools
-            );
+            revert LiquidityPoolFactory__POOL_ALREADY_EXIST(cachedLiquidityPools);
 
-        address _liquidityPool = address(
-            new LiquidityPool(ERC20(_asset), positions)
-        );
+        address _liquidityPool = address(new LiquidityPool(ERC20(_asset), positions));
 
         tokenToLiquidityPools[_asset] = _liquidityPool;
         return _liquidityPool;
     }
 
-    function getTokenToLiquidityPools(
-        address _token
-    ) external view returns (address) {
+    function getTokenToLiquidityPools(address _token) external view returns (address) {
         return tokenToLiquidityPools[_token];
     }
 }
