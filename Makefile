@@ -21,6 +21,8 @@ compile:; forge compile --via-ir
 
 test :; forge test -vv --via-ir
 
+test fork :; forge test --fork-url ${ETH_RPC_URL} -vv --via-ir
+
 snapshot :; forge snapshot
 
 slither :; slither ./src 

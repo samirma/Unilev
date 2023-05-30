@@ -57,11 +57,7 @@ contract LiquidityPool is ERC4626, Ownable {
     ) external onlyOwner {
         // Losses are taken by the pool
         borrowedFunds -= (_amountBorrowed - _losses);
-        asset.safeTransferFrom(
-            msg.sender,
-            address(this),
-            _amountBorrowed + _interests - _losses
-        );
+        asset.safeTransferFrom(msg.sender, address(this), _amountBorrowed + _interests - _losses);
     }
 
     // --------------- View Zone ---------------
