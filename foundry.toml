@@ -4,9 +4,5 @@ out = 'out'
 libs = ['lib']
 gas_reports = ["*"]
 optimizer = true
-optimizer_runs = 20000
+optimizer_runs = 1000
 solc = "0.8.19"
-
-# Remappings in remappings.txt
-
-# See more config options https://github.com/gakonst/foundry/tree/master/config
