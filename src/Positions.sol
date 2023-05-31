@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@uniswapCore/contracts/libraries/TickMath.sol";
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
+
 import "./PriceFeedL1.sol";
 import "./LiquidityPoolFactory.sol";
 import {UniswapV3Helper} from "./UniswapV3Helper.sol";
@@ -73,14 +74,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     mapping(uint256 => PositionParams) public openPositions;
 
     constructor(
-        address _market,
         address _priceFeed,
         address _liquidityPoolFactory,
         address _liquidityPoolFactoryUniswapV3,
         address _uniswapV3Helper,
         uint256 _liquidationReward
     ) ERC721("Uniswap-MAX", "UNIMAX") {
-        transferOwnership(_market);
         liquidityPoolFactoryUniswapV3 = _liquidityPoolFactoryUniswapV3;
         liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
         priceFeed = PriceFeedL1(_priceFeed);
@@ -271,6 +270,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         int24 tickLower;
 
         if (_isShort) {
+            ERC20(baseToken).safeApprove(address(uniswapV3Helper), totalBorrow);
             amountBorrow = uniswapV3Helper.swapExactInputSingle(
                 baseToken,
                 quoteToken,
@@ -297,6 +297,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             }
         } else {
             if (_leverage != 0) {
+                ERC20(quoteToken).safeApprove(address(uniswapV3Helper), totalBorrow);
                 amountBorrow = uniswapV3Helper.swapExactInputSingle(
                     quoteToken,
                     baseToken,
@@ -554,6 +555,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     amountTokenReceived += posParms.collateralSize;
                 }
                 // we need first to swap back to refund the pool
+                ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
                 (uint256 inAmount, uint256 outAmount) = uniswapV3Helper.swapMaxTokenPossible(
                     addTokenReceived,
                     addTokenBorrowed,
@@ -584,6 +586,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             if (posParms.isShort) {
                 amountTokenReceived += posParms.collateralSize;
             }
+            ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
             uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
                 addTokenReceived,
                 addTokenBorrowed,

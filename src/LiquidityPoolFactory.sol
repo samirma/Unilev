@@ -7,17 +7,18 @@ import "./LiquidityPool.sol";
 
 // Errors
 error LiquidityPoolFactory__POOL_ALREADY_EXIST(address pool);
+error LiquidityPoolFactory__POSITIONS_ALREADY_DEFINED();
 
 contract LiquidityPoolFactory is Ownable {
-    address public immutable market;
-    address public immutable positions;
+    address public positions;
 
     mapping(address => address) private tokenToLiquidityPools;
 
-    constructor(address _positions, address _market) {
-        market = _market;
+    function addPositionsAddress(address _positions) external onlyOwner {
+        if (positions != address(0)) {
+            revert LiquidityPoolFactory__POSITIONS_ALREADY_DEFINED();
+        }
         positions = _positions;
-        transferOwnership(_market);
     }
 
     /**

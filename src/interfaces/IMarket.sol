@@ -40,7 +40,7 @@ interface IMarket {
     function getLiquidablePositions() external view returns (uint256[] memory);
 
     // --------------- Admin Zone ---------------
-    function createLiquidityPool(address _token) external;
+    function createLiquidityPool(address _token) external returns (address);
 
     function getTokenToLiquidityPools(address _token) external view returns (address);
 

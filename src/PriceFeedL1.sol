@@ -11,9 +11,11 @@ error PriceFeedL1__TOKEN_NOT_SUPPORTED(address token);
 contract PriceFeedL1 is Ownable {
     mapping(address => AggregatorV3Interface) public tokenToPriceFeedETH;
     AggregatorV3Interface public ethToUsdPriceFeed;
+    ERC20 public immutable weth;
 
-    constructor(address _market) {
-        transferOwnership(_market);
+    constructor(address _ethToUsdPriceFeed, address _weth) {
+        ethToUsdPriceFeed = AggregatorV3Interface(_ethToUsdPriceFeed);
+        weth = ERC20(_weth);
     }
 
     /**
@@ -43,6 +45,9 @@ contract PriceFeedL1 is Ownable {
     function getTokenLatestPriceInETH(address _token) public view returns (uint256) {
         if (address(tokenToPriceFeedETH[_token]) == address(0)) {
             revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
+        }
+        if (_token == address(weth)) {
+            return 1e18;
         }
 
         // prettier-ignore

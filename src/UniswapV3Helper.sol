@@ -201,18 +201,29 @@ contract UniswapV3Helper {
 
     function sqrtPriceX96ToPrice(
         uint160 sqrtPriceX96,
-        uint8 decimalsToken0,
-        uint8 decimalsToken1
+        uint8 decimalsToken0
     ) public pure returns (uint160) {
-        uint256 numerator1 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96);
-        uint256 numerator2 = 10 ** (decimalsToken1 - decimalsToken0);
-        return uint160(FullMath.mulDiv(numerator1, numerator2, (1 << 192)));
+        return
+            uint160(
+                FullMath.mulDiv(
+                    uint256(sqrtPriceX96) * uint256(sqrtPriceX96),
+                    10 ** decimalsToken0,
+                    (1 << 192)
+                )
+            );
     }
 
     function priceToSqrtPriceX96(
         uint160 price,
         uint8 decimalsToken0
     ) public pure returns (uint160) {
-        return uint160((FixedPointMathLib.sqrt(uint256(price)) << 96) / (10 ** decimalsToken0));
+        return
+            uint160(
+                FullMath.mulDiv(
+                    FixedPointMathLib.sqrt(uint256(price)),
+                    1 << 96,
+                    (10 ** (decimalsToken0 / 2))
+                )
+            );
     }
 }
