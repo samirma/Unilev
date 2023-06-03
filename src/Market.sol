@@ -29,8 +29,9 @@ contract Market is IMarket, Ownable, Pausable {
 
     // --------------- Trader Zone ---------------
     function openPosition(
-        address _v3Pool,
-        address _token,
+        address _token0,
+        address _token1,
+        uint24 _fee,
         bool _isShort,
         uint8 _leverage,
         uint128 _amount,
@@ -39,8 +40,9 @@ contract Market is IMarket, Ownable, Pausable {
     ) external whenNotPaused {
         uint256 posId = positions.openPosition(
             msg.sender,
-            _v3Pool,
-            _token,
+            _token0,
+            _token1,
+            _fee,
             _isShort,
             _leverage,
             _amount,
@@ -50,8 +52,8 @@ contract Market is IMarket, Ownable, Pausable {
         emit PositionOpened(
             posId,
             msg.sender,
-            _v3Pool,
-            _token,
+            _token0,
+            _token1,
             _amount,
             _isShort,
             _leverage,
@@ -72,6 +74,26 @@ contract Market is IMarket, Ownable, Pausable {
 
     function getTraderPositions(address _traderAdd) external view returns (uint256[] memory) {
         return positions.getTraderPositions(_traderAdd);
+    }
+
+    function getPositionParams(
+        uint256 _posId
+    )
+        external
+        view
+        returns (
+            address baseToken_,
+            address quoteToken_,
+            uint128 positionSize_,
+            uint64 timestamp_,
+            bool isShort_,
+            uint8 leverage_,
+            uint256 breakEvenLimit_,
+            uint160 limitPrice_,
+            uint256 stopLossPrice_
+        )
+    {
+        return positions.getPositionParams(_posId);
     }
 
     // --------------- Liquidity Provider Zone ---------------
@@ -131,4 +153,15 @@ contract Market is IMarket, Ownable, Pausable {
     function unpause() external onlyOwner {
         _unpause();
     }
+
+    function openPosition(
+        address _token0,
+        address _token1,
+        int24 _fee,
+        bool _isShort,
+        uint8 _leverage,
+        uint128 _amount,
+        uint160 _limitPrice,
+        uint256 _stopLossPrice
+    ) external override {}
 }

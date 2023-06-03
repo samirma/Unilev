@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import "@solmate/tokens/ERC20.sol";
-import "@uniswapCore/contracts/interfaces/IUniswapV3Pool.sol";
+import "@uniswapCore/contracts/UniswapV3Pool.sol";
 
 /*
  * @title IMarket interface
@@ -13,8 +13,9 @@ import "@uniswapCore/contracts/interfaces/IUniswapV3Pool.sol";
 interface IMarket {
     // --------------- Trader Zone ---------------
     function openPosition(
-        address _v3Pool,
-        address _token,
+        address _token0,
+        address _token1,
+        int24 _fee,
         bool _isShort,
         uint8 _leverage,
         uint128 _amount,
@@ -27,6 +28,23 @@ interface IMarket {
     function editPosition(uint256 _posId, uint256 _newLstopLossPrice) external;
 
     function getTraderPositions(address _traderAdd) external view returns (uint256[] memory);
+
+    function getPositionParams(
+        uint256 _posId
+    )
+        external
+        view
+        returns (
+            address baseToken_,
+            address quoteToken_,
+            uint128 positionSize_,
+            uint64 timestamp_,
+            bool isShort_,
+            uint8 leverage_,
+            uint256 breakEvenLimit_,
+            uint160 limitPrice_,
+            uint256 stopLossPrice_
+        );
 
     // --------------- Liquidity Provider Zone ---------------
     function addLiquidity(address _poolAdd, uint256 _amount) external;
@@ -54,8 +72,8 @@ interface IMarket {
     event PositionOpened(
         uint256 indexed posId,
         address indexed trader,
-        address indexed v3Pool,
-        address token,
+        address indexed token0,
+        address token1,
         uint256 amount,
         bool isShort,
         uint8 leverage,

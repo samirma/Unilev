@@ -21,9 +21,8 @@ sizer:; forge build --sizes --via-ir
 
 compile:; forge compile --via-ir
 
-test :; forge test -vv --gas-report --via-ir
-
-test fork :; forge test --fork-url ${ETH_RPC_URL} -vv --gas-report --via-ir 
+test :; forge test --fork-url ${ETH_RPC_URL} -vv --via-ir 
+test-gas :; forge test --fork-url ${ETH_RPC_URL} -vv --gas-report --via-ir 
 
 slither :; slither ./src 
 

@@ -60,7 +60,7 @@ contract TestSetup is Test, HelperConfig {
         // mocks
         mockV3AggregatorWBTCETH = new MockV3Aggregator(18, 1 ether); // 1 WBTC = 1 ETH
         mockV3AggregatorUSDCETH = new MockV3Aggregator(18, 1e15); // 1 USDC = 0,0001 ETH
-        mockV3AggregatorETHUSD = new MockV3Aggregator(8, 1000e8); // 1 ETH = 1000 USD
+        mockV3AggregatorETHUSD = new MockV3Aggregator(8, 100000000000000e8); // 1 ETH = 1000 USD
 
         // contracts
         uniswapV3Helper = new UniswapV3Helper(conf.nonfungiblePositionManager, conf.swapRouter);

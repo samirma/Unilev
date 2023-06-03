@@ -222,7 +222,7 @@ contract UniswapV3Helper {
                 FullMath.mulDiv(
                     FixedPointMathLib.sqrt(uint256(price)),
                     1 << 96,
-                    (10 ** (decimalsToken0 / 2))
+                    (10 ** (decimalsToken0 >> 1))
                 )
             );
     }
