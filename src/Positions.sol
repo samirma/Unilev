@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "forge-std/console.sol";
-
 import "@solmate/tokens/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -70,8 +68,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     uint256 public constant BORROW_FEE_EVERY_HOURS = 1; // 0.01% : assets borrowed/total assets in pool * 0.01%
     uint256 public constant ORACLE_DECIMALS_USD = 8; // Chainlink decimals for USD
     uint256 public immutable LIQUIDATION_REWARD; // 10 USD : //! to be changed depending of the blockchain average gas price
-    string private constant BASE_SVG =
-        "<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='xMinYMin meet' viewBox='0 0 350 350'><style>.base { fill: white; font-family: serif; font-size: 24px; }</style><rect width='100%' height='100%' fill='black' /><text x='50%' y='50%' class='base' dominant-baseline='middle' text-anchor='middle'>";
+    // string private constant BASE_SVG =
+    //     "<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='xMinYMin meet' viewBox='0 0 350 350'><style>.base { fill: white; font-family: serif; font-size: 24px; }</style><rect width='100%' height='100%' fill='black' /><text x='50%' y='50%' class='base' dominant-baseline='middle' text-anchor='middle'>";
 
     LiquidityPoolFactory public immutable liquidityPoolFactory;
     PriceFeedL1 public immutable priceFeed;
@@ -142,65 +140,65 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         _burn(_posId);
     }
 
-    function tokenURI(
-        uint256 _posId
-    ) public view virtual override isPositionOpen(_posId) returns (string memory) {
-        string memory json = Base64.encode(
-            bytes(string.concat(tokenURIIntro(_posId), tokenURIAttributes(openPositions[_posId])))
-        );
+    // function tokenURI(
+    //     uint256 _posId
+    // ) public view virtual override isPositionOpen(_posId) returns (string memory) {
+    //     string memory json = Base64.encode(
+    //         bytes(string.concat(tokenURIIntro(_posId), tokenURIAttributes(openPositions[_posId])))
+    //     );
 
-        return string.concat("data:application/json;base64,", json);
-    }
+    //     return string.concat("data:application/json;base64,", json);
+    // }
 
-    function tokenURIIntro(uint256 _tokenId) private pure returns (string memory) {
-        return
-            string.concat(
-                '{"name": "Uniswap-Max Position #',
-                Strings.toString(_tokenId),
-                '", "description": "This NFT represent a position on Uniswap-Max. The owner can close or edit the position.", "image": "',
-                imageURI(_tokenId)
-            );
-    }
+    // function tokenURIIntro(uint256 _tokenId) private pure returns (string memory) {
+    //     return
+    //         string.concat(
+    //             '{"name": "Uniswap-Max Position #',
+    //             Strings.toString(_tokenId),
+    //             '", "description": "This NFT represent a position on Uniswap-Max. The owner can close or edit the position.", "image": "',
+    //             imageURI(_tokenId)
+    //         );
+    // }
 
-    function tokenURIAttributes(
-        PositionParams memory _position
-    ) private view returns (string memory) {
-        string[2] memory parts = [
-            // To avoid stack too deep error
-            string.concat(
-                '", "attributes": [ { "trait_type": "Tokens", "value": "',
-                _position.baseToken.name(),
-                "/",
-                _position.quoteToken.name(),
-                '"}, { "trait_type": "Amount", "value": "',
-                Strings.toString(_position.positionSize),
-                '"} , { "trait_type": "Direction", "value": "',
-                _position.isShort ? "Short" : "Long",
-                '"}, { "trait_type": "Leverage", "value": "',
-                Strings.toString(_position.leverage)
-            ),
-            string.concat(
-                '"}, { "trait_type": "Limit Price", "value": "',
-                Strings.toString(_position.limitPrice),
-                '"}, { "trait_type": "Stop Loss Price", "value": "',
-                Strings.toString(_position.stopLossPrice),
-                '"}]}'
-            )
-        ];
+    // function tokenURIAttributes(
+    //     PositionParams memory _position
+    // ) private view returns (string memory) {
+    //     string[2] memory parts = [
+    //         // To avoid stack too deep error
+    //         string.concat(
+    //             '", "attributes": [ { "trait_type": "Tokens", "value": "',
+    //             _position.baseToken.name(),
+    //             "/",
+    //             _position.quoteToken.name(),
+    //             '"}, { "trait_type": "Amount", "value": "',
+    //             Strings.toString(_position.positionSize),
+    //             '"} , { "trait_type": "Direction", "value": "',
+    //             _position.isShort ? "Short" : "Long",
+    //             '"}, { "trait_type": "Leverage", "value": "',
+    //             Strings.toString(_position.leverage)
+    //         ),
+    //         string.concat(
+    //             '"}, { "trait_type": "Limit Price", "value": "',
+    //             Strings.toString(_position.limitPrice),
+    //             '"}, { "trait_type": "Stop Loss Price", "value": "',
+    //             Strings.toString(_position.stopLossPrice),
+    //             '"}]}'
+    //         )
+    //     ];
 
-        return string.concat(parts[0], parts[1]);
-    }
+    //     return string.concat(parts[0], parts[1]);
+    // }
 
-    function imageURI(uint256 _tokenId) private pure returns (string memory) {
-        string memory svg = string.concat(
-            BASE_SVG,
-            "UNISWAP-MAX #",
-            Strings.toString(_tokenId),
-            "</text></svg>"
-        );
+    // function imageURI(uint256 _tokenId) private pure returns (string memory) {
+    //     string memory svg = string.concat(
+    //         BASE_SVG,
+    //         "UNISWAP-MAX #",
+    //         Strings.toString(_tokenId),
+    //         "</text></svg>"
+    //     );
 
-        return string.concat("data:image/svg+xml;base64,", Base64.encode(bytes(svg)));
-    }
+    //     return string.concat("data:image/svg+xml;base64,", Base64.encode(bytes(svg)));
+    // }
 
     // --------------- Trader Zone ---------------
 
@@ -832,7 +830,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             _tickLower,
             _tickUpper
         );
-        // uniswapV3Helper.retrieveNFT(tokenId);
     }
 
     function burnV3Position(uint256 _tokenId) private returns (uint256, uint256) {

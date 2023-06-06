@@ -15,8 +15,9 @@ import {SwapRouter} from "@uniswapPeriphery/contracts/SwapRouter.sol";
 import "forge-std/Test.sol";
 import "../test/utils/HelperConfig.sol";
 import "../test/mocks/MockV3Aggregator.sol";
+import {Utils} from "../test/utils/Utils.sol";
 
-contract Deployments is Test, HelperConfig {
+contract Deployments is Test, HelperConfig, Utils {
     UniswapV3Helper public uniswapV3Helper;
     LiquidityPoolFactory public liquidityPoolFactory;
     PriceFeedL1 public priceFeedL1;
@@ -88,6 +89,19 @@ contract Deployments is Test, HelperConfig {
         // add price feeds
         market.addPriceFeed(conf.addWBTC, address(mockV3AggregatorWBTCETH));
         market.addPriceFeed(conf.addUSDC, address(mockV3AggregatorUSDCETH));
+
+        // add liquidity to a pool to be able to open a short position
+        // writeTokenBalance(msg.sender, conf.addWBTC, 100e8);
+        // writeTokenBalance(msg.sender, conf.addWETH, 1000e18);
+        // writeTokenBalance(msg.sender, conf.addUSDC, 100000000e6);
+
+        // ERC20(conf.addWBTC).approve(address(lbPoolWBTC), 10e8);
+        // ERC20(conf.addWETH).approve(address(lbPoolWETH), 100e18);
+        // ERC20(conf.addUSDC).approve(address(lbPoolUSDC), 10000000e6);
+
+        // lbPoolWBTC.deposit(10e8, msg.sender);
+        // lbPoolWETH.deposit(100e18, msg.sender);
+        // lbPoolUSDC.deposit(10000000e6, msg.sender);
 
         vm.stopBroadcast();
     }
