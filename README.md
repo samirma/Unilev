@@ -26,7 +26,6 @@ You'll need to add the following variables to a `.env` file:
 ```sh
 git https://github.com/Los-Byzantinos/Uniswap-Max
 cd Uniswap-Max
-make # This installs the project's dependencies.
 ```
 
 Fill **ETH_RPC_URL** in `.env`

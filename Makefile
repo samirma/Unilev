@@ -2,7 +2,7 @@
 
 .PHONY: all test clean deploy-anvil
 
-all: clean remove install update build
+all: clean install update build
 
 # Clean the repo
 clean  :; forge clean

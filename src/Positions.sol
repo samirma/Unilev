@@ -318,8 +318,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     ERC20(baseToken).safeApprove(address(uniswapV3Helper), amountBorrow);
                     (tokenIdLiquidity, , amount0, amount1) = mintV3Position(
                         UniswapV3Pool(v3Pool),
-                        isBaseToken0 ? 0 : amountBorrow,
                         isBaseToken0 ? amountBorrow : 0,
+                        isBaseToken0 ? 0 : amountBorrow,
                         tickLower,
                         tickUpper
                     );
@@ -636,8 +636,10 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     amountTokenReceived
                 );
                 // loss should not occur here but in case of, we refund the pool
-                int256 lossTemp = int256(outAmount - posParms.totalBorrow - interest);
-                uint256 loss = lossTemp < 0 ? uint256(-lossTemp) : uint256(0);
+                int256 remaining = int256(
+                    int(outAmount) - int(posParms.totalBorrow) - int(interest)
+                );
+                uint256 loss = remaining < 0 ? uint256(-remaining) : uint256(0);
                 ERC20(addTokenBorrowed).safeApprove(
                     address(liquidityPoolToUse),
                     posParms.totalBorrow + interest - loss
@@ -674,7 +676,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     amountTokenReceived
                 );
                 // loss should not occur here but in case of, we refund the pool
-                int256 remaining = int256(outAmount - posParms.totalBorrow - interest);
+                int256 remaining = int256(
+                    int(outAmount) - int(posParms.totalBorrow) - int(interest)
+                );
                 uint256 loss = remaining < 0 ? uint256(-remaining) : uint256(0);
                 ERC20(addTokenBorrowed).safeApprove(
                     address(liquidityPoolToUse),
