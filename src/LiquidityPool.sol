@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import "@solmate/mixins/ERC4626.sol";
-import "@solmate/tokens/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 // Errors
@@ -12,6 +11,7 @@ contract LiquidityPool is ERC4626, Ownable {
     using SafeTransferLib for ERC20;
 
     uint256 private borrowedFunds; // Funds currently used by positions
+
     uint256 private MAX_BORROW_RATIO = 8000; // in basis points => 80%
 
     constructor(
@@ -56,7 +56,7 @@ contract LiquidityPool is ERC4626, Ownable {
         uint256 _losses
     ) external onlyOwner {
         // Losses are taken by the pool
-        borrowedFunds -= (_amountBorrowed - _losses);
+        borrowedFunds = uint256(int256(borrowedFunds) - int256(_amountBorrowed));
         asset.safeTransferFrom(msg.sender, address(this), _amountBorrowed + _interests - _losses);
     }
 

@@ -9,6 +9,7 @@ contract HelperConfig {
         address priceFeedETHUSD;
         address priceFeedBTCETH;
         address priceFeedUSDCETH;
+        address priceFeedDAIETH;
         address nonfungiblePositionManager;
         address swapRouter;
         address liquidityPoolFactoryUniswapV3;
@@ -16,9 +17,7 @@ contract HelperConfig {
         address addWBTC;
         address addWETH;
         address addUSDC;
-        address poolUSDCWETH;
-        address poolWBTCUSDC;
-        address poolWBTCWETH;
+        address addDAI;
     }
 
     mapping(uint256 => NetworkConfig) public chainIdToNetworkConfig;
@@ -62,6 +61,7 @@ contract HelperConfig {
             priceFeedETHUSD: address(0), // This is a mock
             priceFeedBTCETH: address(0),
             priceFeedUSDCETH: address(0),
+            priceFeedDAIETH: address(0),
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             liquidityPoolFactoryUniswapV3: 0x1F98431c8aD98523631AE4a59f267346ea31F984,
@@ -69,9 +69,7 @@ contract HelperConfig {
             addWBTC: 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
             addWETH: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
             addUSDC: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
-            poolUSDCWETH: 0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8,
-            poolWBTCUSDC: 0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35,
-            poolWBTCWETH: 0xCBCdF9626bC03E24f779434178A73a0B4bad62eD
+            addDAI: 0x6B175474E89094C44Da98b954EedeAC495271d0F
         });
     }
 }

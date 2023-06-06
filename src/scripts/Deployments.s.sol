@@ -28,9 +28,6 @@ contract Deployments is Test, HelperConfig {
     LiquidityPool public lbPoolWBTC;
     LiquidityPool public lbPoolWETH;
     LiquidityPool public lbPoolUSDC;
-    UniswapV3Pool public poolUSDCWETH;
-    UniswapV3Pool public poolWBTCUSDC;
-    UniswapV3Pool public poolWBTCWETH;
     SwapRouter public swapRouter;
     address public alice;
     address public bob;
@@ -48,9 +45,6 @@ contract Deployments is Test, HelperConfig {
 
         // mainnet context
         swapRouter = SwapRouter(payable(conf.swapRouter));
-        poolUSDCWETH = UniswapV3Pool(conf.poolUSDCWETH);
-        poolWBTCUSDC = UniswapV3Pool(conf.poolWBTCUSDC);
-        poolWBTCWETH = UniswapV3Pool(conf.poolWBTCWETH);
 
         /// deployments
         // mocks
@@ -66,6 +60,7 @@ contract Deployments is Test, HelperConfig {
             address(priceFeedL1),
             address(liquidityPoolFactory),
             conf.liquidityPoolFactoryUniswapV3,
+            conf.nonfungiblePositionManager,
             address(uniswapV3Helper),
             conf.liquidationReward
         );

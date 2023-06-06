@@ -15,8 +15,9 @@ import {SwapRouter} from "@uniswapPeriphery/contracts/SwapRouter.sol";
 
 import "forge-std/Test.sol";
 import "../utils/HelperConfig.sol";
+import {Utils} from "./Utils.sol";
 
-contract TestSetup is Test, HelperConfig {
+contract TestSetup is Test, HelperConfig, Utils {
     UniswapV3Helper public uniswapV3Helper;
     LiquidityPoolFactory public liquidityPoolFactory;
     PriceFeedL1 public priceFeedL1;
@@ -24,13 +25,12 @@ contract TestSetup is Test, HelperConfig {
     Positions public positions;
     MockV3Aggregator public mockV3AggregatorWBTCETH;
     MockV3Aggregator public mockV3AggregatorUSDCETH;
+    MockV3Aggregator public mockV3AggregatorDAIETH;
     MockV3Aggregator public mockV3AggregatorETHUSD;
     LiquidityPool public lbPoolWBTC;
     LiquidityPool public lbPoolWETH;
     LiquidityPool public lbPoolUSDC;
-    UniswapV3Pool public poolUSDCWETH;
-    UniswapV3Pool public poolWBTCUSDC;
-    UniswapV3Pool public poolWBTCWETH;
+
     SwapRouter public swapRouter;
     address public alice;
     address public bob;
@@ -50,9 +50,6 @@ contract TestSetup is Test, HelperConfig {
 
         // mainnet context
         swapRouter = SwapRouter(payable(conf.swapRouter));
-        poolUSDCWETH = UniswapV3Pool(conf.poolUSDCWETH);
-        poolWBTCUSDC = UniswapV3Pool(conf.poolWBTCUSDC);
-        poolWBTCWETH = UniswapV3Pool(conf.poolWBTCWETH);
 
         vm.startPrank(deployer);
 
@@ -60,6 +57,7 @@ contract TestSetup is Test, HelperConfig {
         // mocks
         mockV3AggregatorWBTCETH = new MockV3Aggregator(18, 1 ether); // 1 WBTC = 1 ETH
         mockV3AggregatorUSDCETH = new MockV3Aggregator(18, 1e15); // 1 USDC = 0,0001 ETH
+        mockV3AggregatorDAIETH = new MockV3Aggregator(18, 1e15); // 1 DAI = 0,0001 ETH
         mockV3AggregatorETHUSD = new MockV3Aggregator(8, 100000000000000e8); // 1 ETH = 1000 USD
 
         // contracts
@@ -70,6 +68,7 @@ contract TestSetup is Test, HelperConfig {
             address(priceFeedL1),
             address(liquidityPoolFactory),
             conf.liquidityPoolFactoryUniswapV3,
+            conf.nonfungiblePositionManager,
             address(uniswapV3Helper),
             conf.liquidationReward
         );
@@ -97,6 +96,23 @@ contract TestSetup is Test, HelperConfig {
         // add price feeds
         market.addPriceFeed(conf.addWBTC, address(mockV3AggregatorWBTCETH));
         market.addPriceFeed(conf.addUSDC, address(mockV3AggregatorUSDCETH));
+        market.addPriceFeed(conf.addDAI, address(mockV3AggregatorDAIETH));
+        vm.stopPrank();
+
+        // add liquidity to a pool to be able to open a short position
+        vm.startPrank(bob);
+        writeTokenBalance(bob, conf.addWBTC, 10e8);
+        writeTokenBalance(bob, conf.addWETH, 100e18);
+        writeTokenBalance(bob, conf.addUSDC, 10000000e6);
+
+        ERC20(conf.addWBTC).approve(address(lbPoolWBTC), 10e8);
+        ERC20(conf.addWETH).approve(address(lbPoolWETH), 100e18);
+        ERC20(conf.addUSDC).approve(address(lbPoolUSDC), 10000000e6);
+
+        lbPoolWBTC.deposit(10e8, bob);
+        lbPoolWETH.deposit(100e18, bob);
+        lbPoolUSDC.deposit(10000000e6, bob);
+
         vm.stopPrank();
     }
 }

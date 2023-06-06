@@ -46,14 +46,11 @@ interface IMarket {
             uint256 stopLossPrice_
         );
 
-    // --------------- Liquidity Provider Zone ---------------
-    function addLiquidity(address _poolAdd, uint256 _amount) external;
-
-    function removeLiquidity(address _poolAdd, uint256 _amount) external;
-
     // --------------- Liquidator/Keeper Zone ---------------
 
     function liquidatePositions(uint256[] memory _posIds) external;
+
+    function liquidatePosition(uint256 _posId) external;
 
     function getLiquidablePositions() external view returns (uint256[] memory);
 

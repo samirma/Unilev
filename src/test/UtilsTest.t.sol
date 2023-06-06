@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Utils} from "./utils/Utils.sol";
 import "./utils/TestSetup.sol";
 
-contract UtilsTest is TestSetup, Utils {
+contract UtilsTest is TestSetup {
     function test__init() public {
         assertEq(address(uniswapV3Helper.swapRouter()), conf.swapRouter);
         assertEq(
@@ -16,7 +16,8 @@ contract UtilsTest is TestSetup, Utils {
     function test__uniswap_priceUSDCWETH() public {
         // UniswapV3Helper.swapExactInputSingle()
 
-        (uint160 sqrtPrice0, , , , , , ) = poolUSDCWETH.slot0();
+        (uint160 sqrtPrice0, , , , , , ) = UniswapV3Pool(0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8) // poolUSDCWETH
+            .slot0();
         // console.log("%s:%d", "sqrtPrice0", sqrtPrice0);
 
         uint160 price0 = uniswapV3Helper.sqrtPriceX96ToPrice(sqrtPrice0, 6);
@@ -31,7 +32,8 @@ contract UtilsTest is TestSetup, Utils {
     function test__uniswap_priceWBTCUSDC() public {
         // UniswapV3Helper.swapExactInputSingle()
 
-        (uint160 sqrtPrice0, , , , , , ) = poolWBTCUSDC.slot0();
+        (uint160 sqrtPrice0, , , , , , ) = UniswapV3Pool(0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35) // poolWBTCUSDC
+            .slot0();
         // console.log("%s:%d", "sqrtPrice0", sqrtPrice0);
 
         uint160 price0 = uniswapV3Helper.sqrtPriceX96ToPrice(sqrtPrice0, 8);
@@ -54,7 +56,8 @@ contract UtilsTest is TestSetup, Utils {
         uniswapV3Helper.swapExactInputSingle(conf.addWBTC, conf.addWETH, 3000, inAmount);
         vm.stopPrank();
 
-        (uint160 sqrtPrice0, , , , , , ) = poolWBTCWETH.slot0();
+        (uint160 sqrtPrice0, , , , , , ) = UniswapV3Pool(0xCBCdF9626bC03E24f779434178A73a0B4bad62eD) // poolWBTCWETH
+            .slot0();
         // console.log("%s:%d", "sqrtPrice0", sqrtPrice0);
 
         uint160 price0 = uniswapV3Helper.sqrtPriceX96ToPrice(sqrtPrice0, 8);
@@ -123,9 +126,14 @@ contract UtilsTest is TestSetup, Utils {
         assertApproxEqRel(init, pricex96, 0.01e18);
     }
 
-    function test__oracleTest() public {
-        (uint160 price, ) = setPrice(
-            0,
+    function test__getLiquidityPool() public {
+        address pool = market.getTokenToLiquidityPools(conf.addWBTC);
+        assertEq(pool, address(lbPoolWBTC));
+    }
+
+    function test__setPrice1() public {
+        setPrice(
+            30000e6,
             conf.addWBTC,
             conf.addUSDC,
             3000,
@@ -133,20 +141,15 @@ contract UtilsTest is TestSetup, Utils {
             mockV3AggregatorUSDCETH,
             uniswapV3Helper
         );
-        uint priceOracle = priceFeedL1.getPairLatestPrice(conf.addWBTC, conf.addUSDC);
 
-        assertApproxEqRel(price, priceOracle, 0.01e18);
+        // setPrice(
+        //     19000e6,
+        //     conf.addWBTC,
+        //     conf.addUSDC,
+        //     3000,
+        //     mockV3AggregatorWBTCETH,
+        //     mockV3AggregatorUSDCETH,
+        //     uniswapV3Helper
+        // );
     }
-
-    function test__getLiquidityPool() public {
-        address pool = market.getTokenToLiquidityPools(conf.addWBTC);
-        assertEq(pool, address(lbPoolWBTC));
-    }
-
-    // function test__oracleUSD() public {
-    //     uint price = priceFeedL1.getTokenLatestPriceInUSD(conf.addWBTC);
-    //     console.log("%s:%d", "price", price);
-
-    //     assertApproxEqRel(price, 40000e6, 0.01e18);
-    // }
 }

@@ -11,6 +11,8 @@ import "./LiquidityPoolFactory.sol";
 import "./PriceFeedL1.sol";
 
 contract Market is IMarket, Ownable, Pausable {
+    using SafeTransferLib for ERC20;
+
     Positions private immutable positions;
     LiquidityPoolFactory private immutable liquidityPoolFactory;
     PriceFeedL1 private immutable priceFeed;
@@ -96,22 +98,6 @@ contract Market is IMarket, Ownable, Pausable {
         return positions.getPositionParams(_posId);
     }
 
-    // --------------- Liquidity Provider Zone ---------------
-    /** @notice provide a simple interface to deal with pools.
-     *          Of course a user can interact directly with the
-     *          pool contract if he wants through deposit/withdraw
-     *          and mint/redeem functions
-     */
-    function addLiquidity(address _poolAdd, uint256 _assets) external whenNotPaused {
-        LiquidityPool(_poolAdd).deposit(_assets, msg.sender);
-        emit LiquidityAdded(_poolAdd, msg.sender, _assets);
-    }
-
-    function removeLiquidity(address _poolAdd, uint256 _shares) external whenNotPaused {
-        LiquidityPool(_poolAdd).redeem(_shares, msg.sender, msg.sender);
-        emit LiquidityRemoved(_poolAdd, msg.sender, _shares);
-    }
-
     // --------------- Liquidator/Keeper Zone ----------------
     function liquidatePositions(uint256[] memory _posIds) external whenNotPaused {
         uint256 len = _posIds.length;
@@ -122,6 +108,11 @@ contract Market is IMarket, Ownable, Pausable {
                 emit PositionLiquidated(_posIds[i], msg.sender);
             } catch {}
         }
+    }
+
+    function liquidatePosition(uint256 _posId) external whenNotPaused {
+        positions.liquidatePosition(msg.sender, _posId);
+        emit PositionLiquidated(_posId, msg.sender);
     }
 
     function getLiquidablePositions() external view returns (uint256[] memory) {

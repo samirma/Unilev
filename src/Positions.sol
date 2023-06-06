@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import "forge-std/console.sol";
+
 import "@solmate/tokens/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -10,6 +12,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@uniswapCore/contracts/libraries/TickMath.sol";
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
 import "@uniswapCore/contracts/UniswapV3Factory.sol";
+import "@uniswapPeriphery/contracts/interfaces/INonfungiblePositionManager.sol";
 
 import "./PriceFeedL1.sol";
 import "./LiquidityPoolFactory.sol";
@@ -73,8 +76,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     PriceFeedL1 public immutable priceFeed;
     UniswapV3Helper public immutable uniswapV3Helper;
     address public immutable liquidityPoolFactoryUniswapV3;
+    address public immutable nonfungiblePositionManager;
 
-    uint256 public posId;
+    uint256 public posId = 1;
     uint256 public totalNbPos;
     mapping(uint256 => PositionParams) public openPositions;
 
@@ -82,10 +86,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         address _priceFeed,
         address _liquidityPoolFactory,
         address _liquidityPoolFactoryUniswapV3,
+        address _nonfungiblePositionManager,
         address _uniswapV3Helper,
         uint256 _liquidationReward
     ) ERC721("Uniswap-MAX", "UNIMAX") {
         liquidityPoolFactoryUniswapV3 = _liquidityPoolFactoryUniswapV3;
+        nonfungiblePositionManager = _nonfungiblePositionManager;
         liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
         priceFeed = PriceFeedL1(_priceFeed);
         uniswapV3Helper = UniswapV3Helper(_uniswapV3Helper);
@@ -113,6 +119,16 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     }
 
     // --------------- ERC721 Zone ---------------
+
+    // Implementing `onERC721Received` so this contract can receive custody of erc721 tokens
+    function onERC721Received(
+        address operator,
+        address,
+        uint256 tokenId,
+        bytes calldata
+    ) external returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
 
     function safeMint(address to) private returns (uint256) {
         uint256 _posId = posId;
@@ -249,14 +265,25 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     (10 ** ERC20(baseToken).decimals()); // Borrow quoteToken
             }
 
-            uint128 openingFees = (uint128(totalBorrow * BORROW_FEE)) / 10000;
-            totalBorrow = (uint128(totalBorrow * (10000 - BORROW_FEE))) / 10000;
+            uint128 openingFeesToken1 = (uint128(totalBorrow * BORROW_FEE)) / 10000;
             address cacheLiquidityPoolToUse = LiquidityPoolFactory(liquidityPoolFactory)
-                .getTokenToLiquidityPools(_isShort ? quoteToken : baseToken);
+                .getTokenToLiquidityPools(_isShort ? baseToken : quoteToken);
 
-            _amount = _amount - openingFees;
-            ERC20(_token0).safeApprove(cacheLiquidityPoolToUse, openingFees);
-            LiquidityPool(cacheLiquidityPoolToUse).refund(0, openingFees, 0);
+            // fees swap
+            ERC20(_token0).safeApprove(address(uniswapV3Helper), _amount);
+            uint256 openingFeesToken0 = uniswapV3Helper.swapExactOutputSingle(
+                _token0,
+                _token1,
+                UniswapV3Pool(v3Pool).fee(),
+                openingFeesToken1,
+                _amount
+            );
+
+            _amount -= uint128(openingFeesToken0);
+            totalBorrow -= openingFeesToken1;
+
+            ERC20(_token1).safeApprove(cacheLiquidityPoolToUse, openingFeesToken1);
+            LiquidityPool(cacheLiquidityPoolToUse).refund(0, openingFeesToken1, 0);
 
             // fees computation
             uint256 decTokenBorrowed = _isShort
@@ -281,17 +308,15 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 );
 
                 if (_limitPrice != 0) {
-                    tickUpper = TickMath.getTickAtSqrtRatio(
+                    tickLower = TickMath.getTickAtSqrtRatio(
                         uniswapV3Helper.priceToSqrtPriceX96(
                             _limitPrice,
-                            isBaseToken0
-                                ? ERC20(baseToken).decimals()
-                                : ERC20(quoteToken).decimals()
+                            ERC20(baseToken).decimals()
                         )
                     );
-                    tickLower = tickUpper + 1;
-
-                    (tokenIdLiquidity, , amount0, amount1) = uniswapV3Helper.mintPosition(
+                    tickUpper = tickLower + 1;
+                    ERC20(baseToken).safeApprove(address(uniswapV3Helper), amountBorrow);
+                    (tokenIdLiquidity, , amount0, amount1) = mintV3Position(
                         UniswapV3Pool(v3Pool),
                         isBaseToken0 ? 0 : amountBorrow,
                         isBaseToken0 ? amountBorrow : 0,
@@ -313,14 +338,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     tickUpper = TickMath.getTickAtSqrtRatio(
                         uniswapV3Helper.priceToSqrtPriceX96(
                             _limitPrice,
-                            isBaseToken0
-                                ? ERC20(baseToken).decimals()
-                                : ERC20(quoteToken).decimals()
+                            ERC20(baseToken).decimals()
                         )
                     );
-                    tickLower = tickUpper + 1;
-
-                    (tokenIdLiquidity, , amount0, amount1) = uniswapV3Helper.mintPosition(
+                    tickLower = tickUpper - 1;
+                    ERC20(baseToken).safeApprove(address(uniswapV3Helper), amountBorrow + _amount);
+                    (tokenIdLiquidity, , amount0, amount1) = mintV3Position(
                         UniswapV3Pool(v3Pool),
                         isBaseToken0 ? amountBorrow + _amount : 0,
                         isBaseToken0 ? 0 : amountBorrow + _amount,
@@ -333,14 +356,13 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             // if not margin
             if (_limitPrice != 0) {
                 tickUpper = TickMath.getTickAtSqrtRatio(
-                    uniswapV3Helper.priceToSqrtPriceX96(
-                        _limitPrice,
-                        isBaseToken0 ? ERC20(baseToken).decimals() : ERC20(quoteToken).decimals()
-                    )
+                    uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, ERC20(baseToken).decimals())
                 );
-                tickLower = tickUpper + 1;
+                tickLower = tickUpper - 1;
 
-                (tokenIdLiquidity, , amount0, amount1) = uniswapV3Helper.mintPosition(
+                ERC20(baseToken).safeApprove(address(uniswapV3Helper), _amount);
+
+                (tokenIdLiquidity, , amount0, amount1) = mintV3Position(
                     UniswapV3Pool(v3Pool),
                     isBaseToken0 ? _amount : 0,
                     isBaseToken0 ? 0 : _amount,
@@ -518,7 +540,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 state = getPositionState(_posId);
         LiquidityPool liquidityPoolToUse = LiquidityPool(
             LiquidityPoolFactory(liquidityPoolFactory).getTokenToLiquidityPools(
-                posParms.isShort ? address(posParms.quoteToken) : address(posParms.baseToken)
+                posParms.isShort ? address(posParms.baseToken) : address(posParms.quoteToken)
             )
         );
 
@@ -529,7 +551,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         address addTokenBorrowed;
         // Close position
         if (posParms.limitPrice != 0) {
-            (amount0, amount1) = uniswapV3Helper.burnPosition(posParms.tokenIdLiquidity);
+            (amount0, amount1) = burnV3Position(posParms.tokenIdLiquidity);
             /* Since the liquidity position is only 1 tick wide, we can assume
              * that this will rarely revert here. */
             if (amount0 != 0 && amount1 != 0) {
@@ -557,15 +579,19 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             : address(posParms.baseToken);
         // will be used if margin position
         addTokenBorrowed = posParms.isShort
-            ? address(posParms.quoteToken)
-            : address(posParms.baseToken);
+            ? address(posParms.baseToken)
+            : address(posParms.quoteToken);
 
         uint256 amountTokenReceived = amount0 != 0 ? amount0 : amount1;
         uint256 interest = posParms.hourlyFees * ((block.timestamp - posParms.timestamp) / 3600);
 
+        address tokenToTrader = addTokenReceived == address(posParms.baseToken)
+            ? address(posParms.quoteToken)
+            : address(posParms.baseToken);
+
         // These state assume that the oracle price and the uniswap price are CONCISTENT
         if (state == 1) {
-            if (addTokenBorrowed == addTokenReceived) {
+            if (addTokenBorrowed != addTokenReceived) {
                 revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(
                     addTokenBorrowed,
                     addTokenReceived,
@@ -590,9 +616,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 ERC20(addTokenBorrowed).safeTransfer(trader, amountTokenReceived);
             }
         } else if (state == 2) {
-            if (addTokenInitiallySupplied != addTokenReceived) {
+            if (addTokenBorrowed == addTokenReceived) {
                 revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(
-                    addTokenInitiallySupplied,
+                    addTokenBorrowed,
                     addTokenReceived,
                     2
                 );
@@ -602,10 +628,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     amountTokenReceived += posParms.collateralSize;
                 }
                 // we need first to swap back to refund the pool
-                ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
-                (uint256 inAmount, uint256 outAmount) = uniswapV3Helper.swapMaxTokenPossible(
+                (uint256 inAmount, uint256 outAmount) = swapMaxTokenPossible(
                     addTokenReceived,
-                    addTokenBorrowed,
+                    tokenToTrader,
                     UniswapV3Pool(posParms.v3Pool).fee(),
                     posParms.totalBorrow + interest,
                     amountTokenReceived
@@ -627,40 +652,47 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         }
         // state 3, 4 and 5
         else {
-            if (addTokenBorrowed != addTokenReceived) {
+            if (addTokenBorrowed == addTokenReceived) {
                 revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(
                     addTokenBorrowed,
                     addTokenReceived,
                     345
                 );
             }
-            if (posParms.isShort) {
-                amountTokenReceived += posParms.collateralSize;
-            }
-            ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
-            uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
-                addTokenReceived,
-                addTokenBorrowed,
-                UniswapV3Pool(posParms.v3Pool).fee(),
-                amountTokenReceived
-            );
 
             if (isMargin) {
-                int256 lossTemp = int256(outAmount - posParms.totalBorrow - interest);
-                uint256 loss = lossTemp < 0 ? uint256(-lossTemp) : uint256(0);
+                if (posParms.isShort) {
+                    amountTokenReceived += posParms.collateralSize;
+                }
+
+                // we need first to swap back to refund the pool
+                ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
+                uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
+                    addTokenReceived,
+                    addTokenBorrowed,
+                    UniswapV3Pool(posParms.v3Pool).fee(),
+                    amountTokenReceived
+                );
+                // loss should not occur here but in case of, we refund the pool
+                int256 remaining = int256(outAmount - posParms.totalBorrow - interest);
+                uint256 loss = remaining < 0 ? uint256(-remaining) : uint256(0);
                 ERC20(addTokenBorrowed).safeApprove(
                     address(liquidityPoolToUse),
                     posParms.totalBorrow + interest - loss
                 );
                 liquidityPoolToUse.refund(posParms.totalBorrow, interest, loss);
                 if (loss == 0) {
-                    ERC20(addTokenBorrowed).safeTransfer(
-                        trader,
-                        outAmount - posParms.totalBorrow - interest
-                    );
+                    ERC20(addTokenBorrowed).safeTransfer(trader, uint256(remaining));
                 }
             } else {
-                ERC20(addTokenBorrowed).safeTransfer(trader, outAmount);
+                ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
+                uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
+                    addTokenReceived,
+                    tokenToTrader,
+                    UniswapV3Pool(posParms.v3Pool).fee(),
+                    amountTokenReceived
+                );
+                ERC20(tokenToTrader).safeTransfer(trader, outAmount);
             }
         }
 
@@ -701,6 +733,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
      *  - 5. The position is liquidable => bad debt
      */
     function getPositionState(uint256 _posId) public view returns (uint256) {
+        if (!_exists(_posId)) {
+            return 0;
+        }
         bool isShort = openPositions[_posId].isShort;
         uint256 breakEvenLimit = openPositions[_posId].breakEvenLimit;
         uint160 limitPrice = openPositions[_posId].limitPrice;
@@ -756,14 +791,68 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         stopLossPrice_ = openPositions[_posId].stopLossPrice;
     }
 
+    function mintV3Position(
+        UniswapV3Pool _v3Pool,
+        uint256 _amount0ToMint,
+        uint256 _amount1ToMint,
+        int24 _tickLower,
+        int24 _tickUpper
+    ) private returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) {
+        (tokenId, liquidity, amount0, amount1) = uniswapV3Helper.mintPosition(
+            _v3Pool,
+            _amount0ToMint,
+            _amount1ToMint,
+            _tickLower,
+            _tickUpper
+        );
+        // uniswapV3Helper.retrieveNFT(tokenId);
+    }
+
+    function burnV3Position(uint256 _tokenId) private returns (uint256, uint256) {
+        uniswapV3Helper.decreaseLiquidity(_tokenId);
+        (uint256 amount0, uint256 amount1) = uniswapV3Helper.collectAllFees(_tokenId);
+        // INonfungiblePositionManager(nonfungiblePositionManager).burn(_tokenId);
+        return (amount0, amount1);
+    }
+
+    function swapMaxTokenPossible(
+        address _token0,
+        address _token1,
+        uint24 _fee,
+        uint256 amountOut,
+        uint256 amountInMaximum
+    ) private returns (uint256, uint256) {
+        ERC20(_token0).safeApprove(address(uniswapV3Helper), amountInMaximum);
+        uint256 swapCost = uniswapV3Helper.swapExactOutputSingle(
+            _token0,
+            _token1,
+            _fee,
+            amountOut,
+            amountInMaximum
+        );
+        // if swap cannot be done with amountInMaximum
+        if (swapCost == 0) {
+            ERC20(_token0).safeApprove(address(uniswapV3Helper), amountInMaximum);
+            uint256 out = uniswapV3Helper.swapExactInputSingle(
+                _token0,
+                _token1,
+                _fee,
+                amountInMaximum
+            );
+            return (amountInMaximum, out);
+        } else {
+            return (swapCost, amountOut);
+        }
+    }
+
     function getTraderPositions(address _traderAdd) external view returns (uint256[] memory) {
         uint256 nbOfPositions = balanceOf(_traderAdd);
         uint256[] memory traderPositions = new uint[](nbOfPositions);
         // start form the highest posId and stop when the all positions are found
         uint256 posId_;
-        for (uint256 i = posId; i > 0; --i) {
-            if (ownerOf(i - 1) == _traderAdd) {
-                traderPositions[posId_] = i - 1;
+        for (uint256 i = posId - 1; i > 0; --i) {
+            if (_ownerOf(i) == _traderAdd) {
+                traderPositions[posId_] = i;
                 if (++posId_ == nbOfPositions) {
                     break;
                 }
@@ -773,11 +862,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     }
 
     function getLiquidablePositions() external view returns (uint256[] memory) {
-        uint256[] memory liquidablePositions;
+        uint256[] memory liquidablePositions = new uint[](totalNbPos);
         // start form the highest posId and stop when the all positions are found
-        uint256 posId_ = 0;
-        for (uint256 i = posId; i > 0; --i) {
-            if (getPositionState(i) != 2) {
+        uint256 posId_;
+        for (uint256 i = posId - 1; i > 0; --i) {
+            uint state = getPositionState(i);
+            if (state != 2 && state != 0) {
                 liquidablePositions[posId_] = i;
                 if (++posId_ == totalNbPos) {
                     break;
@@ -787,3 +877,25 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         return liquidablePositions;
     }
 }
+
+// if (isMargin) {
+//     if (posParms.isShort) {
+//         amountTokenReceived += posParms.collateralSize;
+//     }
+//     int256 lossTemp = int256(amountTokenReceived - posParms.totalBorrow - interest);
+//     uint256 loss = lossTemp < 0 ? uint256(-lossTemp) : uint256(0);
+//     uint256 totalToRefund = posParms.totalBorrow + interest - loss;
+//     ERC20(addTokenBorrowed).safeApprove(address(liquidityPoolToUse), totalToRefund);
+//     liquidityPoolToUse.refund(posParms.totalBorrow, interest, loss);
+//     if (loss == 0) {
+//         uint256 amountToSwap = amountTokenReceived - totalToRefund;
+//         ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountToSwap);
+//         uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
+//             addTokenReceived,
+//             tokenToTrader,
+//             UniswapV3Pool(posParms.v3Pool).fee(),
+//             amountToSwap
+//         );
+//         ERC20(tokenToTrader).safeTransfer(trader, outAmount);
+//     }
+// }

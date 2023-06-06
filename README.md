@@ -65,3 +65,23 @@ And get your slither output.
 
 -   [Chainlink Documentation](https://docs.chain.link/)
 -   [Foundry Documentation](https://book.getfoundry.sh/)
+
+# TODO before deployment
+
+set optimization cycle to 500
+
+mv lib/libraries src/
+
+remmaping.txt
+
+```
+@solmate=lib/solmate/src/
+@std=lib/forge-std/src/
+@clones=lib/clones-with-immutable-args/src/
+@chainlink/=lib/chainlink-brownie-contracts/
+@openzeppelin/=lib/openzeppelin-contracts/
+@uniswapCore/=src/libraries/v3-core/
+@uniswap/v3-core/=src/libraries/v3-core/
+@uniswapPeriphery/=src/libraries/v3-periphery/
+forge-std/=lib/forge-std/src/
+```
