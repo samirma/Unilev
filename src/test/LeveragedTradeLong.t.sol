@@ -143,6 +143,9 @@ contract LeveragedTradeLong is TestSetup {
         assertApproxEqRel(amount * 2, ERC20(conf.addWBTC).balanceOf(address(positions)), 0.05e18);
 
         vm.stopPrank();
+        (, , , , , , , , , int128 pnl, int128 colLeft) = market.getPositionParams(1);
+        console.logInt(pnl);
+        console.log("colLeft ", uint128(colLeft));
         setPrice(
             19000e6,
             conf.addWBTC,
@@ -152,6 +155,10 @@ contract LeveragedTradeLong is TestSetup {
             mockV3AggregatorUSDCETH,
             uniswapV3Helper
         );
+        (, , , , , , , , , pnl, colLeft) = market.getPositionParams(1);
+        console.logInt(pnl);
+        console.log("colLeft ", uint128(colLeft));
+
         uint256[] memory posAlice = positions.getTraderPositions(alice);
         assertEq(1, posAlice[0]);
         assertEq(alice, positions.ownerOf(posAlice[0]));

@@ -43,7 +43,9 @@ interface IMarket {
             uint8 leverage_,
             uint256 breakEvenLimit_,
             uint160 limitPrice_,
-            uint256 stopLossPrice_
+            uint256 stopLossPrice_,
+            int128 currentPnL_,
+            int128 collateralLeft_
         );
 
     // --------------- Liquidator/Keeper Zone ---------------

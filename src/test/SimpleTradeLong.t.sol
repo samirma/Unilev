@@ -72,7 +72,9 @@ contract SimpleTradeLong is TestSetup {
             uint8 leverage_,
             uint256 breakEvenLimit_,
             uint160 limitPrice_,
-            uint256 stopLossPrice_
+            uint256 stopLossPrice_,
+            int128 pnl,
+            int128 currentPnL_
         ) = market.getPositionParams(posAlice[0]);
         assertEq(baseToken_, conf.addWBTC);
         assertEq(quoteToken_, conf.addUSDC);
@@ -83,6 +85,8 @@ contract SimpleTradeLong is TestSetup {
         assertEq(breakEvenLimit_, 0);
         assertEq(limitPrice_, 0);
         assertEq(stopLossPrice_, 0);
+        assertEq(pnl, -100000);
+        assertEq(currentPnL_, int128(999800000));
 
         assertEq(1, posAlice[0]);
         assertEq(alice, positions.ownerOf(posAlice[0]));

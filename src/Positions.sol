@@ -48,6 +48,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         ERC20 quoteToken;          // Token to trade => should be the other token of v3Pool
         uint128 collateralSize;    // Total collateral for the position
         uint128 positionSize;      // Amount (in baseToken if long / quoteToken if short) of token traded
+        uint256 initialPrice;      // Price of the position when opened
         uint128 liquidationReward; // Amount (in baseToken if long / quoteToken if short) of token to pay to the liquidator, refund if no liquidation
         uint64 timestamp;          // Timestamp of position creation
         bool isShort;              // True if short, false if long
@@ -388,6 +389,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             ERC20(quoteToken),
             _amount,
             positionSize,
+            price,
             liquidationReward,
             uint64(block.timestamp),
             _isShort,
@@ -527,8 +529,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
      *  - 1. The position crossed over the limit ordre
      *  - 2. Nothing happened => just refund the trader
      *  - 3. The position crossed over the stop loss
-     *  - 4. The position is liquidable => no bad debt
-     *  - 5. The position is liquidable => bad debt
+     *  - 4. Liquidation threshold => no bad debt
+     *  - 5. Protocol loss => bad debt
      */
     function _closePosition(
         address _liquidator,
@@ -781,7 +783,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             uint8 leverage_,
             uint256 breakEvenLimit_,
             uint160 limitPrice_,
-            uint256 stopLossPrice_
+            uint256 stopLossPrice_,
+            int128 currentPnL_,
+            int128 collateralLeft_
         )
     {
         baseToken_ = address(openPositions[_posId].baseToken);
@@ -793,6 +797,25 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         breakEvenLimit_ = openPositions[_posId].breakEvenLimit;
         limitPrice_ = openPositions[_posId].limitPrice;
         stopLossPrice_ = openPositions[_posId].stopLossPrice;
+
+        uint256 initialPrice = openPositions[_posId].initialPrice;
+        uint256 currentPrice = PriceFeedL1(priceFeed).getPairLatestPrice(baseToken_, quoteToken_);
+
+        uint256 share = 10000 - ((currentPrice) * 10000) / (initialPrice);
+
+        currentPnL_ = share >= 10000
+            ? int128(uint128(positionSize_ * share) / 10000)
+            : -int128(uint128(positionSize_ * share) / 10000);
+
+        currentPnL_ =
+            currentPnL_ -
+            int128(openPositions[_posId].liquidationReward) -
+            int128(
+                int256(openPositions[_posId].hourlyFees) *
+                    ((int256(block.timestamp) - int64(openPositions[_posId].timestamp)) / 3600)
+            );
+
+        collateralLeft_ = int128(openPositions[_posId].collateralSize) + currentPnL_;
     }
 
     function mintV3Position(
@@ -881,25 +904,3 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         return liquidablePositions;
     }
 }
-
-// if (isMargin) {
-//     if (posParms.isShort) {
-//         amountTokenReceived += posParms.collateralSize;
-//     }
-//     int256 lossTemp = int256(amountTokenReceived - posParms.totalBorrow - interest);
-//     uint256 loss = lossTemp < 0 ? uint256(-lossTemp) : uint256(0);
-//     uint256 totalToRefund = posParms.totalBorrow + interest - loss;
-//     ERC20(addTokenBorrowed).safeApprove(address(liquidityPoolToUse), totalToRefund);
-//     liquidityPoolToUse.refund(posParms.totalBorrow, interest, loss);
-//     if (loss == 0) {
-//         uint256 amountToSwap = amountTokenReceived - totalToRefund;
-//         ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountToSwap);
-//         uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
-//             addTokenReceived,
-//             tokenToTrader,
-//             UniswapV3Pool(posParms.v3Pool).fee(),
-//             amountToSwap
-//         );
-//         ERC20(tokenToTrader).safeTransfer(trader, outAmount);
-//     }
-// }
