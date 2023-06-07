@@ -76,7 +76,7 @@ contract LeveragedTradeLong is TestSetup {
         vm.startPrank(alice);
         market.closePosition(posAlice[0]);
 
-        console.log("balance of alice addUSDC ", ERC20(conf.addWBTC).balanceOf(alice));
+        console.log("balance of alice addWBTC ", ERC20(conf.addWBTC).balanceOf(alice));
 
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
         assertEq(0, ERC20(conf.addUSDC).balanceOf(alice));
@@ -165,7 +165,7 @@ contract LeveragedTradeLong is TestSetup {
         vm.startPrank(bob);
         market.liquidatePosition(posAlice[0]);
 
-        console.log("balance of alice addUSDC ", ERC20(conf.addUSDC).balanceOf(alice));
+        console.log("balance of alice addWBTC ", ERC20(conf.addWBTC).balanceOf(alice));
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
         assertEq(100000, ERC20(conf.addWBTC).balanceOf(bob));
         assertEq(0, ERC20(conf.addWBTC).balanceOf(address(positions)));
@@ -203,7 +203,8 @@ contract LeveragedTradeLong is TestSetup {
             mockV3AggregatorUSDCETH,
             uniswapV3Helper
         );
-        vm.warp(block.timestamp + 60 * 24);
+        skip(3600 * 24);
+
         (, , , , , , , , , pnl, colLeft) = market.getPositionParams(1);
         console.logInt(pnl);
         console.log("colLeft ", uint128(colLeft));
@@ -214,7 +215,8 @@ contract LeveragedTradeLong is TestSetup {
         vm.startPrank(bob);
         market.liquidatePosition(posAlice[0]);
 
-        console.log("balance of alice addUSDC ", ERC20(conf.addUSDC).balanceOf(alice));
+        console.log("balance of alice addWBTC ", ERC20(conf.addWBTC).balanceOf(alice));
+        console.log("balance of pool addUSDC ", ERC20(conf.addUSDC).balanceOf(address(lbPoolUSDC)));
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
         assertEq(100000, ERC20(conf.addWBTC).balanceOf(bob));
         assertEq(0, ERC20(conf.addWBTC).balanceOf(address(positions)));
@@ -256,7 +258,7 @@ contract LeveragedTradeLong is TestSetup {
         vm.startPrank(bob);
         market.liquidatePosition(posAlice[0]);
 
-        console.log("balance of alice addUSDC ", ERC20(conf.addUSDC).balanceOf(alice));
+        console.log("balance of alice addWBTC ", ERC20(conf.addWBTC).balanceOf(alice));
         console.log("balance of pool addUSDC ", ERC20(conf.addUSDC).balanceOf(address(lbPoolUSDC)));
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
         assertEq(100000, ERC20(conf.addWBTC).balanceOf(bob));

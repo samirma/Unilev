@@ -78,7 +78,7 @@ contract SimpleTradeShort is TestSetup {
         vm.startPrank(alice);
         market.closePosition(posAlice[0]);
 
-        console.log("balance of alice addWBTC ", ERC20(conf.addUSDC).balanceOf(alice));
+        console.log("balance of alice addUSDC ", ERC20(conf.addUSDC).balanceOf(alice));
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
         assertEq(0, ERC20(conf.addWBTC).balanceOf(alice));
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));
@@ -147,7 +147,9 @@ contract SimpleTradeShort is TestSetup {
         market.openPosition(conf.addUSDC, conf.addWBTC, uint24(fee), true, 1, amount, 0, 40000e6);
 
         assertApproxEqRel(amount * 2, ERC20(conf.addUSDC).balanceOf(address(positions)), 0.05e18);
-
+        (, , , , , , , , , int128 pnl, int128 colLeft) = market.getPositionParams(1);
+        console.logInt(pnl);
+        console.log("colLeft ", uint128(colLeft));
         vm.stopPrank();
         setPrice(
             41000e6,
@@ -158,7 +160,9 @@ contract SimpleTradeShort is TestSetup {
             mockV3AggregatorUSDCETH,
             uniswapV3Helper
         );
-
+        (, , , , , , , , , pnl, colLeft) = market.getPositionParams(1);
+        console.logInt(pnl);
+        console.log("colLeft ", uint128(colLeft));
         uint256[] memory posAlice = positions.getTraderPositions(alice);
         assertEq(1, posAlice[0]);
         assertEq(alice, positions.ownerOf(posAlice[0]));
@@ -166,7 +170,7 @@ contract SimpleTradeShort is TestSetup {
         vm.startPrank(bob);
         market.liquidatePosition(posAlice[0]);
 
-        console.log("balance of alice addWBTC ", ERC20(conf.addWBTC).balanceOf(alice));
+        console.log("balance of alice addUSDC ", ERC20(conf.addUSDC).balanceOf(alice));
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
         assertEq(30003000, ERC20(conf.addUSDC).balanceOf(bob));
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));

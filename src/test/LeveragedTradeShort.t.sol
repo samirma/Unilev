@@ -166,7 +166,7 @@ contract LeveragedTradeShort is TestSetup {
         vm.startPrank(bob);
         market.liquidatePosition(posAlice[0]);
 
-        console.log("balance of alice addWBTC ", ERC20(conf.addWBTC).balanceOf(alice));
+        console.log("balance of alice addUSDC ", ERC20(conf.addUSDC).balanceOf(alice));
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
         assertEq(30003000, ERC20(conf.addUSDC).balanceOf(bob));
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));
@@ -210,7 +210,7 @@ contract LeveragedTradeShort is TestSetup {
         vm.startPrank(bob);
         market.liquidatePosition(posAlice[0]);
 
-        console.log("balance of alice addWBTC ", ERC20(conf.addWBTC).balanceOf(alice));
+        console.log("balance of alice addUSDC ", ERC20(conf.addUSDC).balanceOf(alice));
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
         assertEq(30003000, ERC20(conf.addUSDC).balanceOf(bob));
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));

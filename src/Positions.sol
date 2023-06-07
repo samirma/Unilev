@@ -767,18 +767,18 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 initialPrice = openPositions[_posId].initialPrice;
         uint256 currentPrice = PriceFeedL1(priceFeed).getPairLatestPrice(baseToken_, quoteToken_);
 
-        uint256 share = 10000 - ((currentPrice) * 10000) / (initialPrice);
+        int256 share = 10000 - int(currentPrice * 10000) / int(initialPrice);
 
-        currentPnL_ = share >= 10000
-            ? int128(uint128(positionSize_ * share) / 10000)
-            : -int128(uint128(positionSize_ * share) / 10000);
+        currentPnL_ = int128((int128(positionSize_) * share) / 10000);
+
+        currentPnL_ = isShort_ ? currentPnL_ : -currentPnL_;
 
         currentPnL_ =
             currentPnL_ -
             int128(openPositions[_posId].liquidationReward) -
             int128(
                 int256(openPositions[_posId].hourlyFees) *
-                    ((int256(block.timestamp) - int64(openPositions[_posId].timestamp)) / 3600)
+                    ((int256(block.timestamp) - int64(timestamp_)) / 3600)
             );
 
         collateralLeft_ = int128(openPositions[_posId].collateralSize) + currentPnL_;
