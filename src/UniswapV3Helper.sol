@@ -92,6 +92,7 @@ contract UniswapV3Helper is IERC721Receiver {
             }
         } catch {
             amountIn = 0; // So if the value return == 0 => the swap failed
+            TransferHelper.safeTransfer(_token0, msg.sender, amountInMaximum);
         }
     }
 

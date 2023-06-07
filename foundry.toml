@@ -4,5 +4,5 @@ out = 'out'
 libs = ['lib']
 gas_reports = ["*"]
 optimizer = true
-optimizer_runs = 149
+optimizer_runs = 150
 solc = "0.8.19"

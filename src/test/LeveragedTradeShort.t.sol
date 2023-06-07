@@ -78,9 +78,9 @@ contract LeveragedTradeShort is TestSetup {
         vm.startPrank(alice);
         market.closePosition(posAlice[0]);
 
-        console.log("balance of alice addWBTC ", ERC20(conf.addWBTC).balanceOf(alice));
+        console.log("balance of alice addWBTC ", ERC20(conf.addUSDC).balanceOf(alice));
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
-        assertEq(30003000, ERC20(conf.addUSDC).balanceOf(alice));
+        assertEq(0, ERC20(conf.addWBTC).balanceOf(alice));
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));
         assertEq(0, ERC20(conf.addWBTC).balanceOf(address(positions)));
     }

@@ -90,7 +90,7 @@ contract Deployments is Test, HelperConfig, Utils {
         market.addPriceFeed(conf.addWBTC, address(mockV3AggregatorWBTCETH));
         market.addPriceFeed(conf.addUSDC, address(mockV3AggregatorUSDCETH));
 
-        // add liquidity to a pool to be able to open a short position
+        // // add liquidity to a pool to be able to open a short position
         // writeTokenBalance(msg.sender, conf.addWBTC, 100e8);
         // writeTokenBalance(msg.sender, conf.addWETH, 1000e18);
         // writeTokenBalance(msg.sender, conf.addUSDC, 100000000e6);

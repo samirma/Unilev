@@ -615,15 +615,20 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             } else {
                 ERC20(addTokenBorrowed).safeTransfer(trader, amountTokenReceived);
             }
-        } else if (state == 2) {
+        }
+        // state 2, 3, 4 and 5
+        else {
             if (addTokenBorrowed == addTokenReceived) {
                 revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(
                     addTokenBorrowed,
                     addTokenReceived,
-                    2
+                    2345
                 );
             }
+
             if (isMargin) {
+                // when margin we need to swap back to refund the pool
+                // but when refund the trader with the token received
                 if (posParms.isShort) {
                     amountTokenReceived += posParms.collateralSize;
                 }
@@ -648,47 +653,10 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 if (loss == 0) {
                     ERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - inAmount);
                 }
-            } else {
+            } else if (state == 2) {
                 ERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived);
-            }
-        }
-        // state 3, 4 and 5
-        else {
-            if (addTokenBorrowed == addTokenReceived) {
-                revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(
-                    addTokenBorrowed,
-                    addTokenReceived,
-                    345
-                );
-            }
-
-            if (isMargin) {
-                if (posParms.isShort) {
-                    amountTokenReceived += posParms.collateralSize;
-                }
-
-                // we need first to swap back to refund the pool
-                ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
-                uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
-                    addTokenReceived,
-                    addTokenBorrowed,
-                    UniswapV3Pool(posParms.v3Pool).fee(),
-                    amountTokenReceived
-                );
-                // loss should not occur here but in case of, we refund the pool
-                int256 remaining = int256(
-                    int(outAmount) - int(posParms.totalBorrow) - int(interest)
-                );
-                uint256 loss = remaining < 0 ? uint256(-remaining) : uint256(0);
-                ERC20(addTokenBorrowed).safeApprove(
-                    address(liquidityPoolToUse),
-                    posParms.totalBorrow + interest - loss
-                );
-                liquidityPoolToUse.refund(posParms.totalBorrow, interest, loss);
-                if (loss == 0) {
-                    ERC20(addTokenBorrowed).safeTransfer(trader, uint256(remaining));
-                }
             } else {
+                // when not margin, we need to swap to the other token
                 ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
                 uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
                     addTokenReceived,
