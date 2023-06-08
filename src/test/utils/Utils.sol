@@ -39,7 +39,7 @@ contract Utils is Test {
         MockV3Aggregator mockV3Aggregator1,
         UniswapV3Helper uniswapV3Helper
     ) public returns (uint160, uint160) {
-        vm.stopPrank();
+        // vm.stopPrank();
         UniswapV3Pool pool = UniswapV3Pool(getPool(token0, token1, fee));
         (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
         uint priceToken0;

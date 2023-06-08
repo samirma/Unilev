@@ -68,8 +68,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     uint256 public constant BORROW_FEE_EVERY_HOURS = 1; // 0.01% : assets borrowed/total assets in pool * 0.01%
     uint256 public constant ORACLE_DECIMALS_USD = 8; // Chainlink decimals for USD
     uint256 public immutable LIQUIDATION_REWARD; // 10 USD : //! to be changed depending of the blockchain average gas price
-    // string private constant BASE_SVG =
-    //     "<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='xMinYMin meet' viewBox='0 0 350 350'><style>.base { fill: white; font-family: serif; font-size: 24px; }</style><rect width='100%' height='100%' fill='black' /><text x='50%' y='50%' class='base' dominant-baseline='middle' text-anchor='middle'>";
 
     LiquidityPoolFactory public immutable liquidityPoolFactory;
     PriceFeedL1 public immutable priceFeed;
@@ -140,68 +138,20 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         _burn(_posId);
     }
 
-    // function tokenURI(
-    //     uint256 _posId
-    // ) public view virtual override isPositionOpen(_posId) returns (string memory) {
-    //     string memory json = Base64.encode(
-    //         bytes(string.concat(tokenURIIntro(_posId), tokenURIAttributes(openPositions[_posId])))
-    //     );
-
-    //     return string.concat("data:application/json;base64,", json);
-    // }
-
-    // function tokenURIIntro(uint256 _tokenId) private pure returns (string memory) {
-    //     return
-    //         string.concat(
-    //             '{"name": "Uniswap-Max Position #',
-    //             Strings.toString(_tokenId),
-    //             '", "description": "This NFT represent a position on Uniswap-Max. The owner can close or edit the position.", "image": "',
-    //             imageURI(_tokenId)
-    //         );
-    // }
-
-    // function tokenURIAttributes(
-    //     PositionParams memory _position
-    // ) private view returns (string memory) {
-    //     string[2] memory parts = [
-    //         // To avoid stack too deep error
-    //         string.concat(
-    //             '", "attributes": [ { "trait_type": "Tokens", "value": "',
-    //             _position.baseToken.name(),
-    //             "/",
-    //             _position.quoteToken.name(),
-    //             '"}, { "trait_type": "Amount", "value": "',
-    //             Strings.toString(_position.positionSize),
-    //             '"} , { "trait_type": "Direction", "value": "',
-    //             _position.isShort ? "Short" : "Long",
-    //             '"}, { "trait_type": "Leverage", "value": "',
-    //             Strings.toString(_position.leverage)
-    //         ),
-    //         string.concat(
-    //             '"}, { "trait_type": "Limit Price", "value": "',
-    //             Strings.toString(_position.limitPrice),
-    //             '"}, { "trait_type": "Stop Loss Price", "value": "',
-    //             Strings.toString(_position.stopLossPrice),
-    //             '"}]}'
-    //         )
-    //     ];
-
-    //     return string.concat(parts[0], parts[1]);
-    // }
-
-    // function imageURI(uint256 _tokenId) private pure returns (string memory) {
-    //     string memory svg = string.concat(
-    //         BASE_SVG,
-    //         "UNISWAP-MAX #",
-    //         Strings.toString(_tokenId),
-    //         "</text></svg>"
-    //     );
-
-    //     return string.concat("data:image/svg+xml;base64,", Base64.encode(bytes(svg)));
-    // }
-
     // --------------- Trader Zone ---------------
-
+    /**
+     * @notice function to open a new positions
+     * @param _trader trader address
+     * @param _token0 token sent
+     * @param _token1 token traded
+     * @param _fee Uniswap V3 pool fee
+     * @param _isShort true if short else long
+     * @param _leverage leverage value 1 -> 5
+     * @param _amount trade amount in token0
+     * @param _limitPrice limit price in token1
+     * @param _stopLossPrice stop loss price in token1
+     * @return posId position Id
+     */
     function openPosition(
         address _trader,
         address _token0,
@@ -507,6 +457,11 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         return (price, baseToken, quoteToken, isBaseToken0, v3Pool);
     }
 
+    /**
+     * @notice function to close a position can only be call by the position owner
+     * @param _trader trader address
+     * @param _posId position Id
+     */
     function closePosition(
         address _trader,
         uint256 _posId
@@ -514,6 +469,11 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         _closePosition(_trader, _posId);
     }
 
+    /**
+     * @notice function to liquidate a position canbe call be every one
+     * @param _liquidator liquidator address
+     * @param _posId position Id
+     */
     function liquidatePosition(
         address _liquidator,
         uint256 _posId
@@ -674,7 +634,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         ERC20(addTokenInitiallySupplied).safeTransfer(_liquidator, posParms.liquidationReward);
     }
 
-    // we can only edit the stop loss price for now
+    /**
+     * @notice function to edit a position. We can only edit the stop loss price for now.
+     * @param _trader trader address
+     * @param _posId position Id
+     * @param _newStopLossPrice new SL
+     */
     function editPosition(
         address _trader,
         uint256 _posId,
@@ -697,12 +662,14 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         openPositions[_posId].stopLossPrice = _newStopLossPrice;
     }
 
-    /* @notice 5 states:
+    /**
+     * @notice 5 states:
      *  - 1. The position crossed over the limit ordre
      *  - 2. Nothing happened => just refund the trader
      *  - 3. The position crossed over the stop loss
      *  - 4. The position is liquidable => no bad debt
      *  - 5. The position is liquidable => bad debt
+     * @param _posId position Id
      */
     function getPositionState(uint256 _posId) public view returns (uint256) {
         if (!_exists(_posId)) {
