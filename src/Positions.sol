@@ -255,49 +255,14 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     UniswapV3Pool(v3Pool).fee(),
                     totalBorrow
                 );
-
-                if (_limitPrice != 0) {
-                    tickLower = TickMath.getTickAtSqrtRatio(
-                        uniswapV3Helper.priceToSqrtPriceX96(
-                            _limitPrice,
-                            ERC20(baseToken).decimals()
-                        )
-                    );
-                    tickUpper = tickLower + 1;
-                    ERC20(baseToken).safeApprove(address(uniswapV3Helper), amountBorrow);
-                    (tokenIdLiquidity, , amount0, amount1) = mintV3Position(
-                        UniswapV3Pool(v3Pool),
-                        isBaseToken0 ? amountBorrow : 0,
-                        isBaseToken0 ? 0 : amountBorrow,
-                        tickLower,
-                        tickUpper
-                    );
-                }
             } else {
-                if (_leverage != 0) {
+                if (_leverage != 1) {
                     ERC20(quoteToken).safeApprove(address(uniswapV3Helper), totalBorrow);
                     amountBorrow = uniswapV3Helper.swapExactInputSingle(
                         quoteToken,
                         baseToken,
                         UniswapV3Pool(v3Pool).fee(),
                         totalBorrow
-                    );
-                }
-                if (_limitPrice != 0) {
-                    tickUpper = TickMath.getTickAtSqrtRatio(
-                        uniswapV3Helper.priceToSqrtPriceX96(
-                            _limitPrice,
-                            ERC20(baseToken).decimals()
-                        )
-                    );
-                    tickLower = tickUpper - 1;
-                    ERC20(baseToken).safeApprove(address(uniswapV3Helper), amountBorrow + _amount);
-                    (tokenIdLiquidity, , amount0, amount1) = mintV3Position(
-                        UniswapV3Pool(v3Pool),
-                        isBaseToken0 ? amountBorrow + _amount : 0,
-                        isBaseToken0 ? 0 : amountBorrow + _amount,
-                        tickLower,
-                        tickUpper
                     );
                 }
             }
@@ -325,7 +290,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint128 positionSize;
         if (_isShort) {
             positionSize = uint128(amountBorrow);
-        } else if (_leverage != 0) {
+        } else if (_leverage != 1) {
             positionSize = uint128(_amount + amountBorrow);
         } else {
             positionSize = _amount;
@@ -510,7 +475,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         address addTokenInitiallySupplied;
         address addTokenBorrowed;
         // Close position
-        if (posParms.limitPrice != 0) {
+        if (posParms.limitPrice != 0 && !isMargin) {
             (amount0, amount1) = burnV3Position(posParms.tokenIdLiquidity);
             /* Since the liquidity position is only 1 tick wide, we can assume
              * that this will rarely revert here. */
@@ -550,7 +515,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             : address(posParms.baseToken);
 
         // These state assume that the oracle price and the uniswap price are CONCISTENT
-        if (state == 1) {
+        // state 1+classic
+        if (state == 1 && !isMargin) {
             if (addTokenBorrowed != addTokenReceived) {
                 revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(
                     addTokenBorrowed,
@@ -558,25 +524,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     1
                 );
             }
-            if (isMargin) {
-                // can't have loss here since the limit order is crossed
-                ERC20(addTokenBorrowed).safeApprove(
-                    address(liquidityPoolToUse),
-                    posParms.totalBorrow + interest
-                );
-                liquidityPoolToUse.refund(posParms.totalBorrow, interest, 0);
-                if (posParms.isShort) {
-                    amountTokenReceived += posParms.collateralSize;
-                }
-                ERC20(addTokenBorrowed).safeTransfer(
-                    trader,
-                    amountTokenReceived - interest - posParms.totalBorrow
-                );
-            } else {
-                ERC20(addTokenBorrowed).safeTransfer(trader, amountTokenReceived);
-            }
+            ERC20(addTokenBorrowed).safeTransfer(trader, amountTokenReceived);
         }
-        // state 2, 3, 4 and 5
+        // state 1+margin, 2, 3, 4 and 5
         else {
             if (addTokenBorrowed == addTokenReceived) {
                 revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(

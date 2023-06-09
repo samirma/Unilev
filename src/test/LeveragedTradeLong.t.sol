@@ -266,5 +266,99 @@ contract LeveragedTradeLong is TestSetup {
         assertEq(0, ERC20(conf.addWBTC).balanceOf(address(positions)));
     }
 
-    // function test__leveragedLimitOrderAndCloseLong() public {} // TODO
+    function test__leveragedLimitOrderAndLiquidateLong() public {
+        uint128 amount = 1e8;
+        uint24 fee = 3000;
+        writeTokenBalance(alice, conf.addWBTC, amount);
+        setPrice(
+            30000e6,
+            conf.addWBTC,
+            conf.addUSDC,
+            fee,
+            mockV3AggregatorWBTCETH,
+            mockV3AggregatorUSDCETH,
+            uniswapV3Helper
+        );
+        vm.startPrank(alice);
+        ERC20(conf.addWBTC).approve(address(positions), amount);
+        market.openPosition(
+            conf.addWBTC,
+            conf.addUSDC,
+            uint24(fee),
+            false,
+            3,
+            amount,
+            48000e6,
+            20000e6
+        );
+        assertApproxEqRel(amount * 3, ERC20(conf.addWBTC).balanceOf(address(positions)), 0.05e18);
+        vm.stopPrank();
+        setPrice(
+            50000e6,
+            conf.addWBTC,
+            conf.addUSDC,
+            fee,
+            mockV3AggregatorWBTCETH,
+            mockV3AggregatorUSDCETH,
+            uniswapV3Helper
+        );
+        uint256[] memory posAlice = positions.getTraderPositions(alice);
+        assertEq(1, posAlice[0]);
+        assertEq(alice, positions.ownerOf(posAlice[0]));
+        vm.startPrank(bob);
+        market.liquidatePosition(posAlice[0]);
+
+        console.log("balance of alice addWBTC ", ERC20(conf.addWBTC).balanceOf(alice));
+        // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
+        assertEq(100000, ERC20(conf.addWBTC).balanceOf(bob));
+        assertEq(0, ERC20(conf.addUSDC).balanceOf(alice));
+        assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));
+        assertEq(0, ERC20(conf.addWBTC).balanceOf(address(positions)));
+    }
+
+    function test__leveragedLimitOrderAndLiquidateRevertLong() public {
+        uint128 amount = 1e8;
+        uint24 fee = 3000;
+        writeTokenBalance(alice, conf.addWBTC, amount);
+        setPrice(
+            30000e6,
+            conf.addWBTC,
+            conf.addUSDC,
+            fee,
+            mockV3AggregatorWBTCETH,
+            mockV3AggregatorUSDCETH,
+            uniswapV3Helper
+        );
+        vm.startPrank(alice);
+        ERC20(conf.addWBTC).approve(address(positions), amount);
+        market.openPosition(
+            conf.addWBTC,
+            conf.addUSDC,
+            uint24(fee),
+            false,
+            3,
+            amount,
+            48000e6,
+            20000e6
+        );
+        assertApproxEqRel(amount * 3, ERC20(conf.addWBTC).balanceOf(address(positions)), 0.05e18);
+        vm.stopPrank();
+        setPrice(
+            40000e6,
+            conf.addWBTC,
+            conf.addUSDC,
+            fee,
+            mockV3AggregatorWBTCETH,
+            mockV3AggregatorUSDCETH,
+            uniswapV3Helper
+        );
+        uint256[] memory posAlice = positions.getTraderPositions(alice);
+        assertEq(1, posAlice[0]);
+        assertEq(alice, positions.ownerOf(posAlice[0]));
+        vm.startPrank(bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(Positions__POSITION_NOT_LIQUIDABLE_YET.selector, posAlice[0])
+        );
+        market.liquidatePosition(posAlice[0]);
+    }
 }
