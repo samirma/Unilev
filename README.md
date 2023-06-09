@@ -58,9 +58,9 @@ make deploy-anvil
 
 # Uniswap Max White paper
 
-Live demo on Ethereum mainnet fork : [uniswap-max.vercel.app](https://uniswap-max.vercel.app/)
+⚡ Live demo on Ethereum mainnet fork : [uniswap-max.vercel.app](https://uniswap-max.vercel.app/)
 
-Code base contracts/front : [github.com/orgs/Los-Byzantinos](https://github.com/orgs/Los-Byzantinos/repositories)
+📋 Code base contracts/front : [github.com/orgs/Los-Byzantinos](https://github.com/orgs/Los-Byzantinos/repositories)
 
 # Abstract
 
