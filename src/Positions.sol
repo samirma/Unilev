@@ -119,11 +119,11 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
     // Implementing `onERC721Received` so this contract can receive custody of erc721 tokens
     function onERC721Received(
-        address operator,
         address,
-        uint256 tokenId,
+        address,
+        uint256,
         bytes calldata
-    ) external returns (bytes4) {
+    ) external pure returns (bytes4) {
         return this.onERC721Received.selector;
     }
 

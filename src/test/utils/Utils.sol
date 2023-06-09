@@ -44,7 +44,7 @@ contract Utils is Test {
         (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
         uint priceToken0;
         uint priceToken1;
-        uint o;
+        // uint o;
         uint bT0 = ERC20(token0).balanceOf(address(pool));
         uint bT1 = ERC20(token1).balanceOf(address(pool));
         uint precision = (sqrtPriceX96 * 50) / 10000;
