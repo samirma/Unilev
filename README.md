@@ -92,12 +92,12 @@ We used the [foundry](https://github.com/smartcontractkit/foundry-starter-kit) f
 
 | Contract name | Description | Fork/Inspiration/Library |
 | --- | --- | --- |
-| Positions.sol | Positions recorder/main contract | OZ https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol |
+| Positions.sol | Positions recorder/main contract | [OZ ERC721](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol) |
 | Market.sol | Global protocol interface | - |
-| LiquidityPool.sol | Liquidity pool for leverage and short position one liquidity pool for each token | Solmate https://github.com/transmissions11/solmate/blob/main/src/mixins/ERC4626.sol |
+| LiquidityPool.sol | Liquidity pool for leverage and short position one liquidity pool for each token | [Solmate ERC4626](https://github.com/transmissions11/solmate/blob/main/src/mixins/ERC4626.sol) |
 | LiquidityPoolFactory.sol | Interface the create LiquidityPoolXXX | - |
-| PriceFeed.sol | The price feed | https://docs.chain.link/data-feeds/#price-feeds |
-| UniswapV3Helper.sol | Helper for managing liquidity and swap on Uniswap | https://github.com/stakewithus/defi-by-example/tree/main/uni-v3/contracts |
+| PriceFeed.sol | The price feed | [Chainlink data feed](https://docs.chain.link/data-feeds/#price-feeds) |
+| UniswapV3Helper.sol | Helper for managing liquidity and swap on Uniswap | [Uniswap Doc](https://github.com/stakewithus/defi-by-example/tree/main/uni-v3/contracts) |
 
 ![Untitled](/images/intro.png)
 ### Positions
