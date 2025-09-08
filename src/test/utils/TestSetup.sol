@@ -23,9 +23,9 @@ contract TestSetup is Test, HelperConfig, Utils {
     PriceFeedL1 public priceFeedL1;
     Market public market;
     Positions public positions;
-    MockV3Aggregator public mockV3AggregatorWBTCETH;
-    MockV3Aggregator public mockV3AggregatorUSDCETH;
-    MockV3Aggregator public mockV3AggregatorDAIETH;
+    MockV3Aggregator public mockV3AggregatorWBTCUSD;
+    MockV3Aggregator public mockV3AggregatorUSDCUSD;
+    MockV3Aggregator public mockV3AggregatorDAIUSD;
     MockV3Aggregator public mockV3AggregatorETHUSD;
     LiquidityPool public lbPoolWBTC;
     LiquidityPool public lbPoolWETH;
@@ -54,15 +54,15 @@ contract TestSetup is Test, HelperConfig, Utils {
         vm.startPrank(deployer);
 
         /// deployments
-        // mocks
-        mockV3AggregatorWBTCETH = new MockV3Aggregator(18, 1 ether); // 1 WBTC = 1 ETH
-        mockV3AggregatorUSDCETH = new MockV3Aggregator(18, 1e15); // 1 USDC = 0,0001 ETH
-        mockV3AggregatorDAIETH = new MockV3Aggregator(18, 1e15); // 1 DAI = 0,0001 ETH
-        mockV3AggregatorETHUSD = new MockV3Aggregator(8, 100000000000000e8); // 1 ETH = 1000 USD
+        // mocks - Chainlink USD feeds usually have 8 decimals
+        mockV3AggregatorWBTCUSD = new MockV3Aggregator(8, 60000 * 1e8); // 1 WBTC = $60,000
+        mockV3AggregatorUSDCUSD = new MockV3Aggregator(8, 1 * 1e8); // 1 USDC = $1
+        mockV3AggregatorDAIUSD = new MockV3Aggregator(8, 1 * 1e8); // 1 DAI = $1
+        mockV3AggregatorETHUSD = new MockV3Aggregator(8, 3000 * 1e8); // 1 ETH = $3000
 
         // contracts
         uniswapV3Helper = new UniswapV3Helper(conf.nonfungiblePositionManager, conf.swapRouter);
-        priceFeedL1 = new PriceFeedL1(address(mockV3AggregatorETHUSD), conf.addWETH);
+        priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
         positions = new Positions(
             address(priceFeedL1),
@@ -94,9 +94,10 @@ contract TestSetup is Test, HelperConfig, Utils {
         lbPoolUSDC = LiquidityPool(market.createLiquidityPool(conf.addUSDC));
 
         // add price feeds
-        market.addPriceFeed(conf.addWBTC, address(mockV3AggregatorWBTCETH));
-        market.addPriceFeed(conf.addUSDC, address(mockV3AggregatorUSDCETH));
-        market.addPriceFeed(conf.addDAI, address(mockV3AggregatorDAIETH));
+        market.addPriceFeed(conf.addWBTC, address(mockV3AggregatorWBTCUSD));
+        market.addPriceFeed(conf.addUSDC, address(mockV3AggregatorUSDCUSD));
+        market.addPriceFeed(conf.addDAI, address(mockV3AggregatorDAIUSD));
+        market.addPriceFeed(conf.addWETH, address(mockV3AggregatorETHUSD));
         vm.stopPrank();
 
         // add liquidity to a pool to be able to open a short position

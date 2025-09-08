@@ -66,7 +66,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     uint256 public constant MAX_LEVERAGE = 3;
     uint256 public constant BORROW_FEE = 20; // 0.2% when opening a position
     uint256 public constant BORROW_FEE_EVERY_HOURS = 1; // 0.01% : assets borrowed/total assets in pool * 0.01%
-    uint256 public constant ORACLE_DECIMALS_USD = 8; // Chainlink decimals for USD
+    uint256 public constant USD_DECIMALS = 18; // The standard for USD values in this contract
     uint256 public immutable LIQUIDATION_REWARD; // 10 USD : //! to be changed depending of the blockchain average gas price
 
     LiquidityPoolFactory public immutable liquidityPoolFactory;
@@ -92,7 +92,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
         priceFeed = PriceFeedL1(_priceFeed);
         uniswapV3Helper = UniswapV3Helper(_uniswapV3Helper);
-        LIQUIDATION_REWARD = _liquidationReward * (10 ** ORACLE_DECIMALS_USD);
+        LIQUIDATION_REWARD = _liquidationReward * (10**USD_DECIMALS);
     }
 
     modifier isPositionOpen(uint256 _posId) {
@@ -198,8 +198,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
         // take opening fees
         uint128 liquidationReward = uint128(
-            (LIQUIDATION_REWARD * (10 ** uint256(ERC20(_token0).decimals()))) /
-                (PriceFeedL1(priceFeed).getTokenLatestPriceInUSD(_token0))
+            (LIQUIDATION_REWARD * (10 ** ERC20(_token0).decimals())) /
+                (priceFeed.getTokenLatestPriceInUSD(_token0))
         );
         _amount = _amount - liquidationReward;
 
@@ -364,11 +364,11 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         bool isBaseToken0 = (baseToken == UniswapV3Pool(v3Pool).token0());
 
         // check if pair is supported by PriceFeed
-        if (!PriceFeedL1(priceFeed).isPairSupported(baseToken, quoteToken)) {
+        if (!priceFeed.isPairSupported(baseToken, quoteToken)) {
             revert Positions__NO_PRICE_FEED(baseToken, quoteToken);
         }
 
-        uint256 price = PriceFeedL1(priceFeed).getPairLatestPrice(baseToken, quoteToken);
+        uint256 price = priceFeed.getPairLatestPrice(baseToken, quoteToken);
 
         // check leverage
         if (_leverage < 1 || _leverage > MAX_LEVERAGE) {
@@ -393,15 +393,10 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         }
 
         // check amount
-        if (
-            (_amount * PriceFeedL1(priceFeed).getTokenLatestPriceInUSD(_token0)) /
-                (10 ** (ORACLE_DECIMALS_USD + ERC20(_token0).decimals())) <
-            MIN_POSITION_AMOUNT_IN_USD
-        ) {
-            revert Positions__AMOUNT_TO_SMALL(
-                (_amount * PriceFeedL1(priceFeed).getTokenLatestPriceInUSD(_token0)) /
-                    (10 ** (ORACLE_DECIMALS_USD + ERC20(_token0).decimals()))
-            );
+        uint256 amountInUSD = priceFeed.getAmountInUSD(_token0, _amount); // Returns value with 18 decimals
+        uint256 humanReadableUSD = amountInUSD / (10**USD_DECIMALS);
+        if (humanReadableUSD < MIN_POSITION_AMOUNT_IN_USD) {
+            revert Positions__AMOUNT_TO_SMALL(humanReadableUSD);
         }
 
         if (_isShort) {
@@ -449,11 +444,11 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     /**
      * @dev Close/Liquidate a position
      * @notice the 5 states:
-     *  - 1. The position crossed over the limit ordre
-     *  - 2. Nothing happened => just refund the trader
-     *  - 3. The position crossed over the stop loss
-     *  - 4. Liquidation threshold => no bad debt
-     *  - 5. Protocol loss => bad debt
+     * - 1. The position crossed over the limit ordre
+     * - 2. Nothing happened => just refund the trader
+     * - 3. The position crossed over the stop loss
+     * - 4. Liquidation threshold => no bad debt
+     * - 5. Protocol loss => bad debt
      */
     function _closePosition(
         address _liquidator,
@@ -596,7 +591,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 _newStopLossPrice
     ) external onlyOwner isPositionOwned(_trader, _posId) {
         // check params
-        uint256 price = PriceFeedL1(priceFeed).getPairLatestPrice(
+        uint256 price = priceFeed.getPairLatestPrice(
             address(openPositions[_posId].baseToken),
             address(openPositions[_posId].quoteToken)
         );
@@ -614,11 +609,11 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
     /**
      * @notice 5 states:
-     *  - 1. The position crossed over the limit ordre
-     *  - 2. Nothing happened => just refund the trader
-     *  - 3. The position crossed over the stop loss
-     *  - 4. The position is liquidable => no bad debt
-     *  - 5. The position is liquidable => bad debt
+     * - 1. The position crossed over the limit ordre
+     * - 2. Nothing happened => just refund the trader
+     * - 3. The position crossed over the stop loss
+     * - 4. The position is liquidable => no bad debt
+     * - 5. The position is liquidable => bad debt
      * @param _posId position Id
      */
     function getPositionState(uint256 _posId) public view returns (uint256) {
@@ -629,7 +624,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 breakEvenLimit = openPositions[_posId].breakEvenLimit;
         uint160 limitPrice = openPositions[_posId].limitPrice;
         uint256 stopLossPrice = openPositions[_posId].stopLossPrice;
-        uint256 price = PriceFeedL1(priceFeed).getPairLatestPrice(
+        uint256 price = priceFeed.getPairLatestPrice(
             address(openPositions[_posId].baseToken),
             address(openPositions[_posId].quoteToken)
         );
@@ -682,7 +677,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         stopLossPrice_ = openPositions[_posId].stopLossPrice;
 
         uint256 initialPrice = openPositions[_posId].initialPrice;
-        uint256 currentPrice = PriceFeedL1(priceFeed).getPairLatestPrice(baseToken_, quoteToken_);
+        uint256 currentPrice = priceFeed.getPairLatestPrice(baseToken_, quoteToken_);
 
         int256 share = 10000 - int(currentPrice * 10000) / int(initialPrice);
 
@@ -786,3 +781,4 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         return liquidablePositions;
     }
 }
+

@@ -9,25 +9,20 @@ import "@solmate/tokens/ERC20.sol";
 error PriceFeedL1__TOKEN_NOT_SUPPORTED(address token);
 
 contract PriceFeedL1 is Ownable {
-    mapping(address => AggregatorV3Interface) public tokenToPriceFeedETH;
-    AggregatorV3Interface public ethToUsdPriceFeed;
-    ERC20 public immutable weth;
+    mapping(address => AggregatorV3Interface) public tokenToPriceFeedUSD;
 
-    constructor(address _ethToUsdPriceFeed, address _weth) {
-        ethToUsdPriceFeed = AggregatorV3Interface(_ethToUsdPriceFeed);
-        weth = ERC20(_weth);
-    }
+    constructor() {}
 
     /**
      * @notice Add a token to the price feed.
-     *         Only the owner can add a token
-     *         The token must be supported by Chainlink
-     *         The price feed must be XXX/USD one (e.g. ETH/USD)
+     * Only the owner can add a token
+     * The token must be supported by Chainlink
+     * The price feed must be XXX/USD one (e.g. ETH/USD)
      * @param _token token address
      * @param _priceFeed price feed address
      */
     function addPriceFeed(address _token, address _priceFeed) external onlyOwner {
-        tokenToPriceFeedETH[_token] = AggregatorV3Interface(_priceFeed);
+        tokenToPriceFeedUSD[_token] = AggregatorV3Interface(_priceFeed);
     }
 
     /**
@@ -38,52 +33,42 @@ contract PriceFeedL1 is Ownable {
      */
     function getPairLatestPrice(address _token0, address _token1) public view returns (uint256) {
         return
-            (getTokenLatestPriceInETH(_token0) * (10 ** uint256(ERC20(_token1).decimals()))) /
-            getTokenLatestPriceInETH(_token1);
+            (getTokenLatestPriceInUSD(_token0) * (10 ** uint256(ERC20(_token1).decimals()))) /
+            getTokenLatestPriceInUSD(_token1);
     }
 
-    function getTokenLatestPriceInETH(address _token) public view returns (uint256) {
-        if (address(tokenToPriceFeedETH[_token]) == address(0)) {
-            revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
-        }
-        if (_token == address(weth)) {
-            return 1e18;
-        }
-
-        // prettier-ignore
-        (
-            /* uint80 roundID */,
-            int256 priceToken,
-            /*uint startedAt*/,
-            /*uint timeStamp*/,
-            /*uint80 answeredInRound*/
-        ) = tokenToPriceFeedETH[_token].latestRoundData();
-
-        return uint256(priceToken);
-    }
-
+    /**
+     * @notice Returns the latest price of a token in USD, normalized to 18 decimals.
+     * @param _token The token address.
+     * @return uint256 The price in USD with 18 decimals.
+     */
     function getTokenLatestPriceInUSD(address _token) public view returns (uint256) {
-        if (address(tokenToPriceFeedETH[_token]) == address(0)) {
+        AggregatorV3Interface priceFeed = tokenToPriceFeedUSD[_token];
+        if (address(priceFeed) == address(0)) {
             revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
         }
+        (, int256 price, , , ) = priceFeed.latestRoundData();
+        uint8 decimals = priceFeed.decimals();
+        return uint256(price) * 10**(18 - decimals);
+    }
 
-        // prettier-ignore
-        (
-            /* uint80 roundID */,
-            int256 priceEth,
-            /*uint startedAt*/,
-            /*uint timeStamp*/,
-            /*uint80 answeredInRound*/
-        ) = ethToUsdPriceFeed.latestRoundData();
-
-        return ((getTokenLatestPriceInETH(_token) * uint256(priceEth)) / 1e18);
+    /**
+     * @notice Returns the USD value of a given amount of a token.
+     * @param _token The token address.
+     * @param _amount The amount of the token (in its smallest unit, not human-readable format).
+     * @return uint256 The value in USD, with 18 decimals of precision.
+     */
+    function getAmountInUSD(address _token, uint256 _amount) public view returns (uint256) {
+        uint256 priceInUSD = getTokenLatestPriceInUSD(_token); // This is already normalized to 18 decimals
+        uint8 tokenDecimals = ERC20(_token).decimals();
+        return (_amount * priceInUSD) / (10**tokenDecimals);
     }
 
     function isPairSupported(address _token0, address _token1) public view returns (bool) {
-        if (address(tokenToPriceFeedETH[_token0]) == address(0)) {
+        if (address(tokenToPriceFeedUSD[_token0]) == address(0)) {
             return false;
         }
-        if (address(tokenToPriceFeedETH[_token1]) == address(0)) {
+        if (address(tokenToPriceFeedUSD[_token1]) == address(0)) {
             return false;
         }
         return true;

@@ -23,5 +23,9 @@
     "format": "make format",
     "lint": "make lint",
     "all": "make all"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "ethers": "^6.15.0"
   }
 }

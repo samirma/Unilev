@@ -5,11 +5,10 @@ contract HelperConfig {
     NetworkConfig public activeNetworkConfig;
 
     struct NetworkConfig {
-        address oracle;
         address priceFeedETHUSD;
-        address priceFeedBTCETH;
-        address priceFeedUSDCETH;
-        address priceFeedDAIETH;
+        address priceFeedWBTCUSD;
+        address priceFeedUSDCUSD;
+        address priceFeedDAIUSD;
         address nonfungiblePositionManager;
         address swapRouter;
         address liquidityPoolFactoryUniswapV3;
@@ -23,10 +22,7 @@ contract HelperConfig {
     mapping(uint256 => NetworkConfig) public chainIdToNetworkConfig;
 
     constructor() {
-        // chainIdToNetworkConfig[11155111] = getSepoliaEthConfig();
         chainIdToNetworkConfig[1] = getMainnetForkConfig();
-        // chainIdToNetworkConfig[31337] = getAnvilConfig();
-
         activeNetworkConfig = chainIdToNetworkConfig[block.chainid];
     }
 
@@ -34,34 +30,16 @@ contract HelperConfig {
         return activeNetworkConfig;
     }
 
-    // // georli in reality
-    // function getSepoliaEthConfig()
-    //     internal
-    //     pure
-    //     returns (NetworkConfig memory sepoliaNetworkConfig)
-    // {
-    //     sepoliaNetworkConfig = NetworkConfig({
-    //         oracle: 0x6090149792dAAeE9D1D568c9f9a6F6B46AA29eFD,
-    //         priceFeedETHUSD: 0x694AA1769357215DE4FAC081bf1f309aDC325306, // ETH / USD
-    //         priceFeedBTCETH: 0x5fb1616F78dA7aFC9FF79e0371741a747D2a7F22,
-    //         nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
-    //         swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
-    //         liquidityPoolFactoryUniswapV3: 0x1F98431c8aD98523631AE4a59f267346ea31F984,
-    //         liquidationReward: 10
-    //     });
-    // }
-
     function getMainnetForkConfig()
         internal
         pure
         returns (NetworkConfig memory mainnetNetworkConfig)
     {
         mainnetNetworkConfig = NetworkConfig({
-            oracle: address(0), // This is a mock
-            priceFeedETHUSD: address(0), // This is a mock
-            priceFeedBTCETH: address(0),
-            priceFeedUSDCETH: address(0),
-            priceFeedDAIETH: address(0),
+            priceFeedETHUSD: 0x5f4eC3Df9cbd43714FE274045F3641370dFf471a, // ETH/USD Mainnet
+            priceFeedWBTCUSD: 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // BTC/USD Mainnet
+            priceFeedUSDCUSD: 0x8fFfFfd4AfB6115b954Fe285BEc579aA0e7f2C83, // USDC/USD Mainnet
+            priceFeedDAIUSD: 0xAed0c38402a5d19df6E4835349250d3e92F9416b, // DAI/USD Mainnet
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             liquidityPoolFactoryUniswapV3: 0x1F98431c8aD98523631AE4a59f267346ea31F984,

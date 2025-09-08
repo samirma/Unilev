@@ -6,9 +6,9 @@ import "../Market.sol";
 import "../LiquidityPoolFactory.sol";
 import "../LiquidityPool.sol";
 import "../PriceFeedL1.sol";
+import {UniswapV3Helper} from "../UniswapV3Helper.sol";
 import "@solmate/tokens/ERC20.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
 import {SwapRouter} from "@uniswapPeriphery/contracts/SwapRouter.sol";
 
@@ -25,7 +25,9 @@ contract Deployments is Script, HelperConfig {
     LiquidityPool public lbPoolWBTC;
     LiquidityPool public lbPoolWETH;
     LiquidityPool public lbPoolUSDC;
+    LiquidityPool public lbPoolDAI; // Added for DAI
     SwapRouter public swapRouter;
+
     address public alice;
     address public bob;
     address public carol;
@@ -34,26 +36,25 @@ contract Deployments is Script, HelperConfig {
     HelperConfig.NetworkConfig public conf;
 
     function run() public {
-        conf = getActiveNetworkConfig(); // Assign conf first
+        conf = getActiveNetworkConfig();
 
         // Logging statements to debug configuration
         console.log("--- Debug Logs ---");
-        
-        console.log("Using priceFeedETHUSD (MATIC/USD on Polygon):", conf.priceFeedETHUSD);
-        console.log("Using addWBTC:", conf.addWBTC);
-        console.log("Using addWETH:", conf.addWETH);
-        console.log("Using addUSDC:", conf.addUSDC);
+        console.log("Using priceFeedETHUSD:", conf.priceFeedETHUSD);
+        console.log("Using priceFeedWBTCUSD:", conf.priceFeedWBTCUSD);
+        console.log("Using priceFeedUSDCUSD:", conf.priceFeedUSDCUSD);
+        console.log("Using priceFeedDAIUSD:", conf.priceFeedDAIUSD);
         console.log("--- End Debug Logs ---");
 
         vm.startBroadcast();
 
-        // mainnet context (swapRouter should be fine for Polygon too)
+        // mainnet context
         swapRouter = SwapRouter(payable(conf.swapRouter));
 
         /// deployments
         // contracts
         uniswapV3Helper = new UniswapV3Helper(conf.nonfungiblePositionManager, conf.swapRouter);
-        priceFeedL1 = new PriceFeedL1(conf.priceFeedETHUSD, conf.addWETH); // Uses MATIC/USD and WETH on Polygon
+        priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
         positions = new Positions(
             address(priceFeedL1),
@@ -71,7 +72,7 @@ contract Deployments is Script, HelperConfig {
         );
 
         /// configurations
-        // add position addres to the factory
+        // add position address to the factory
         liquidityPoolFactory.addPositionsAddress(address(positions));
 
         // transfer ownership
@@ -83,10 +84,13 @@ contract Deployments is Script, HelperConfig {
         lbPoolWBTC = LiquidityPool(market.createLiquidityPool(conf.addWBTC));
         lbPoolWETH = LiquidityPool(market.createLiquidityPool(conf.addWETH));
         lbPoolUSDC = LiquidityPool(market.createLiquidityPool(conf.addUSDC));
+        lbPoolDAI = LiquidityPool(market.createLiquidityPool(conf.addDAI)); // Added for DAI
 
         // add price feeds
-        market.addPriceFeed(conf.addWBTC, conf.priceFeedBTCETH);
-        market.addPriceFeed(conf.addUSDC, conf.priceFeedUSDCETH);
+        market.addPriceFeed(conf.addWBTC, conf.priceFeedWBTCUSD);
+        market.addPriceFeed(conf.addUSDC, conf.priceFeedUSDCUSD);
+        market.addPriceFeed(conf.addWETH, conf.priceFeedETHUSD);
+        market.addPriceFeed(conf.addDAI, conf.priceFeedDAIUSD); // Added for DAI
 
         vm.stopBroadcast();
     }
