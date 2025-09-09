@@ -36,10 +36,10 @@ contract HelperConfig {
         returns (NetworkConfig memory mainnetNetworkConfig)
     {
         mainnetNetworkConfig = NetworkConfig({
-            priceFeedETHUSD: 0x5f4eC3Df9cbd43714FE274045F3641370dFf471a, // ETH/USD Mainnet
+            priceFeedETHUSD: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // ETH/USD Mainnet
             priceFeedWBTCUSD: 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // BTC/USD Mainnet
-            priceFeedUSDCUSD: 0x8fFfFfd4AfB6115b954Fe285BEc579aA0e7f2C83, // USDC/USD Mainnet
-            priceFeedDAIUSD: 0xAed0c38402a5d19df6E4835349250d3e92F9416b, // DAI/USD Mainnet
+            priceFeedUSDCUSD: 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // USDC/USD Mainnet
+            priceFeedDAIUSD: 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9, // DAI/USD Mainnet
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             liquidityPoolFactoryUniswapV3: 0x1F98431c8aD98523631AE4a59f267346ea31F984,

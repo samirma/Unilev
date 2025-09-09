@@ -16,8 +16,8 @@ contract SimpleTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         assertEq(amount, ERC20(conf.addUSDC).balanceOf(alice));
@@ -50,8 +50,8 @@ contract SimpleTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -66,8 +66,8 @@ contract SimpleTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -94,8 +94,8 @@ contract SimpleTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -110,8 +110,8 @@ contract SimpleTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -138,8 +138,8 @@ contract SimpleTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -156,8 +156,8 @@ contract SimpleTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         (, , , , , , , , , pnl, colLeft) = market.getPositionParams(1);

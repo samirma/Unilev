@@ -63,8 +63,8 @@ contract UtilsTest is TestSetup {
         uint160 price0 = uniswapV3Helper.sqrtPriceX96ToPrice(sqrtPrice0, 8);
         // console.log("%s:%d", "Price0", price0);
 
-        mockV3AggregatorWBTCETH.updateAnswer(int(int160(price0)));
-        (, int256 priceToken, , , ) = mockV3AggregatorWBTCETH.latestRoundData();
+        mockV3AggregatorWBTCUSD.updateAnswer(int(int160(price0)));
+        (, int256 priceToken, , , ) = mockV3AggregatorWBTCUSD.latestRoundData();
         // console.log("%s:%d", "Chainlink price : ", uint(priceToken));
         // console.log("%s:%d", "Chainlink price : ", uint(priceToken));
 
@@ -137,8 +137,8 @@ contract UtilsTest is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             3000,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -147,8 +147,8 @@ contract UtilsTest is TestSetup {
         //     conf.addWBTC,
         //     conf.addUSDC,
         //     3000,
-        //     mockV3AggregatorWBTCETH,
-        //     mockV3AggregatorUSDCETH,
+        //     mockV3AggregatorWBTCUSD,
+        //     mockV3AggregatorUSDCUSD,
         //     uniswapV3Helper
         // );
     }

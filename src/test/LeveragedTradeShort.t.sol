@@ -16,8 +16,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         assertEq(amount, ERC20(conf.addUSDC).balanceOf(alice));
@@ -50,8 +50,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -66,8 +66,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -94,8 +94,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -110,8 +110,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -138,8 +138,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -154,8 +154,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -182,8 +182,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -198,8 +198,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -227,8 +227,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -243,8 +243,8 @@ contract LeveragedTradeShort is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 

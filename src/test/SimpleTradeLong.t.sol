@@ -15,8 +15,8 @@ contract SimpleTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             3000,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         assertEq(amount, ERC20(conf.addWBTC).balanceOf(alice));
@@ -47,8 +47,8 @@ contract SimpleTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             3000,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         assertEq(10e8, ERC20(conf.addWBTC).balanceOf(alice));
@@ -105,8 +105,8 @@ contract SimpleTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             3000,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         uint256[] memory posAlices = positions.getTraderPositions(alice);
@@ -137,8 +137,8 @@ contract SimpleTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             3000,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -167,8 +167,8 @@ contract SimpleTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             3000,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -185,8 +185,8 @@ contract SimpleTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             3000,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(bob);
@@ -217,8 +217,8 @@ contract SimpleTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             3000,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -248,8 +248,8 @@ contract SimpleTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             3000,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(bob);
@@ -312,7 +312,7 @@ contract SimpleTradeLong is TestSetup {
     //         token2,
     //         fee,
     //         mockV3AggregatorDAIETH,
-    //         mockV3AggregatorUSDCETH,
+    //         mockV3AggregatorUSDCUSD,
     //         uniswapV3Helper
     //     );
 

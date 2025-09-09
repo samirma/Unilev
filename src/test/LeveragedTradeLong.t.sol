@@ -16,8 +16,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
 
@@ -52,8 +52,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -66,8 +66,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -93,8 +93,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -107,8 +107,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -133,8 +133,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -151,8 +151,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         (, , , , , , , , , pnl, colLeft) = market.getPositionParams(1);
@@ -181,8 +181,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -199,8 +199,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         skip(3600 * 24);
@@ -233,8 +233,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -248,8 +248,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -275,8 +275,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -298,8 +298,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -325,8 +325,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         vm.startPrank(alice);
@@ -348,8 +348,8 @@ contract LeveragedTradeLong is TestSetup {
             conf.addWBTC,
             conf.addUSDC,
             fee,
-            mockV3AggregatorWBTCETH,
-            mockV3AggregatorUSDCETH,
+            mockV3AggregatorWBTCUSD,
+            mockV3AggregatorUSDCUSD,
             uniswapV3Helper
         );
         uint256[] memory posAlice = positions.getTraderPositions(alice);
