@@ -40,6 +40,9 @@ contract Market is IMarket, Ownable, Pausable {
         uint160 _limitPrice,
         uint256 _stopLossPrice
     ) external whenNotPaused {
+
+        ERC20(_token0).safeApprove(address(positions), _amount);
+
         uint256 posId = positions.openPosition(
             msg.sender,
             _token0,

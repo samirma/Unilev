@@ -53,7 +53,7 @@ contract PriceFeedL1 is Ownable {
     }
 
     /**
-     * @notice Returns the USD value of a given amount of a token.
+     * @notice Returns the USD in a human readable value of a given amount of a token.
      * @param _token The token address.
      * @param _amount The amount of the token (in its smallest unit, not human-readable format).
      * @return uint256 The value in USD, with 18 decimals of precision.

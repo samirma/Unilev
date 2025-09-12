@@ -24,7 +24,7 @@ error Positions__TOKEN_NOT_SUPPORTED(address _token);
 error Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(address _token);
 error Positions__NO_PRICE_FEED(address _token0, address _token1);
 error Positions__LEVERAGE_NOT_IN_RANGE(uint8 _leverage);
-error Positions__AMOUNT_TO_SMALL(uint256 _amount);
+error Positions__AMOUNT_TO_SMALL(string tokenSymbol, uint256 amountInUSD, uint256 amount);
 error Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(uint256 _limitPrice);
 error Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(uint256 _stopLossPrice);
 error Positions__NOT_LIQUIDABLE(uint256 _posId);
@@ -62,7 +62,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
     // Variables
     uint256 public constant LIQUIDATION_THRESHOLD = 1000; // 10% of margin
-    uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 100; // To avoid DOS attack
+    uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 1; // To avoid DOS attack
     uint256 public constant MAX_LEVERAGE = 3;
     uint256 public constant BORROW_FEE = 20; // 0.2% when opening a position
     uint256 public constant BORROW_FEE_EVERY_HOURS = 1; // 0.01% : assets borrowed/total assets in pool * 0.01%
@@ -393,10 +393,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         }
 
         // check amount
-        uint256 amountInUSD = priceFeed.getAmountInUSD(_token0, _amount); // Returns value with 18 decimals
-        uint256 humanReadableUSD = amountInUSD / (10**USD_DECIMALS);
+        uint256 humanReadableUSD = priceFeed.getAmountInUSD(_token0, _amount); // Returns value with 18 decimals
         if (humanReadableUSD < MIN_POSITION_AMOUNT_IN_USD) {
-            revert Positions__AMOUNT_TO_SMALL(humanReadableUSD);
+            revert Positions__AMOUNT_TO_SMALL(ERC20(_token0).symbol(), humanReadableUSD, _amount);
         }
 
         if (_isShort) {

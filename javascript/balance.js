@@ -1,5 +1,5 @@
 // This script connects to the blockchain and fetches the balance of ETH, WETH, DAI, USDC, and WBTC for a given wallet.
-// It also fetches the USD price of each asset from Chainlink Price Feeds and calculates the USD value of the balances.
+// It now uses the PriceFeedL1 contract to fetch the USD price of each asset and calculate the USD value of the balances.
 // Configuration is loaded from a .env file.
 
 // Import necessary libraries
@@ -7,6 +7,23 @@ const { ethers } = require("ethers");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
+
+/**
+ * Loads the contract ABI from the JSON file.
+ * @param {string} contractName The name of the contract.
+ * @returns {object} The contract ABI.
+ */
+function getAbi(contractName) {
+  try {
+    const abiPath = path.resolve(__dirname, `../out/${contractName}.sol/${contractName}.json`);
+    const abiFile = fs.readFileSync(abiPath, "utf8");
+    return JSON.parse(abiFile).abi;
+  } catch (error) {
+    console.error(`Error loading contract ABI for ${contractName}:`, error.message);
+    console.error("Please ensure the contract has been compiled and the ABI file is in the correct path.");
+    process.exit(1);
+  }
+}
 
 /**
  * Loads a standard ERC20 ABI.
@@ -22,23 +39,12 @@ function getErc20Abi() {
 }
 
 /**
- * Loads the Chainlink Aggregator V3 Interface ABI.
- * @returns {object} The AggregatorV3Interface ABI.
- */
-function getAggregatorV3Abi() {
-    return [
-        "function latestRoundData() view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)",
-        "function decimals() view returns (uint8)"
-    ];
-}
-
-/**
- * Fetches and displays the balance of a specific ERC20 token.
+ * Fetches and displays the balance of a specific ERC20 token using PriceFeedL1.
  * @param {ethers.Contract} contract The ethers.js contract instance.
  * @param {string} address The wallet address to check.
- * @param {ethers.Contract} priceFeedContract The Chainlink price feed contract instance.
+ * @param {ethers.Contract} priceFeedL1Contract The PriceFeedL1 contract instance.
  */
-async function getTokenBalance(contract, address, priceFeedContract) {
+async function getTokenBalance(contract, address, priceFeedL1Contract) {
     const [name, symbol, decimals, balance] = await Promise.all([
         contract.name(),
         contract.symbol(),
@@ -48,11 +54,9 @@ async function getTokenBalance(contract, address, priceFeedContract) {
 
     const formattedBalance = ethers.formatUnits(balance, decimals);
 
-    // Fetch the price from Chainlink
-    const [, price, , ,] = await priceFeedContract.latestRoundData();
-    const priceFeedDecimals = await priceFeedContract.decimals();
-    
-    const usdValue = (Number(formattedBalance) * Number(ethers.formatUnits(price, priceFeedDecimals))).toFixed(2);
+    // Fetch the USD value from the PriceFeedL1 contract
+    const usdValueBigInt = await priceFeedL1Contract.getAmountInUSD(await contract.getAddress(), balance);
+    const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2); // PriceFeedL1 returns USD with 18 decimals
 
     console.log(`- ${name} (${symbol}): ${formattedBalance} (~$${usdValue} USD)`);
 }
@@ -65,8 +69,7 @@ async function main() {
   const envVars = process.env;
 
   const requiredVars = [
-    "RPC_URL", "PRIVATE_KEY", "WETH", "DAI", "USDC", "WBTC",
-    "ETH_USD_PRICE_FEED", "DAI_USD_PRICE_FEED", "USDC_USD_PRICE_FEED", "BTC_USD_PRICE_FEED"
+    "RPC_URL", "PRIVATE_KEY", "WETH", "DAI", "USDC", "WBTC", "PRICEFEEDL1_ADDRESS"
   ];
 
   for (const v of requiredVars) {
@@ -81,16 +84,13 @@ async function main() {
   const DAI = ethers.getAddress(envVars.DAI);
   const USDC = ethers.getAddress(envVars.USDC);
   const WBTC = ethers.getAddress(envVars.WBTC);
-  const ETH_USD_PRICE_FEED = ethers.getAddress(envVars.ETH_USD_PRICE_FEED);
-  const DAI_USD_PRICE_FEED = ethers.getAddress(envVars.DAI_USD_PRICE_FEED);
-  const USDC_USD_PRICE_FEED = ethers.getAddress(envVars.USDC_USD_PRICE_FEED);
-  const BTC_USD_PRICE_FEED = ethers.getAddress(envVars.BTC_USD_PRICE_FEED);
+  const PRICEFEEDL1_ADDRESS = ethers.getAddress(envVars.PRICEFEEDL1_ADDRESS);
   const PRIVATE_KEY = envVars.PRIVATE_KEY;
   const RPC_URL = envVars.RPC_URL;
 
   // --- Load ABIs ---
   const erc20Abi = getErc20Abi();
-  const aggregatorAbi = getAggregatorV3Abi();
+  const priceFeedL1Abi = getAbi("PriceFeedL1");
 
   // --- Provider & Wallet Setup ---
   const provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -104,11 +104,8 @@ async function main() {
   const usdcContract = new ethers.Contract(USDC, erc20Abi, provider);
   const wbtcContract = new ethers.Contract(WBTC, erc20Abi, provider);
 
-  // --- Price Feed Contract Instances ---
-  const ethPriceFeed = new ethers.Contract(ETH_USD_PRICE_FEED, aggregatorAbi, provider);
-  const daiPriceFeed = new ethers.Contract(DAI_USD_PRICE_FEED, aggregatorAbi, provider);
-  const usdcPriceFeed = new ethers.Contract(USDC_USD_PRICE_FEED, aggregatorAbi, provider);
-  const btcPriceFeed = new ethers.Contract(BTC_USD_PRICE_FEED, aggregatorAbi, provider);
+  // --- Price Feed Contract Instance ---
+  const priceFeedL1Contract = new ethers.Contract(PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
 
   try {
     // --- Fetch and Display Balances ---
@@ -117,19 +114,16 @@ async function main() {
     // ETH Balance
     const ethBalance = await provider.getBalance(wallet.address);
     const formattedEthBalance = ethers.formatEther(ethBalance);
-    const [, ethPrice, , ,] = await ethPriceFeed.latestRoundData();
-    const ethPriceFeedDecimals = await ethPriceFeed.decimals();
-    const ethUsdValue = (Number(formattedEthBalance) * Number(ethers.formatUnits(ethPrice, ethPriceFeedDecimals))).toFixed(2);
+    // Use WETH address to get the price of ETH from PriceFeedL1
+    const ethUsdValueBigInt = await priceFeedL1Contract.getAmountInUSD(WETH, ethBalance);
+    const ethUsdValue = parseFloat(ethers.formatUnits(ethUsdValueBigInt, 18)).toFixed(2);
     console.log(`- ETH: ${formattedEthBalance} (~$${ethUsdValue} USD)`);
-    
-    // WETH (uses ETH price feed)
-    await getTokenBalance(wethContract, wallet.address, ethPriceFeed);
-    // DAI
-    await getTokenBalance(daiContract, wallet.address, daiPriceFeed);
-    // USDC
-    await getTokenBalance(usdcContract, wallet.address, usdcPriceFeed);
-    // WBTC
-    await getTokenBalance(wbtcContract, wallet.address, btcPriceFeed);
+
+    // Fetch ERC20 token balances
+    await getTokenBalance(wethContract, wallet.address, priceFeedL1Contract);
+    await getTokenBalance(daiContract, wallet.address, priceFeedL1Contract);
+    await getTokenBalance(usdcContract, wallet.address, priceFeedL1Contract);
+    await getTokenBalance(wbtcContract, wallet.address, priceFeedL1Contract);
 
     console.log("\n====================================================");
     console.log("✅ Balance check complete!");
