@@ -12,17 +12,19 @@ contract SimpleTradeLong is TestSetup {
 
         address tokenAddress = conf.addWBTC;
 
+        ERC20 tokenErc20 = ERC20(tokenAddress);
+
         writeTokenBalance(alice, tokenAddress, amount);
 
-        assertEq(amount, ERC20(tokenAddress).balanceOf(alice));
-        assertEq(0, ERC20(tokenAddress).balanceOf(address(positions)));
+        assertEq(amount, tokenErc20.balanceOf(alice));
+        assertEq(0, tokenErc20.balanceOf(address(positions)));
 
         vm.startPrank(alice);
-        ERC20(tokenAddress).approve(address(positions), amount);
+        tokenErc20.approve(address(positions), amount);
         market.openPosition(tokenAddress, conf.addUSDC, uint24(3000), false, 1, amount, 0, 0);
 
-        assertEq(0, ERC20(tokenAddress).balanceOf(alice));
-        assertEq(amount, ERC20(tokenAddress).balanceOf(address(positions)));
+        assertEq(0, tokenErc20.balanceOf(alice));
+        assertEq(amount, tokenErc20.balanceOf(address(positions)));
 
         assertEq(1, positions.totalNbPos());
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -31,25 +33,27 @@ contract SimpleTradeLong is TestSetup {
 
         market.closePosition(posAlice[0]);
 
-        assertEq(amount, ERC20(tokenAddress).balanceOf(alice));
-        assertEq(0, ERC20(tokenAddress).balanceOf(address(positions)));
+        assertEq(amount, tokenErc20.balanceOf(alice));
+        assertEq(0, tokenErc20.balanceOf(address(positions)));
     }
 
     function test__simpleTradeToCloseLong2() public {
 
         address tokenAddress = conf.addWBTC;
 
+        ERC20 tokenErc20 = ERC20(tokenAddress);
+
         writeTokenBalance(alice, tokenAddress, 10e8);
 
-        assertEq(10e8, ERC20(tokenAddress).balanceOf(alice));
-        assertEq(0, ERC20(tokenAddress).balanceOf(address(positions)));
+        assertEq(10e8, tokenErc20.balanceOf(alice));
+        assertEq(0, tokenErc20.balanceOf(address(positions)));
 
         vm.startPrank(alice);
-        ERC20(tokenAddress).approve(address(positions), 10e8);
+        tokenErc20.approve(address(positions), 10e8);
         market.openPosition(tokenAddress, conf.addUSDC, uint24(3000), false, 1, 10e8, 0, 0);
 
-        assertEq(0, ERC20(tokenAddress).balanceOf(alice));
-        assertEq(10e8, ERC20(tokenAddress).balanceOf(address(positions)));
+        assertEq(0, tokenErc20.balanceOf(alice));
+        assertEq(10e8, tokenErc20.balanceOf(address(positions)));
 
         assertEq(1, positions.totalNbPos());
         uint256[] memory posAlice = market.getTraderPositions(alice);
@@ -83,8 +87,8 @@ contract SimpleTradeLong is TestSetup {
 
         market.closePosition(posAlice[0]);
 
-        assertEq(10e8, ERC20(tokenAddress).balanceOf(alice));
-        assertEq(0, ERC20(tokenAddress).balanceOf(address(positions)));
+        assertEq(10e8, tokenErc20.balanceOf(alice));
+        assertEq(0, tokenErc20.balanceOf(address(positions)));
     }
 
 /*
@@ -105,7 +109,7 @@ contract SimpleTradeLong is TestSetup {
         assertEq(0, posAlices.length);
 
         vm.startPrank(alice);
-        ERC20(tokenAddress).approve(address(positions), amount);
+        tokenErc20.approve(address(positions), amount);
         market.openPosition(tokenAddress, conf.addUSDC, uint24(3000), false, 1, amount, 0, 20000e6); // ST at 20000$ for 1 BTC
 
         assertEq(2, positions.getPositionState(1));
@@ -144,7 +148,7 @@ contract SimpleTradeLong is TestSetup {
         // console.log("balance of alice", ERC20(conf.addUSDC).balanceOf(alice));
 
         assertApproxEqRel(19000e6 * 10, ERC20(conf.addUSDC).balanceOf(alice), 0.01e18);
-        assertEq(0, ERC20(tokenAddress).balanceOf(address(positions)));
+        assertEq(0, tokenErc20.balanceOf(address(positions)));
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));
 
         vm.stopPrank();
@@ -164,7 +168,7 @@ contract SimpleTradeLong is TestSetup {
         );
 
         vm.startPrank(alice);
-        ERC20(tokenAddress).approve(address(positions), amount);
+        tokenErc20.approve(address(positions), amount);
         market.openPosition(tokenAddress, conf.addUSDC, uint24(3000), false, 1, amount, 0, 20000e6); // ST at 20000$ for 1 BTC
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -189,12 +193,12 @@ contract SimpleTradeLong is TestSetup {
 
         market.liquidatePosition(liquidablePos[0]);
 
-        // console.log("balance of bob reward", ERC20(tokenAddress).balanceOf(bob));
+        // console.log("balance of bob reward", tokenErc20.balanceOf(bob));
 
         assertApproxEqRel(19000e6 * 10, ERC20(conf.addUSDC).balanceOf(alice), 0.01e18);
-        assertApproxEqRel(100000, ERC20(tokenAddress).balanceOf(bob), 0.01e18);
+        assertApproxEqRel(100000, tokenErc20.balanceOf(bob), 0.01e18);
 
-        assertEq(0, ERC20(tokenAddress).balanceOf(address(positions)));
+        assertEq(0, tokenErc20.balanceOf(address(positions)));
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));
 
         vm.stopPrank();
@@ -214,9 +218,9 @@ contract SimpleTradeLong is TestSetup {
         );
 
         vm.startPrank(alice);
-        ERC20(tokenAddress).approve(address(positions), amount);
+        tokenErc20.approve(address(positions), amount);
         market.openPosition(tokenAddress, conf.addUSDC, uint24(3000), false, 1, amount, 0, 20000e6); // ST at 20000$ for 1 BTC
-        ERC20(tokenAddress).approve(address(positions), amount * 2);
+        tokenErc20.approve(address(positions), amount * 2);
         market.openPosition(
             tokenAddress,
             conf.addUSDC,
@@ -254,9 +258,9 @@ contract SimpleTradeLong is TestSetup {
         market.liquidatePositions(liquidablePos);
 
         assertApproxEqRel(19000e6 * 10 * 3, ERC20(conf.addUSDC).balanceOf(alice), 0.05e18);
-        assertApproxEqRel(100000 * 2, ERC20(tokenAddress).balanceOf(bob), 0.01e18);
+        assertApproxEqRel(100000 * 2, tokenErc20.balanceOf(bob), 0.01e18);
 
-        assertEq(0, ERC20(tokenAddress).balanceOf(address(positions)));
+        assertEq(0, tokenErc20.balanceOf(address(positions)));
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));
 
         vm.stopPrank();
