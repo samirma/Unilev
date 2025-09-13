@@ -5,4 +5,5 @@ libs = ['lib']
 gas_reports = ["*"]
 optimizer = true
 optimizer_runs = 151
-solc = "0.8.19"
+solc = "0.8.20"
+via_ir = true

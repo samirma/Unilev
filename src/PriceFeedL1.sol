@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -12,7 +12,7 @@ error PriceFeedL1__TOKEN_NOT_SUPPORTED(address token);
 contract PriceFeedL1 is Ownable {
     mapping(address => AggregatorV3Interface) public tokenToPriceFeedUSD;
 
-    constructor() {}
+    constructor() Ownable(msg.sender) {}
 
     /**
      * @notice Add a token to the price feed.

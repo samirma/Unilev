@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 import "./interfaces/IMarket.sol";
 import "./Positions.sol";
@@ -24,11 +24,10 @@ contract Market is IMarket, Ownable, Pausable {
         address _liquidityPoolFactory,
         address _priceFeed,
         address _owner
-    ) {
+    ) Ownable(_owner) {
         positions = Positions(_positions);
         liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
         priceFeed = PriceFeedL1(_priceFeed);
-        transferOwnership(_owner);
     }
 
     // --------------- Trader Zone ---------------
@@ -43,7 +42,7 @@ contract Market is IMarket, Ownable, Pausable {
         uint256 _stopLossPrice
     ) external whenNotPaused {
 
-        IERC20(_token0).safeApprove(address(positions), _amount);
+        SafeERC20.forceApprove(IERC20(_token0), address(positions), _amount);
 
         uint256 posId = positions.openPosition(
             msg.sender,
