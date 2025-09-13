@@ -7,7 +7,6 @@ import "../LiquidityPoolFactory.sol";
 import "../LiquidityPool.sol";
 import "../PriceFeedL1.sol";
 import {UniswapV3Helper} from "../UniswapV3Helper.sol";
-import "@solmate/tokens/ERC20.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
 import {SwapRouter} from "@uniswapPeriphery/contracts/SwapRouter.sol";

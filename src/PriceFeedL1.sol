@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@solmate/tokens/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Errors
 error PriceFeedL1__TOKEN_NOT_SUPPORTED(address token);
@@ -33,7 +33,7 @@ contract PriceFeedL1 is Ownable {
      */
     function getPairLatestPrice(address _token0, address _token1) public view returns (uint256) {
         return
-            (getTokenLatestPriceInUSD(_token0) * (10 ** uint256(ERC20(_token1).decimals()))) /
+            (getTokenLatestPriceInUSD(_token0) * (10 ** uint256(IERC20(_token1).decimals()))) /
             getTokenLatestPriceInUSD(_token1);
     }
 
@@ -60,7 +60,7 @@ contract PriceFeedL1 is Ownable {
      */
     function getAmountInUSD(address _token, uint256 _amount) public view returns (uint256) {
         uint256 priceInUSD = getTokenLatestPriceInUSD(_token); // This is already normalized to 18 decimals
-        uint8 tokenDecimals = ERC20(_token).decimals();
+        uint8 tokenDecimals = IERC20(_token).decimals();
         return (_amount * priceInUSD) / (10**tokenDecimals);
     }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "@solmate/tokens/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./LiquidityPool.sol";
 
@@ -32,7 +32,11 @@ contract LiquidityPoolFactory is Ownable {
         if (cachedLiquidityPools != address(0))
             revert LiquidityPoolFactory__POOL_ALREADY_EXIST(cachedLiquidityPools);
 
-        address _liquidityPool = address(new LiquidityPool(ERC20(_asset), positions));
+        IERC20 token = IERC20(_asset);
+        string memory name = string.concat("UniswapMaxLP-", token.name());
+        string memory symbol = string.concat("um", token.symbol());
+
+        address _liquidityPool = address(new LiquidityPool(token, positions, name, symbol));
 
         tokenToLiquidityPools[_asset] = _liquidityPool;
         return _liquidityPool;

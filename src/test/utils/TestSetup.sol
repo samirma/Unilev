@@ -8,7 +8,7 @@ import "../../LiquidityPool.sol";
 import "../../PriceFeedL1.sol";
 import {UniswapV3Helper} from "../../UniswapV3Helper.sol";
 import "../mocks/MockV3Aggregator.sol";
-import "@solmate/tokens/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
 import {SwapRouter} from "@uniswapPeriphery/contracts/SwapRouter.sol";
@@ -106,9 +106,9 @@ contract TestSetup is Test, HelperConfig, Utils {
         writeTokenBalance(bob, conf.addWETH, 100e18);
         writeTokenBalance(bob, conf.addUSDC, 10000000e6);
 
-        ERC20(conf.addWBTC).approve(address(lbPoolWBTC), 10e8);
-        ERC20(conf.addWETH).approve(address(lbPoolWETH), 100e18);
-        ERC20(conf.addUSDC).approve(address(lbPoolUSDC), 10000000e6);
+        IERC20(conf.addWBTC).approve(address(lbPoolWBTC), 10e8);
+        IERC20(conf.addWETH).approve(address(lbPoolWETH), 100e18);
+        IERC20(conf.addUSDC).approve(address(lbPoolUSDC), 10000000e6);
 
         lbPoolWBTC.deposit(10e8, bob);
         lbPoolWETH.deposit(100e18, bob);

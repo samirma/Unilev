@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "@solmate/tokens/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
@@ -36,14 +37,14 @@ error Positions__TOKEN_RECEIVED_NOT_CONCISTENT(
 );
 
 contract Positions is ERC721, Ownable, ReentrancyGuard {
-    using SafeTransferLib for ERC20;
+    using SafeERC20 for IERC20;
 
     // Structs
     // prettier-ignore
     struct PositionParams {
         UniswapV3Pool v3Pool;      // Pool to trade
-        ERC20 baseToken;           // Token to trade => should be token0 or token1 of v3Pool
-        ERC20 quoteToken;          // Token to trade => should be the other token of v3Pool
+        IERC20 baseToken;           // Token to trade => should be token0 or token1 of v3Pool
+        IERC20 quoteToken;          // Token to trade => should be the other token of v3Pool
         uint128 collateralSize;    // Total collateral for the position
         uint128 positionSize;      // Amount (in baseToken if long / quoteToken if short) of token traded
         uint256 initialPrice;      // Price of the position when opened
@@ -183,7 +184,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         bool isMargin = _leverage != 1 || _isShort;
 
         // transfer funds to the contract (trader need to approve first)
-        ERC20(_token0).safeTransferFrom(_trader, address(this), _amount);
+        IERC20(_token0).safeTransferFrom(_trader, address(this), _amount);
 
         // Compute parameters
         uint256 breakEvenLimit;
@@ -198,7 +199,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
         // take opening fees
         uint128 liquidationReward = uint128(
-            (LIQUIDATION_REWARD * (10 ** ERC20(_token0).decimals())) /
+            (LIQUIDATION_REWARD * (10 ** IERC20(_token0).decimals())) /
                 (priceFeed.getTokenLatestPriceInUSD(_token0))
         );
         _amount = _amount - liquidationReward;
@@ -206,12 +207,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         if (isMargin) {
             if (_isShort) {
                 breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
-                totalBorrow = ((_amount * (10 ** ERC20(baseToken).decimals())) / price) * _leverage; // Borrow baseToken
+                totalBorrow = ((_amount * (10 ** IERC20(baseToken).decimals())) / price) * _leverage; // Borrow baseToken
             } else {
                 breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
                 totalBorrow =
                     (_amount * (_leverage - 1) * price) /
-                    (10 ** ERC20(baseToken).decimals()); // Borrow quoteToken
+                    (10 ** IERC20(baseToken).decimals()); // Borrow quoteToken
             }
 
             uint128 openingFeesToken1 = (uint128(totalBorrow * BORROW_FEE)) / 10000;
@@ -219,7 +220,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 .getTokenToLiquidityPools(_isShort ? baseToken : quoteToken);
 
             // fees swap
-            ERC20(_token0).safeApprove(address(uniswapV3Helper), _amount);
+            IERC20(_token0).safeApprove(address(uniswapV3Helper), _amount);
             uint256 openingFeesToken0 = uniswapV3Helper.swapExactOutputSingle(
                 _token0,
                 _token1,
@@ -231,13 +232,13 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             _amount -= uint128(openingFeesToken0);
             totalBorrow -= openingFeesToken1;
 
-            ERC20(_token1).safeApprove(cacheLiquidityPoolToUse, openingFeesToken1);
+            IERC20(_token1).safeApprove(cacheLiquidityPoolToUse, openingFeesToken1);
             LiquidityPool(cacheLiquidityPoolToUse).refund(0, openingFeesToken1, 0);
 
             // fees computation
             uint256 decTokenBorrowed = _isShort
-                ? ERC20(baseToken).decimals()
-                : ERC20(quoteToken).decimals();
+                ? IERC20(baseToken).decimals()
+                : IERC20(quoteToken).decimals();
             hourlyFees =
                 (((totalBorrow * (10 ** decTokenBorrowed)) /
                     LiquidityPool(cacheLiquidityPoolToUse).rawTotalAsset()) *
@@ -248,7 +249,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
 
             if (_isShort) {
-                ERC20(baseToken).safeApprove(address(uniswapV3Helper), totalBorrow);
+                IERC20(baseToken).safeApprove(address(uniswapV3Helper), totalBorrow);
                 amountBorrow = uniswapV3Helper.swapExactInputSingle(
                     baseToken,
                     quoteToken,
@@ -257,7 +258,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 );
             } else {
                 if (_leverage != 1) {
-                    ERC20(quoteToken).safeApprove(address(uniswapV3Helper), totalBorrow);
+                    IERC20(quoteToken).safeApprove(address(uniswapV3Helper), totalBorrow);
                     amountBorrow = uniswapV3Helper.swapExactInputSingle(
                         quoteToken,
                         baseToken,
@@ -270,11 +271,11 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             // if not margin
             if (_limitPrice != 0) {
                 tickUpper = TickMath.getTickAtSqrtRatio(
-                    uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, ERC20(baseToken).decimals())
+                    uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, IERC20(baseToken).decimals())
                 );
                 tickLower = tickUpper - 1;
 
-                ERC20(baseToken).safeApprove(address(uniswapV3Helper), _amount);
+                IERC20(baseToken).safeApprove(address(uniswapV3Helper), _amount);
 
                 (tokenIdLiquidity, , amount0, amount1) = mintV3Position(
                     UniswapV3Pool(v3Pool),
@@ -298,8 +299,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
         openPositions[posId] = PositionParams(
             UniswapV3Pool(v3Pool),
-            ERC20(baseToken),
-            ERC20(quoteToken),
+            IERC20(baseToken),
+            IERC20(quoteToken),
             _amount,
             positionSize,
             price,
@@ -395,7 +396,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         // check amount
         uint256 humanReadableUSD = priceFeed.getAmountInUSD(_token0, _amount); // Returns value with 18 decimals
         if (humanReadableUSD < MIN_POSITION_AMOUNT_IN_USD) {
-            revert Positions__AMOUNT_TO_SMALL(ERC20(_token0).symbol(), humanReadableUSD, _amount);
+            revert Positions__AMOUNT_TO_SMALL(IERC20(_token0).symbol(), humanReadableUSD, _amount);
         }
 
         if (_isShort) {
@@ -518,7 +519,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     1
                 );
             }
-            ERC20(addTokenBorrowed).safeTransfer(trader, amountTokenReceived);
+            IERC20(addTokenBorrowed).safeTransfer(trader, amountTokenReceived);
         }
         // state 1+margin, 2, 3, 4 and 5
         else {
@@ -549,33 +550,33 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     int(outAmount) - int(posParms.totalBorrow) - int(interest)
                 );
                 uint256 loss = remaining < 0 ? uint256(-remaining) : uint256(0);
-                ERC20(addTokenBorrowed).safeApprove(
+                IERC20(addTokenBorrowed).safeApprove(
                     address(liquidityPoolToUse),
                     posParms.totalBorrow + interest - loss
                 );
                 liquidityPoolToUse.refund(posParms.totalBorrow, interest, loss);
                 if (loss == 0) {
-                    ERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - inAmount);
+                    IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - inAmount);
                 }
             } else if (state == 2) {
-                ERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived);
+                IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived);
             } else {
                 // when not margin, we need to swap to the other token
-                ERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
+                IERC20(addTokenReceived).safeApprove(address(uniswapV3Helper), amountTokenReceived);
                 uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
                     addTokenReceived,
                     tokenToTrader,
                     UniswapV3Pool(posParms.v3Pool).fee(),
                     amountTokenReceived
                 );
-                ERC20(tokenToTrader).safeTransfer(trader, outAmount);
+                IERC20(tokenToTrader).safeTransfer(trader, outAmount);
             }
         }
 
         --totalNbPos;
         delete openPositions[_posId];
         safeBurn(_posId);
-        ERC20(addTokenInitiallySupplied).safeTransfer(_liquidator, posParms.liquidationReward);
+        IERC20(addTokenInitiallySupplied).safeTransfer(_liquidator, posParms.liquidationReward);
     }
 
     /**
@@ -725,7 +726,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 amountOut,
         uint256 amountInMaximum
     ) private returns (uint256, uint256) {
-        ERC20(_token0).safeApprove(address(uniswapV3Helper), amountInMaximum);
+        IERC20(_token0).safeApprove(address(uniswapV3Helper), amountInMaximum);
         uint256 swapCost = uniswapV3Helper.swapExactOutputSingle(
             _token0,
             _token1,
@@ -735,7 +736,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         );
         // if swap cannot be done with amountInMaximum
         if (swapCost == 0) {
-            ERC20(_token0).safeApprove(address(uniswapV3Helper), amountInMaximum);
+            IERC20(_token0).safeApprove(address(uniswapV3Helper), amountInMaximum);
             uint256 out = uniswapV3Helper.swapExactInputSingle(
                 _token0,
                 _token1,
