@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -14,6 +14,8 @@ contract LiquidityPoolFactory is Ownable {
     address public positions;
 
     mapping(address => address) private tokenToLiquidityPools;
+
+    constructor() Ownable(msg.sender) {}
 
     function addPositionsAddress(address _positions) external onlyOwner {
         if (positions != address(0)) {
