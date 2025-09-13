@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "@solmate/tokens/ERC20.sol";
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
 
 /*

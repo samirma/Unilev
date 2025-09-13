@@ -1,29 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "@solmate/mixins/ERC4626.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Errors
 error LiquidityPool__NOT_ENOUGH_LIQUIDITY(uint256 maxBorrowCapatity);
 
 contract LiquidityPool is ERC4626, Ownable {
-    using SafeTransferLib for ERC20;
+    using SafeERC20 for IERC20;
 
     uint256 private borrowedFunds; // Funds currently used by positions
 
     uint256 private MAX_BORROW_RATIO = 8000; // in basis points => 80%
 
     constructor(
-        ERC20 _asset,
-        address _positions
-    )
-        ERC4626(
-            _asset,
-            string.concat("UniswapMaxLP-", _asset.symbol()),
-            string.concat("um", _asset.symbol())
-        )
-    {
+        IERC20 _asset,
+        address _positions,
+        string memory _name,
+        string memory _symbol
+    ) ERC4626(_asset) ERC20(_name, _symbol) {
         transferOwnership(_positions);
     }
 
@@ -40,7 +38,7 @@ contract LiquidityPool is ERC4626, Ownable {
         if (_amountToBorrow > borrowCapacity)
             revert LiquidityPool__NOT_ENOUGH_LIQUIDITY(borrowCapacity);
         borrowedFunds += _amountToBorrow;
-        asset.safeTransfer(msg.sender, _amountToBorrow);
+        IERC20(asset()).safeTransfer(msg.sender, _amountToBorrow);
     }
 
     /**
@@ -57,17 +55,21 @@ contract LiquidityPool is ERC4626, Ownable {
     ) external onlyOwner {
         // Losses are taken by the pool
         borrowedFunds = uint256(int256(borrowedFunds) - int256(_amountBorrowed));
-        asset.safeTransferFrom(msg.sender, address(this), _amountBorrowed + _interests - _losses);
+        IERC20(asset()).safeTransferFrom(
+            msg.sender,
+            address(this),
+            _amountBorrowed + _interests - _losses
+        );
     }
 
     // --------------- View Zone ---------------
 
     function totalAssets() public view override returns (uint256) {
-        return asset.balanceOf(address(this)) + borrowedFunds;
+        return super.totalAssets() + borrowedFunds;
     }
 
     function rawTotalAsset() public view returns (uint256) {
-        return asset.balanceOf(address(this));
+        return IERC20(asset()).balanceOf(address(this));
     }
 
     function getBorrowedFund() external view returns (uint256) {

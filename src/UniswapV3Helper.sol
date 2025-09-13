@@ -2,9 +2,8 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
-import "@solmate/tokens/ERC20.sol";
 
-import "@solmate/utils/FixedPointMathLib.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@uniswapCore/contracts/libraries/FullMath.sol";
 import "@uniswapPeriphery/contracts/libraries/TransferHelper.sol";
 import "@uniswapPeriphery/contracts/interfaces/INonfungiblePositionManager.sol";
@@ -13,7 +12,6 @@ import {UniswapV3Pool} from "@uniswapCore/contracts/UniswapV3Pool.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 contract UniswapV3Helper is IERC721Receiver {
-    using FixedPointMathLib for uint256;
     ISwapRouter public immutable swapRouter;
     INonfungiblePositionManager public immutable nonfungiblePositionManager;
 
@@ -365,7 +363,7 @@ contract UniswapV3Helper is IERC721Receiver {
         return
             uint160(
                 FullMath.mulDiv(
-                    FixedPointMathLib.sqrt(uint256(price)),
+                    Math.sqrt(uint256(price)),
                     1 << 96,
                     (10 ** (decimalsToken0 >> 1))
                 )

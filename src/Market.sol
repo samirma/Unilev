@@ -9,9 +9,11 @@ import "./Positions.sol";
 import "./LiquidityPool.sol";
 import "./LiquidityPoolFactory.sol";
 import "./PriceFeedL1.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Market is IMarket, Ownable, Pausable {
-    using SafeTransferLib for ERC20;
+    using SafeERC20 for IERC20;
 
     Positions private immutable positions;
     LiquidityPoolFactory private immutable liquidityPoolFactory;
@@ -41,7 +43,7 @@ contract Market is IMarket, Ownable, Pausable {
         uint256 _stopLossPrice
     ) external whenNotPaused {
 
-        ERC20(_token0).safeApprove(address(positions), _amount);
+        IERC20(_token0).safeApprove(address(positions), _amount);
 
         uint256 posId = positions.openPosition(
             msg.sender,
