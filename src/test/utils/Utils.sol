@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@uniswapCore/contracts/UniswapV3Factory.sol";
 import "../mocks/MockV3Aggregator.sol";
@@ -51,7 +52,7 @@ contract Utils is Test {
         // set uniswap price
         uint sqrtPriceX96target = uniswapV3Helper.priceToSqrtPriceX96(
             targetPrice,
-            IERC20(token0).decimals()
+            IERC20Metadata(token0).decimals()
         );
         // price enslavement
         while (uint(abs(int(int160(sqrtPriceX96) - int(sqrtPriceX96target)))) > precision) {
@@ -77,17 +78,17 @@ contract Utils is Test {
             // // console.log("sqrtPriceX96:       %d", sqrtPriceX96);
             // console.log(
             //     "Price:        %d",
-            //     uniswapV3Helper.sqrtPriceX96ToPrice(sqrtPriceX96, IERC20(token0).decimals())
+            //     uniswapV3Helper.sqrtPriceX96ToPrice(sqrtPriceX96, IERC20Metadata(token0).decimals())
             // );
             // console.log("o: %d", o++);
 
             // set chainlink price
-            priceToken0 = (10 ** IERC20(token0).decimals());
-            priceToken1 = (priceToken0 * (10 ** uint256(IERC20(token1).decimals()))) / targetPrice;
+            priceToken0 = (10 ** IERC20Metadata(token0).decimals());
+            priceToken1 = (priceToken0 * (10 ** uint256(IERC20Metadata(token1).decimals()))) / targetPrice;
             mockV3Aggregator0.updateAnswer(int(priceToken0));
             mockV3Aggregator1.updateAnswer(int(priceToken1));
         }
-        uint160 price = uniswapV3Helper.sqrtPriceX96ToPrice(sqrtPriceX96, IERC20(token0).decimals());
+        uint160 price = uniswapV3Helper.sqrtPriceX96ToPrice(sqrtPriceX96, IERC20Metadata(token0).decimals());
 
         assertApproxEqRel(targetPrice, price, 0.05e18, "Price not set correctly");
         return (price, sqrtPriceX96);

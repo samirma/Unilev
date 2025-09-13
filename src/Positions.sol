@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -199,7 +200,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
         // take opening fees
         uint128 liquidationReward = uint128(
-            (LIQUIDATION_REWARD * (10 ** IERC20(_token0).decimals())) /
+            (LIQUIDATION_REWARD * (10 ** IERC20Metadata(_token0).decimals())) /
                 (priceFeed.getTokenLatestPriceInUSD(_token0))
         );
         _amount = _amount - liquidationReward;
@@ -207,12 +208,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         if (isMargin) {
             if (_isShort) {
                 breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
-                totalBorrow = ((_amount * (10 ** IERC20(baseToken).decimals())) / price) * _leverage; // Borrow baseToken
+                totalBorrow = ((_amount * (10 ** IERC20Metadata(baseToken).decimals())) / price) * _leverage; // Borrow baseToken
             } else {
                 breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
                 totalBorrow =
                     (_amount * (_leverage - 1) * price) /
-                    (10 ** IERC20(baseToken).decimals()); // Borrow quoteToken
+                    (10 ** IERC20Metadata(baseToken).decimals()); // Borrow quoteToken
             }
 
             uint128 openingFeesToken1 = (uint128(totalBorrow * BORROW_FEE)) / 10000;
@@ -237,8 +238,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
             // fees computation
             uint256 decTokenBorrowed = _isShort
-                ? IERC20(baseToken).decimals()
-                : IERC20(quoteToken).decimals();
+                ? IERC20Metadata(baseToken).decimals()
+                : IERC20Metadata(quoteToken).decimals();
             hourlyFees =
                 (((totalBorrow * (10 ** decTokenBorrowed)) /
                     LiquidityPool(cacheLiquidityPoolToUse).rawTotalAsset()) *
@@ -271,7 +272,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             // if not margin
             if (_limitPrice != 0) {
                 tickUpper = TickMath.getTickAtSqrtRatio(
-                    uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, IERC20(baseToken).decimals())
+                    uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, IERC20Metadata(baseToken).decimals())
                 );
                 tickLower = tickUpper - 1;
 
@@ -396,7 +397,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         // check amount
         uint256 humanReadableUSD = priceFeed.getAmountInUSD(_token0, _amount); // Returns value with 18 decimals
         if (humanReadableUSD < MIN_POSITION_AMOUNT_IN_USD) {
-            revert Positions__AMOUNT_TO_SMALL(IERC20(_token0).symbol(), humanReadableUSD, _amount);
+            revert Positions__AMOUNT_TO_SMALL(IERC20Metadata(_token0).symbol(), humanReadableUSD, _amount);
         }
 
         if (_isShort) {
