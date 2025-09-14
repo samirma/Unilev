@@ -3,8 +3,6 @@ pragma solidity ^0.8.0;
 
 import {Utils} from "./utils/Utils.sol";
 import "./utils/TestSetup.sol";
-import "@uniswapPeriphery/contracts/interfaces/INonfungiblePositionManager.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 contract SimpleTradeLong is TestSetup {
     function test__simpleTradeToCloseLong1() public {

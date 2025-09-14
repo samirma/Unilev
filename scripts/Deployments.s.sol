@@ -7,7 +7,6 @@ import "../src/LiquidityPoolFactory.sol";
 import "../src/LiquidityPool.sol";
 import "../src/PriceFeedL1.sol";
 import {UniswapV3Helper} from "../src/UniswapV3Helper.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
 import {SwapRouter} from "@uniswapPeriphery/contracts/SwapRouter.sol";
 

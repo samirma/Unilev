@@ -11,7 +11,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@uniswapCore/contracts/libraries/TickMath.sol";
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
 import "@uniswapCore/contracts/UniswapV3Factory.sol";
-import "@uniswapPeriphery/contracts/interfaces/INonfungiblePositionManager.sol";
 
 import "./PriceFeedL1.sol";
 import "./LiquidityPoolFactory.sol";
@@ -716,7 +715,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     function burnV3Position(uint256 _tokenId) private returns (uint256, uint256) {
         uniswapV3Helper.decreaseLiquidity(_tokenId);
         (uint256 amount0, uint256 amount1) = uniswapV3Helper.collectAllFees(_tokenId);
-        // INonfungiblePositionManager(nonfungiblePositionManager).burn(_tokenId);
         return (amount0, amount1);
     }
 
