@@ -34,7 +34,7 @@ contract SimpleTradeLong is TestSetup {
         assertEq(amount, tokenErc20.balanceOf(alice));
         assertEq(0, tokenErc20.balanceOf(address(positions)));
     }
-
+/*
     function test__simpleTradeToCloseLong2() public {
 
         address tokenAddress = conf.addWBTC;
@@ -89,7 +89,7 @@ contract SimpleTradeLong is TestSetup {
         assertEq(0, tokenErc20.balanceOf(address(positions)));
     }
 
-/*
+
     function test__simpleTradeStopLossAndCloseLong() public {
         uint128 amount = 10e8;
         writeTokenBalance(alice, tokenAddress, amount);

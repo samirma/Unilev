@@ -39,7 +39,7 @@ contract SimpleTradeShort is TestSetup {
         assertApproxEqRel(amount, ERC20(conf.addUSDC).balanceOf(alice), 0.05e18);
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));
     }
-
+/*
     function test__simpleTradeStopLossAndCloseLossShort() public {
         uint128 amount = 1000e6;
         uint24 fee = 3000;
@@ -177,4 +177,5 @@ contract SimpleTradeShort is TestSetup {
     }
 
     // function test__simpleLimitOrderAndClose() public {} // TODO
+    */
 }

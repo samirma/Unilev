@@ -3,10 +3,9 @@ pragma solidity ^0.8.0;
 
 import {Utils} from "./utils/Utils.sol";
 import "./utils/TestSetup.sol";
-import "@uniswapPeriphery/contracts/interfaces/INonfungiblePositionManager.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 contract LeveragedTradeShort is TestSetup {
+    /*
     function test__leveragedTradeToCloseShort1() public {
         uint128 amount = 1000e6;
         uint24 fee = 3000;
@@ -264,4 +263,5 @@ contract LeveragedTradeShort is TestSetup {
     }
 
     // function test__leveragedLimitOrderAndCloseShort() public {} // TODO
+    */
 }

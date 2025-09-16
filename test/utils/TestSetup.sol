@@ -30,6 +30,7 @@ contract TestSetup is Test, HelperConfig, Utils {
     LiquidityPool public lbPoolWBTC;
     LiquidityPool public lbPoolWETH;
     LiquidityPool public lbPoolUSDC;
+    LiquidityPool public lbPoolDAI;
 
     SwapRouter public swapRouter;
     address public alice;
@@ -92,6 +93,7 @@ contract TestSetup is Test, HelperConfig, Utils {
         lbPoolWBTC = LiquidityPool(market.createLiquidityPool(conf.addWBTC));
         lbPoolWETH = LiquidityPool(market.createLiquidityPool(conf.addWETH));
         lbPoolUSDC = LiquidityPool(market.createLiquidityPool(conf.addUSDC));
+        lbPoolDAI = LiquidityPool(market.createLiquidityPool(conf.addDAI));
 
         // add price feeds
         market.addPriceFeed(conf.addWBTC, address(mockV3AggregatorWBTCUSD));
@@ -105,14 +107,17 @@ contract TestSetup is Test, HelperConfig, Utils {
         writeTokenBalance(bob, conf.addWBTC, 10e8);
         writeTokenBalance(bob, conf.addWETH, 100e18);
         writeTokenBalance(bob, conf.addUSDC, 10000000e6);
+        writeTokenBalance(bob, conf.addDAI, 10000000e6);
 
         IERC20(conf.addWBTC).approve(address(lbPoolWBTC), 10e8);
         IERC20(conf.addWETH).approve(address(lbPoolWETH), 100e18);
         IERC20(conf.addUSDC).approve(address(lbPoolUSDC), 10000000e6);
+        IERC20(conf.addDAI).approve(address(lbPoolDAI), 10000000e6);
 
         lbPoolWBTC.deposit(10e8, bob);
         lbPoolWETH.deposit(100e18, bob);
         lbPoolUSDC.deposit(10000000e6, bob);
+        lbPoolDAI.deposit(10000000e6, bob);
 
         vm.stopPrank();
     }
