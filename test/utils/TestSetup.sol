@@ -96,10 +96,10 @@ contract TestSetup is Test, HelperConfig, Utils {
         lbPoolDAI = LiquidityPool(market.createLiquidityPool(conf.addDAI));
 
         // add price feeds
-        market.addPriceFeed(conf.addWBTC, address(mockV3AggregatorWBTCUSD));
-        market.addPriceFeed(conf.addUSDC, address(mockV3AggregatorUSDCUSD));
-        market.addPriceFeed(conf.addDAI, address(mockV3AggregatorDAIUSD));
-        market.addPriceFeed(conf.addWETH, address(mockV3AggregatorETHUSD));
+        market.addPriceFeed(conf.addWBTC, conf.priceFeedWBTCUSD);
+        market.addPriceFeed(conf.addUSDC, conf.priceFeedUSDCUSD);
+        market.addPriceFeed(conf.addDAI, conf.priceFeedDAIUSD);
+        market.addPriceFeed(conf.addWETH, conf.priceFeedETHUSD);
         vm.stopPrank();
 
         // add liquidity to a pool to be able to open a short position
