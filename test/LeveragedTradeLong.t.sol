@@ -11,19 +11,7 @@ function test__leveragedTradeToCloseLong1() public {
     uint128 amount = 1e8;
     uint24 fee = 3000;
     
-    // Log the initial state before any actions
-    console.log("Initial State");
-    console.log("Amount to use:", amount);
-    console.log("Fee:", fee);
-    console.log("------------------------");
-
     writeTokenBalance(alice, conf.addWBTC, amount);
-
-    // Log the balances after writing the token balance
-    console.log("After writing token balance to Alice");
-    console.log("Alice's WBTC balance:", ERC20(conf.addWBTC).balanceOf(alice));
-    console.log("Positions contract WBTC balance:", ERC20(conf.addWBTC).balanceOf(address(positions)));
-    console.log("------------------------");
 
     assertEq(amount, ERC20(conf.addWBTC).balanceOf(alice));
     assertEq(0, ERC20(conf.addWBTC).balanceOf(address(positions)));
@@ -33,35 +21,16 @@ function test__leveragedTradeToCloseLong1() public {
     console.log("Open position");
     market.openPosition(conf.addWBTC, conf.addUSDC, uint24(fee), false, 2, amount, 0, 0);
 
-    // Log the balances after opening the position
-    console.log("After opening position");
-    console.log("Alice's WBTC balance:", ERC20(conf.addWBTC).balanceOf(alice));
-    console.log("Positions contract WBTC balance:", ERC20(conf.addWBTC).balanceOf(address(positions)));
-    console.log("------------------------");
-
     assertEq(0, ERC20(conf.addWBTC).balanceOf(alice));
     assertApproxEqRel(amount * 2, ERC20(conf.addWBTC).balanceOf(address(positions)), 0.05e18);
 
     assertEq(1, positions.totalNbPos());
     uint256[] memory posAlice = positions.getTraderPositions(alice);
     
-    // Log the position details
-    console.log("Trader's position details");
-    console.log("Total number of positions:", positions.totalNbPos());
-    console.log("Alice's first position ID:", posAlice[0]);
-    console.log("Owner of position ID", posAlice[0], "is", positions.ownerOf(posAlice[0]));
-    console.log("------------------------");
-
     assertEq(1, posAlice[0]);
     assertEq(alice, positions.ownerOf(posAlice[0]));
     console.log("Close position");
     market.closePosition(posAlice[0]);
-
-    // Log the final balances after closing the position
-    console.log("After closing position");
-    console.log("Alice's WBTC balance:", ERC20(conf.addWBTC).balanceOf(alice));
-    console.log("Positions contract WBTC balance:", ERC20(conf.addWBTC).balanceOf(address(positions)));
-    console.log("------------------------");
 
     assertApproxEqRel(amount, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18);
     assertEq(0, ERC20(conf.addWBTC).balanceOf(address(positions)));

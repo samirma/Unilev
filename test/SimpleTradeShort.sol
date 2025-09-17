@@ -10,15 +10,7 @@ contract SimpleTradeShort is TestSetup {
         uint128 amount = 1000e6;
         uint24 fee = 3000;
         writeTokenBalance(alice, conf.addUSDC, amount);
-        setPrice(
-            30000e6,
-            conf.addWBTC,
-            conf.addUSDC,
-            fee,
-            mockV3AggregatorWBTCUSD,
-            mockV3AggregatorUSDCUSD,
-            uniswapV3Helper
-        );
+
         assertEq(amount, ERC20(conf.addUSDC).balanceOf(alice));
         assertEq(0, ERC20(conf.addUSDC).balanceOf(address(positions)));
 
