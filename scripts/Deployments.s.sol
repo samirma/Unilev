@@ -7,8 +7,6 @@ import "../src/LiquidityPoolFactory.sol";
 import "../src/LiquidityPool.sol";
 import "../src/PriceFeedL1.sol";
 import {UniswapV3Helper} from "../src/UniswapV3Helper.sol";
-import "@uniswapCore/contracts/UniswapV3Pool.sol";
-import {SwapRouter} from "@uniswapPeriphery/contracts/SwapRouter.sol";
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol"; // Added for logging
@@ -24,7 +22,6 @@ contract Deployments is Script, HelperConfig {
     LiquidityPool public lbPoolWETH;
     LiquidityPool public lbPoolUSDC;
     LiquidityPool public lbPoolDAI; // Added for DAI
-    SwapRouter public swapRouter;
 
     address public alice;
     address public bob;
@@ -55,7 +52,6 @@ contract Deployments is Script, HelperConfig {
             address(priceFeedL1),
             address(liquidityPoolFactory),
             conf.liquidityPoolFactoryUniswapV3,
-            conf.nonfungiblePositionManager,
             address(uniswapV3Helper),
             conf.liquidationReward
         );

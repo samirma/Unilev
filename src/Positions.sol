@@ -8,8 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@uniswapCore/contracts/UniswapV3Pool.sol";
-import "@uniswapCore/contracts/UniswapV3Factory.sol";
+import "./interfaces/IUniswapV3.sol";
 
 import "./PriceFeedL1.sol";
 import "./LiquidityPoolFactory.sol";
@@ -40,7 +39,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     // Structs
     // prettier-ignore
     struct PositionParams {
-        UniswapV3Pool v3Pool;      // Pool to trade
+        address v3Pool;      // Pool to trade
         IERC20 baseToken;           // Token to trade => should be token0 or token1 of v3Pool
         IERC20 quoteToken;          // Token to trade => should be the other token of v3Pool
         uint128 collateralSize;    // Total collateral for the position
@@ -72,7 +71,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     PriceFeedL1 public immutable priceFeed;
     UniswapV3Helper public immutable uniswapV3Helper;
     address public immutable liquidityPoolFactoryUniswapV3;
-    address public immutable nonfungiblePositionManager;
 
     uint256 public posId = 1;
     uint256 public totalNbPos;
@@ -82,12 +80,10 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         address _priceFeed,
         address _liquidityPoolFactory,
         address _liquidityPoolFactoryUniswapV3,
-        address _nonfungiblePositionManager,
         address _uniswapV3Helper,
         uint256 _liquidationReward
     ) ERC721("Uniswap-MAX", "UNIMAX") Ownable(msg.sender) {
         liquidityPoolFactoryUniswapV3 = _liquidityPoolFactoryUniswapV3;
-        nonfungiblePositionManager = _nonfungiblePositionManager;
         liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
         priceFeed = PriceFeedL1(_priceFeed);
         uniswapV3Helper = UniswapV3Helper(_uniswapV3Helper);
@@ -189,11 +185,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 totalBorrow;
         uint256 hourlyFees;
         uint256 tokenIdLiquidity;
-        uint256 amount0;
-        uint256 amount1;
         uint256 amountBorrow;
-        int24 tickUpper;
-        int24 tickLower;
 
         // take opening fees
         uint128 liquidationReward = uint128(
@@ -205,7 +197,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         if (isMargin) {
             if (_isShort) {
                 breakEvenLimit = price + (price * (10000 / _leverage)) / 10000;
-                totalBorrow = ((_amount * (10 ** IERC20Metadata(baseToken).decimals())) / price) * _leverage; // Borrow baseToken
+                totalBorrow = (_amount * (10 ** IERC20Metadata(baseToken).decimals()) * _leverage) / price; // Borrow baseToken
             } else {
                 breakEvenLimit = price - (price * (10000 / _leverage)) / 10000;
                 totalBorrow =
@@ -222,7 +214,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             uint256 openingFeesToken0 = uniswapV3Helper.swapExactOutputSingle(
                 _token0,
                 _token1,
-                UniswapV3Pool(v3Pool).fee(),
+                IUniswapV3Pool(v3Pool).fee(),
                 openingFeesToken1,
                 _amount
             );
@@ -238,10 +230,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 ? IERC20Metadata(baseToken).decimals()
                 : IERC20Metadata(quoteToken).decimals();
             hourlyFees =
-                (((totalBorrow * (10 ** decTokenBorrowed)) /
-                    LiquidityPool(cacheLiquidityPoolToUse).rawTotalAsset()) *
-                    BORROW_FEE_EVERY_HOURS) /
-                10000;
+                (totalBorrow * (10 ** decTokenBorrowed) * BORROW_FEE_EVERY_HOURS) /
+                LiquidityPool(cacheLiquidityPoolToUse).rawTotalAsset() / 10000;
 
             // Borrow funds from the pool
             LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
@@ -251,7 +241,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 amountBorrow = uniswapV3Helper.swapExactInputSingle(
                     baseToken,
                     quoteToken,
-                    UniswapV3Pool(v3Pool).fee(),
+                    IUniswapV3Pool(v3Pool).fee(),
                     totalBorrow
                 );
             } else {
@@ -260,7 +250,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     amountBorrow = uniswapV3Helper.swapExactInputSingle(
                         quoteToken,
                         baseToken,
-                        UniswapV3Pool(v3Pool).fee(),
+                        IUniswapV3Pool(v3Pool).fee(),
                         totalBorrow
                     );
                 }
@@ -268,22 +258,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         } else {
             // if not margin
             if (_limitPrice != 0) {
-                /**
-                                tickUpper = TickMath.getTickAtSqrtRatio(
-                    uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, IERC20Metadata(baseToken).decimals())
-                );
-                tickLower = tickUpper - 1;
-
-                SafeERC20.forceApprove(IERC20(baseToken), address(uniswapV3Helper), _amount);
-
-                (tokenIdLiquidity, , amount0, amount1) = mintV3Position(
-                    UniswapV3Pool(v3Pool),
-                    isBaseToken0 ? _amount : 0,
-                    isBaseToken0 ? 0 : _amount,
-                    tickLower,
-                    tickUpper
-                );
-                 */
+                revert("Limit orders for non-margin trades are temporarily disabled");
             }
         }
 
@@ -298,7 +273,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         }
 
         openPositions[posId] = PositionParams(
-            UniswapV3Pool(v3Pool),
+            v3Pool,
             IERC20(baseToken),
             IERC20(quoteToken),
             _amount,
@@ -334,15 +309,15 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         address quoteToken;
 
         address v3Pool = address(
-            UniswapV3Factory(liquidityPoolFactoryUniswapV3).getPool(_token0, _token1, _fee)
+            IUniswapV3Factory(liquidityPoolFactoryUniswapV3).getPool(_token0, _token1, _fee)
         );
 
-        if (UniswapV3Pool(v3Pool).factory() != liquidityPoolFactoryUniswapV3) {
+        if (IUniswapV3Pool(v3Pool).factory() != liquidityPoolFactoryUniswapV3) {
             revert Positions__POOL_NOT_OFFICIAL(v3Pool);
         }
         // check token
         if (
-            UniswapV3Pool(v3Pool).token0() != _token0 && UniswapV3Pool(v3Pool).token1() != _token0
+            IUniswapV3Pool(v3Pool).token0() != _token0 && IUniswapV3Pool(v3Pool).token1() != _token0
         ) {
             revert Positions__TOKEN_NOT_SUPPORTED(_token0);
         }
@@ -353,16 +328,16 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
          */
         if (_isShort) {
             quoteToken = _token0;
-            baseToken = (_token0 == UniswapV3Pool(v3Pool).token0())
-                ? UniswapV3Pool(v3Pool).token1()
-                : UniswapV3Pool(v3Pool).token0();
+            baseToken = (_token0 == IUniswapV3Pool(v3Pool).token0())
+                ? IUniswapV3Pool(v3Pool).token1()
+                : IUniswapV3Pool(v3Pool).token0();
         } else {
             baseToken = _token0;
-            quoteToken = (_token0 == UniswapV3Pool(v3Pool).token0())
-                ? UniswapV3Pool(v3Pool).token1()
-                : UniswapV3Pool(v3Pool).token0();
+            quoteToken = (_token0 == IUniswapV3Pool(v3Pool).token0())
+                ? IUniswapV3Pool(v3Pool).token1()
+                : IUniswapV3Pool(v3Pool).token0();
         }
-        bool isBaseToken0 = (baseToken == UniswapV3Pool(v3Pool).token0());
+        bool isBaseToken0 = (baseToken == IUniswapV3Pool(v3Pool).token0());
 
         // check if pair is supported by PriceFeed
         if (!priceFeed.isPairSupported(baseToken, quoteToken)) {
@@ -470,14 +445,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         address addTokenInitiallySupplied;
         address addTokenBorrowed;
         // Close position
-        if (posParms.limitPrice != 0 && !isMargin) {
-            (amount0, amount1) = burnV3Position(posParms.tokenIdLiquidity);
-            /* Since the liquidity position is only 1 tick wide, we can assume
-             * that this will rarely revert here. */
-            if (amount0 != 0 && amount1 != 0) {
-                revert Positions__WAIT_FOR_LIMIT_ORDER_TO_COMPLET(_posId);
-            }
-        } else if (posParms.isShort) {
+        if (posParms.isShort) {
             posParms.isBaseToken0 ? amount1 = posParms.positionSize : amount0 = posParms
                 .positionSize;
         } else {
@@ -541,7 +509,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 (uint256 inAmount, uint256 outAmount) = swapMaxTokenPossible(
                     addTokenReceived,
                     tokenToTrader,
-                    UniswapV3Pool(posParms.v3Pool).fee(),
+                    IUniswapV3Pool(posParms.v3Pool).fee(),
                     posParms.totalBorrow + interest,
                     amountTokenReceived
                 );
@@ -567,7 +535,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 uint256 outAmount = uniswapV3Helper.swapExactInputSingle(
                     addTokenReceived,
                     tokenToTrader,
-                    UniswapV3Pool(posParms.v3Pool).fee(),
+                    IUniswapV3Pool(posParms.v3Pool).fee(),
                     amountTokenReceived
                 );
                 IERC20(tokenToTrader).safeTransfer(trader, outAmount);
@@ -695,28 +663,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             );
 
         collateralLeft_ = int128(openPositions[_posId].collateralSize) + currentPnL_;
-    }
-
-    function mintV3Position(
-        UniswapV3Pool _v3Pool,
-        uint256 _amount0ToMint,
-        uint256 _amount1ToMint,
-        int24 _tickLower,
-        int24 _tickUpper
-    ) private returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) {
-        (tokenId, liquidity, amount0, amount1) = uniswapV3Helper.mintPosition(
-            _v3Pool,
-            _amount0ToMint,
-            _amount1ToMint,
-            _tickLower,
-            _tickUpper
-        );
-    }
-
-    function burnV3Position(uint256 _tokenId) private returns (uint256, uint256) {
-        uniswapV3Helper.decreaseLiquidity(_tokenId);
-        (uint256 amount0, uint256 amount1) = uniswapV3Helper.collectAllFees(_tokenId);
-        return (amount0, amount1);
     }
 
     function swapMaxTokenPossible(
