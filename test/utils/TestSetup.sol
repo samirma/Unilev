@@ -11,7 +11,6 @@ import "../mocks/MockV3Aggregator.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "@uniswapCore/contracts/UniswapV3Pool.sol";
-import {SwapRouter} from "@uniswapPeriphery/contracts/SwapRouter.sol";
 
 import "forge-std/Test.sol";
 import "../utils/HelperConfig.sol";
@@ -32,7 +31,6 @@ contract TestSetup is Test, HelperConfig, Utils {
     LiquidityPool public lbPoolUSDC;
     LiquidityPool public lbPoolDAI;
 
-    SwapRouter public swapRouter;
     address public alice;
     address public bob;
     address public carol;
@@ -49,9 +47,6 @@ contract TestSetup is Test, HelperConfig, Utils {
         bob = address(0x21);
         carol = address(0x31);
 
-        // mainnet context
-        swapRouter = SwapRouter(payable(conf.swapRouter));
-
         vm.startPrank(deployer);
 
         /// deployments
@@ -62,7 +57,7 @@ contract TestSetup is Test, HelperConfig, Utils {
         mockV3AggregatorETHUSD = new MockV3Aggregator(8, 3000 * 1e8); // 1 ETH = $3000
 
         // contracts
-        uniswapV3Helper = new UniswapV3Helper(conf.nonfungiblePositionManager, conf.swapRouter);
+        uniswapV3Helper = new UniswapV3Helper(conf.swapRouter);
         priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
         positions = new Positions(

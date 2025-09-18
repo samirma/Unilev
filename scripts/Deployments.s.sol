@@ -46,12 +46,9 @@ contract Deployments is Script, HelperConfig {
 
         vm.startBroadcast();
 
-        // mainnet context
-        swapRouter = SwapRouter(payable(conf.swapRouter));
-
         /// deployments
         // contracts
-        uniswapV3Helper = new UniswapV3Helper(conf.nonfungiblePositionManager, conf.swapRouter);
+        uniswapV3Helper = new UniswapV3Helper(conf.swapRouter);
         priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
         positions = new Positions(
