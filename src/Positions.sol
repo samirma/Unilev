@@ -268,7 +268,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         } else {
             // if not margin
             if (_limitPrice != 0) {
-                tickUpper = TickMath.getTickAtSqrtRatio(
+                /**
+                                tickUpper = TickMath.getTickAtSqrtRatio(
                     uniswapV3Helper.priceToSqrtPriceX96(_limitPrice, IERC20Metadata(baseToken).decimals())
                 );
                 tickLower = tickUpper - 1;
@@ -282,6 +283,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     tickLower,
                     tickUpper
                 );
+                 */
             }
         }
 
