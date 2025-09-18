@@ -10,8 +10,6 @@ import {UniswapV3Helper} from "../../src/UniswapV3Helper.sol";
 import "../mocks/MockV3Aggregator.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "@uniswapCore/contracts/UniswapV3Pool.sol";
-
 import "forge-std/Test.sol";
 import "../utils/HelperConfig.sol";
 import {Utils} from "./Utils.sol";
@@ -64,7 +62,6 @@ contract TestSetup is Test, HelperConfig, Utils {
             address(priceFeedL1),
             address(liquidityPoolFactory),
             conf.liquidityPoolFactoryUniswapV3,
-            conf.nonfungiblePositionManager,
             address(uniswapV3Helper),
             conf.liquidationReward
         );

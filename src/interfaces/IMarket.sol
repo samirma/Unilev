@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@uniswapCore/contracts/UniswapV3Pool.sol";
-
 /*
  * @title IMarket interface
  * @notice Interface for the Market contract
