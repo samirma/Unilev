@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 // Errors
 error PriceFeedL1__TOKEN_NOT_SUPPORTED(address token);
 
 contract PriceFeedL1 is Ownable {
-    mapping(address => AggregatorV3Interface) public tokenToPriceFeedUSD;
+    mapping(address => AggregatorV3Interface) public tokenToPriceFeedUsd;
 
     constructor() Ownable(msg.sender) {}
 
@@ -22,7 +22,7 @@ contract PriceFeedL1 is Ownable {
      * @param _priceFeed price feed address
      */
     function addPriceFeed(address _token, address _priceFeed) external onlyOwner {
-        tokenToPriceFeedUSD[_token] = AggregatorV3Interface(_priceFeed);
+        tokenToPriceFeedUsd[_token] = AggregatorV3Interface(_priceFeed);
     }
 
     /**
@@ -33,8 +33,8 @@ contract PriceFeedL1 is Ownable {
      */
     function getPairLatestPrice(address _token0, address _token1) public view returns (uint256) {
         return
-            (getTokenLatestPriceInUSD(_token0) * (10 ** uint256(IERC20Metadata(_token1).decimals()))) /
-            getTokenLatestPriceInUSD(_token1);
+            (getTokenLatestPriceInUsd(_token0) * (10 ** uint256(IERC20Metadata(_token1).decimals()))) /
+            getTokenLatestPriceInUsd(_token1);
     }
 
     /**
@@ -42,8 +42,8 @@ contract PriceFeedL1 is Ownable {
      * @param _token The token address.
      * @return uint256 The price in USD with 18 decimals.
      */
-    function getTokenLatestPriceInUSD(address _token) public view returns (uint256) {
-        AggregatorV3Interface priceFeed = tokenToPriceFeedUSD[_token];
+    function getTokenLatestPriceInUsd(address _token) public view returns (uint256) {
+        AggregatorV3Interface priceFeed = tokenToPriceFeedUsd[_token];
         if (address(priceFeed) == address(0)) {
             revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
         }
@@ -58,17 +58,17 @@ contract PriceFeedL1 is Ownable {
      * @param _amount The amount of the token (in its smallest unit, not human-readable format).
      * @return uint256 The value in USD, with 18 decimals of precision.
      */
-    function getAmountInUSD(address _token, uint256 _amount) public view returns (uint256) {
-        uint256 priceInUSD = getTokenLatestPriceInUSD(_token); // This is already normalized to 18 decimals
+    function getAmountInUsd(address _token, uint256 _amount) public view returns (uint256) {
+        uint256 priceInUsd = getTokenLatestPriceInUsd(_token); // This is already normalized to 18 decimals
         uint8 tokenDecimals = IERC20Metadata(_token).decimals();
-        return (_amount * priceInUSD) / (10**tokenDecimals);
+        return (_amount * priceInUsd) / (10**tokenDecimals);
     }
 
     function isPairSupported(address _token0, address _token1) public view returns (bool) {
-        if (address(tokenToPriceFeedUSD[_token0]) == address(0)) {
+        if (address(tokenToPriceFeedUsd[_token0]) == address(0)) {
             return false;
         }
-        if (address(tokenToPriceFeedUSD[_token1]) == address(0)) {
+        if (address(tokenToPriceFeedUsd[_token1]) == address(0)) {
             return false;
         }
         return true;

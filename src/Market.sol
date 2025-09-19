@@ -1,23 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import "./interfaces/IMarket.sol";
-import "./Positions.sol";
-import "./LiquidityPool.sol";
-import "./LiquidityPoolFactory.sol";
-import "./PriceFeedL1.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IMarket} from "./interfaces/IMarket.sol";
+import {Positions} from "./Positions.sol";
+import {LiquidityPoolFactory} from "./LiquidityPoolFactory.sol";
+import {PriceFeedL1} from "./PriceFeedL1.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Market is IMarket, Ownable, Pausable {
     using SafeERC20 for IERC20;
 
-    Positions private immutable positions;
-    LiquidityPoolFactory private immutable liquidityPoolFactory;
-    PriceFeedL1 private immutable priceFeed;
+    Positions private immutable POSITIONS;
+    LiquidityPoolFactory private immutable LIQUIDITY_POOL_FACTORY;
+    PriceFeedL1 private immutable PRICE_FEED;
 
     constructor(
         address _positions,
@@ -25,9 +24,9 @@ contract Market is IMarket, Ownable, Pausable {
         address _priceFeed,
         address _owner
     ) Ownable(_owner) {
-        positions = Positions(_positions);
-        liquidityPoolFactory = LiquidityPoolFactory(_liquidityPoolFactory);
-        priceFeed = PriceFeedL1(_priceFeed);
+        POSITIONS = Positions(_positions);
+        LIQUIDITY_POOL_FACTORY = LiquidityPoolFactory(_liquidityPoolFactory);
+        PRICE_FEED = PriceFeedL1(_priceFeed);
     }
 
     // --------------- Trader Zone ---------------
@@ -42,9 +41,9 @@ contract Market is IMarket, Ownable, Pausable {
         uint256 _stopLossPrice
     ) external whenNotPaused {
 
-        SafeERC20.forceApprove(IERC20(_token0), address(positions), _amount);
+        SafeERC20.forceApprove(IERC20(_token0), address(POSITIONS), _amount);
 
-        uint256 posId = positions.openPosition(
+        uint256 posId = POSITIONS.openPosition(
             msg.sender,
             _token0,
             _token1,
@@ -69,17 +68,17 @@ contract Market is IMarket, Ownable, Pausable {
     }
 
     function closePosition(uint256 _posId) external whenNotPaused {
-        positions.closePosition(msg.sender, _posId);
+        POSITIONS.closePosition(msg.sender, _posId);
         emit PositionClosed(_posId, msg.sender);
     }
 
     function editPosition(uint256 _posId, uint256 _newLstopLossPrice) external whenNotPaused {
-        positions.editPosition(msg.sender, _posId, _newLstopLossPrice);
+        POSITIONS.editPosition(msg.sender, _posId, _newLstopLossPrice);
         emit PositionEdited(_posId, msg.sender, _newLstopLossPrice);
     }
 
     function getTraderPositions(address _traderAdd) external view returns (uint256[] memory) {
-        return positions.getTraderPositions(_traderAdd);
+        return POSITIONS.getTraderPositions(_traderAdd);
     }
 
     function getPositionParams(
@@ -101,7 +100,7 @@ contract Market is IMarket, Ownable, Pausable {
             int128 collateralLeft_
         )
     {
-        return positions.getPositionParams(_posId);
+        return POSITIONS.getPositionParams(_posId);
     }
 
     // --------------- Liquidator/Keeper Zone ----------------
@@ -110,36 +109,36 @@ contract Market is IMarket, Ownable, Pausable {
 
         for (uint256 i; i < len; ++i) {
             // Is that safe ?
-            try positions.liquidatePosition(msg.sender, _posIds[i]) {
+            try POSITIONS.liquidatePosition(msg.sender, _posIds[i]) {
                 emit PositionLiquidated(_posIds[i], msg.sender);
             } catch {}
         }
     }
 
     function liquidatePosition(uint256 _posId) external whenNotPaused {
-        positions.liquidatePosition(msg.sender, _posId);
+        POSITIONS.liquidatePosition(msg.sender, _posId);
         emit PositionLiquidated(_posId, msg.sender);
     }
 
     function getLiquidablePositions() external view returns (uint256[] memory) {
-        return positions.getLiquidablePositions();
+        return POSITIONS.getLiquidablePositions();
     }
 
     // --------------- Admin Zone ---------------
     function createLiquidityPool(
         address _token
     ) external onlyOwner whenNotPaused returns (address) {
-        address lpAdd = liquidityPoolFactory.createLiquidityPool(_token);
+        address lpAdd = LIQUIDITY_POOL_FACTORY.createLiquidityPool(_token);
         emit LiquidityPoolCreated(_token, msg.sender);
         return lpAdd;
     }
 
     function getTokenToLiquidityPools(address _token) external view returns (address) {
-        return liquidityPoolFactory.getTokenToLiquidityPools(_token);
+        return LIQUIDITY_POOL_FACTORY.getTokenToLiquidityPools(_token);
     }
 
     function addPriceFeed(address _token, address _priceFeed) external onlyOwner whenNotPaused {
-        priceFeed.addPriceFeed(_token, _priceFeed);
+        PRICE_FEED.addPriceFeed(_token, _priceFeed);
         emit PriceFeedAdded(_token, _priceFeed);
     }
 

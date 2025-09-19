@@ -5,18 +5,18 @@ contract HelperConfig {
     NetworkConfig public activeNetworkConfig;
 
     struct NetworkConfig {
-        address priceFeedETHUSD;
-        address priceFeedWBTCUSD;
-        address priceFeedUSDCUSD;
-        address priceFeedDAIUSD;
+        address priceFeedEthUsd;
+        address priceFeedWbtcUsd;
+        address priceFeedUsdcUsd;
+        address priceFeedDaiUsd;
         address nonfungiblePositionManager;
         address swapRouter;
         address liquidityPoolFactoryUniswapV3;
         uint256 liquidationReward;
-        address addWBTC;
-        address addWETH;
-        address addUSDC;
-        address addDAI;
+        address addWbtc;
+        address addWeth;
+        address addUsdc;
+        address addDai;
     }
 
     mapping(uint256 => NetworkConfig) public chainIdToNetworkConfig;
@@ -36,18 +36,18 @@ contract HelperConfig {
         returns (NetworkConfig memory mainnetNetworkConfig)
     {
         mainnetNetworkConfig = NetworkConfig({
-            priceFeedETHUSD: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // ETH/USD Mainnet
-            priceFeedWBTCUSD: 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // BTC/USD Mainnet
-            priceFeedUSDCUSD: 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // USDC/USD Mainnet
-            priceFeedDAIUSD: 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9, // DAI/USD Mainnet
+            priceFeedEthUsd: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419, // ETH/USD Mainnet
+            priceFeedWbtcUsd: 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c, // BTC/USD Mainnet
+            priceFeedUsdcUsd: 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6, // USDC/USD Mainnet
+            priceFeedDaiUsd: 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9, // DAI/USD Mainnet
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             liquidityPoolFactoryUniswapV3: 0x1F98431c8aD98523631AE4a59f267346ea31F984,
             liquidationReward: 10,
-            addWBTC: 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
-            addWETH: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
-            addUSDC: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
-            addDAI: 0x6B175474E89094C44Da98b954EedeAC495271d0F
+            addWbtc: 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
+            addWeth: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
+            addUsdc: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
+            addDai: 0x6B175474E89094C44Da98b954EedeAC495271d0F
         });
     }
 }
