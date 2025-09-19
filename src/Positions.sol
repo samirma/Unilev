@@ -51,7 +51,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         bool isBaseToken0;         // True if the baseToken is the token0 (in the uniswapV3Pool) 
         uint8 leverage;            // Leverage of position => 0 if no leverage
         uint256 totalBorrow;       // Total borrow in baseToken if long or quoteToken if short
-        uint256 hourlyFees;        // Fees to pay every hour on the borrowed amount => 0 if no leverage
         uint256 breakEvenLimit;    // After this limit the position is undercollateralize => 0 if no leverage or short
         uint160 limitPrice;        // Limit order price => 0 if no limit order
         uint256 stopLossPrice;     // Stop loss price => 0 if no stop loss
@@ -63,7 +62,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 1; // To avoid DOS attack
     uint256 public constant MAX_LEVERAGE = 3;
     uint256 public constant BORROW_FEE = 20; // 0.2% when opening a position
-    uint256 public constant BORROW_FEE_EVERY_HOURS = 1; // 0.01% : assets borrowed/total assets in pool * 0.01%
     uint256 public constant USD_DECIMALS = 18; // The standard for USD values in this contract
     uint256 public immutable LIQUIDATION_REWARD; // 10 USD : //! to be changed depending of the blockchain average gas price
 
@@ -183,7 +181,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         // Compute parameters
         uint256 breakEvenLimit;
         uint256 totalBorrow;
-        uint256 hourlyFees;
         uint256 tokenIdLiquidity;
         uint256 amountBorrow;
 
@@ -224,14 +221,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
             SafeERC20.forceApprove(IERC20(_token1), cacheLiquidityPoolToUse, openingFeesToken1);
             LiquidityPool(cacheLiquidityPoolToUse).refund(0, openingFeesToken1, 0);
-
-            // fees computation
-            uint256 decTokenBorrowed = _isShort
-                ? IERC20Metadata(baseToken).decimals()
-                : IERC20Metadata(quoteToken).decimals();
-            hourlyFees =
-                (totalBorrow * (10 ** decTokenBorrowed) * BORROW_FEE_EVERY_HOURS) /
-                LiquidityPool(cacheLiquidityPoolToUse).rawTotalAsset() / 10000;
 
             // Borrow funds from the pool
             LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
@@ -285,7 +274,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             isBaseToken0,
             _leverage,
             totalBorrow,
-            hourlyFees,
             breakEvenLimit,
             _limitPrice,
             _stopLossPrice,
@@ -471,7 +459,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             : address(posParms.quoteToken);
 
         uint256 amountTokenReceived = amount0 != 0 ? amount0 : amount1;
-        uint256 interest = posParms.hourlyFees * ((block.timestamp - posParms.timestamp) / 3600);
 
         address tokenToTrader = addTokenReceived == address(posParms.baseToken)
             ? address(posParms.quoteToken)
@@ -510,20 +497,18 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     addTokenReceived,
                     tokenToTrader,
                     IUniswapV3Pool(posParms.v3Pool).fee(),
-                    posParms.totalBorrow + interest,
+                    posParms.totalBorrow,
                     amountTokenReceived
                 );
                 // loss should not occur here but in case of, we refund the pool
-                int256 remaining = int256(
-                    int(outAmount) - int(posParms.totalBorrow) - int(interest)
-                );
+                int256 remaining = int256(int(outAmount) - int(posParms.totalBorrow));
                 uint256 loss = remaining < 0 ? uint256(-remaining) : uint256(0);
                 SafeERC20.forceApprove(
                     IERC20(addTokenBorrowed),
                     address(liquidityPoolToUse),
-                    posParms.totalBorrow + interest - loss
+                    posParms.totalBorrow - loss
                 );
-                liquidityPoolToUse.refund(posParms.totalBorrow, interest, loss);
+                liquidityPoolToUse.refund(posParms.totalBorrow, 0, loss);
                 if (loss == 0) {
                     IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - inAmount);
                 }
@@ -654,13 +639,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
         currentPnL_ = isShort_ ? currentPnL_ : -currentPnL_;
 
-        currentPnL_ =
-            currentPnL_ -
-            int128(openPositions[_posId].liquidationReward) -
-            int128(
-                int256(openPositions[_posId].hourlyFees) *
-                    ((int256(block.timestamp) - int64(timestamp_)) / 3600)
-            );
+        currentPnL_ = currentPnL_ - int128(openPositions[_posId].liquidationReward);
 
         collateralLeft_ = int128(openPositions[_posId].collateralSize) + currentPnL_;
     }
