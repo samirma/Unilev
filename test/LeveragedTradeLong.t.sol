@@ -16,6 +16,8 @@ function test__leveragedTradeToCloseLong1() public {
     assertEq(amount, IERC20(conf.addWbtc).balanceOf(alice));
     assertEq(0, IERC20(conf.addWbtc).balanceOf(address(positions)));
 
+    uint256 usdcBalanceBefore = IERC20(conf.addUsdc).balanceOf(address(lbPoolUsdc));
+
     vm.startPrank(alice);
     IERC20(conf.addWbtc).approve(address(positions), amount);
     console.log("Open position");
@@ -23,6 +25,12 @@ function test__leveragedTradeToCloseLong1() public {
 
     assertEq(0, IERC20(conf.addWbtc).balanceOf(alice));
     assertApproxEqRel(amount * 2, IERC20(conf.addWbtc).balanceOf(address(positions)), 0.05e18);
+
+    uint256 usdcBalanceAfter = IERC20(conf.addUsdc).balanceOf(address(lbPoolUsdc));
+    uint256 price = priceFeedL1.getPairLatestPrice(conf.addWbtc, conf.addUsdc);
+    uint256 totalBorrow = (amount * 1 * price) / (10**18);
+    uint256 openingFees = (totalBorrow * positions.BORROW_FEE()) / 10000;
+    assertApproxEqRel(usdcBalanceBefore + openingFees, usdcBalanceAfter, 0.05e18);
 
     assertEq(1, positions.totalNbPos());
     uint256[] memory posAlice = positions.getTraderPositions(alice);
