@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Errors
 error LiquidityPool__NOT_ENOUGH_LIQUIDITY(uint256 maxBorrowCapatity);
@@ -14,7 +15,7 @@ contract LiquidityPool is ERC4626, Ownable {
 
     uint256 private borrowedFunds; // Funds currently used by positions
 
-    uint256 private MAX_BORROW_RATIO = 8000; // in basis points => 80%
+    uint256 private maxBorrowRatio = 8000; // in basis points => 80%
 
     constructor(
         IERC20 _asset,
@@ -76,6 +77,6 @@ contract LiquidityPool is ERC4626, Ownable {
     }
 
     function borrowCapacityLeft() public view returns (uint256) {
-        return ((totalAssets() * MAX_BORROW_RATIO) / 10000) - borrowedFunds;
+        return ((totalAssets() * maxBorrowRatio) / 10000) - borrowedFunds;
     }
 }

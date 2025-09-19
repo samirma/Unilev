@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.19;
 
-import "./interfaces/IUniswapV3.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IUniswapV3SwapRouter} from "./interfaces/IUniswapV3.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract UniswapV3Helper {
-    IUniswapV3SwapRouter public immutable swapRouter;
+    IUniswapV3SwapRouter public immutable SWAP_ROUTER;
 
     constructor(address _swapRouter) {
-        swapRouter = IUniswapV3SwapRouter(_swapRouter);
+        SWAP_ROUTER = IUniswapV3SwapRouter(_swapRouter);
     }
 
     function swapExactInputSingle(
@@ -22,7 +22,7 @@ contract UniswapV3Helper {
         SafeERC20.safeTransferFrom(IERC20(_tokenIn), msg.sender, address(this), _amountIn);
 
         // Approve the router to spend the input token.
-        SafeERC20.forceApprove(IERC20(_tokenIn), address(swapRouter), _amountIn);
+        SafeERC20.forceApprove(IERC20(_tokenIn), address(SWAP_ROUTER), _amountIn);
 
         IUniswapV3SwapRouter.ExactInputSingleParams memory params = IUniswapV3SwapRouter
             .ExactInputSingleParams({
@@ -36,7 +36,7 @@ contract UniswapV3Helper {
                 sqrtPriceLimitX96: 0
             });
 
-        amountOut = swapRouter.exactInputSingle(params);
+        amountOut = SWAP_ROUTER.exactInputSingle(params);
     }
 
     function swapExactOutputSingle(
@@ -50,7 +50,7 @@ contract UniswapV3Helper {
         SafeERC20.safeTransferFrom(IERC20(_tokenIn), msg.sender, address(this), _amountInMaximum);
 
         // Approve the router to spend the input token.
-        SafeERC20.forceApprove(IERC20(_tokenIn), address(swapRouter), _amountInMaximum);
+        SafeERC20.forceApprove(IERC20(_tokenIn), address(SWAP_ROUTER), _amountInMaximum);
 
         IUniswapV3SwapRouter.ExactOutputSingleParams memory params = IUniswapV3SwapRouter
             .ExactOutputSingleParams({
@@ -64,7 +64,7 @@ contract UniswapV3Helper {
                 sqrtPriceLimitX96: 0
             });
 
-        amountIn = swapRouter.exactOutputSingle(params);
+        amountIn = SWAP_ROUTER.exactOutputSingle(params);
 
         // Refund the unused tokens
         if (amountIn < _amountInMaximum) {

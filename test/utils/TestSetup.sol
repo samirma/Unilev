@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../src/Positions.sol";
-import "../../src/Market.sol";
-import "../../src/LiquidityPoolFactory.sol";
-import "../../src/LiquidityPool.sol";
-import "../../src/PriceFeedL1.sol";
+import {Positions} from "../../src/Positions.sol";
+import {Market} from "../../src/Market.sol";
+import {LiquidityPoolFactory} from "../../src/LiquidityPoolFactory.sol";
+import {LiquidityPool} from "../../src/LiquidityPool.sol";
+import {PriceFeedL1} from "../../src/PriceFeedL1.sol";
 import {UniswapV3Helper} from "../../src/UniswapV3Helper.sol";
-import "../mocks/MockV3Aggregator.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "forge-std/Test.sol";
-import "../utils/HelperConfig.sol";
+import {HelperConfig} from "../utils/HelperConfig.sol";
 import {Utils} from "./Utils.sol";
 
 contract TestSetup is Test, HelperConfig, Utils {
@@ -20,14 +20,14 @@ contract TestSetup is Test, HelperConfig, Utils {
     PriceFeedL1 public priceFeedL1;
     Market public market;
     Positions public positions;
-    MockV3Aggregator public mockV3AggregatorWBTCUSD;
-    MockV3Aggregator public mockV3AggregatorUSDCUSD;
-    MockV3Aggregator public mockV3AggregatorDAIUSD;
-    MockV3Aggregator public mockV3AggregatorETHUSD;
-    LiquidityPool public lbPoolWBTC;
-    LiquidityPool public lbPoolWETH;
-    LiquidityPool public lbPoolUSDC;
-    LiquidityPool public lbPoolDAI;
+    MockV3Aggregator public mockV3AggregatorWbtcUsd;
+    MockV3Aggregator public mockV3AggregatorUsdcUsd;
+    MockV3Aggregator public mockV3AggregatorDaiUsd;
+    MockV3Aggregator public mockV3AggregatorEthUsd;
+    LiquidityPool public lbPoolWbtc;
+    LiquidityPool public lbPoolWeth;
+    LiquidityPool public lbPoolUsdc;
+    LiquidityPool public lbPoolDai;
 
     address public alice;
     address public bob;
@@ -49,10 +49,10 @@ contract TestSetup is Test, HelperConfig, Utils {
 
         /// deployments
         // mocks - Chainlink USD feeds usually have 8 decimals
-        mockV3AggregatorWBTCUSD = new MockV3Aggregator(8, 60000 * 1e8); // 1 WBTC = $60,000
-        mockV3AggregatorUSDCUSD = new MockV3Aggregator(8, 1 * 1e8); // 1 USDC = $1
-        mockV3AggregatorDAIUSD = new MockV3Aggregator(8, 1 * 1e8); // 1 DAI = $1
-        mockV3AggregatorETHUSD = new MockV3Aggregator(8, 3000 * 1e8); // 1 ETH = $3000
+        mockV3AggregatorWbtcUsd = new MockV3Aggregator(8, 60000 * 1e8); // 1 WBTC = $60,000
+        mockV3AggregatorUsdcUsd = new MockV3Aggregator(8, 1 * 1e8); // 1 USDC = $1
+        mockV3AggregatorDaiUsd = new MockV3Aggregator(8, 1 * 1e8); // 1 DAI = $1
+        mockV3AggregatorEthUsd = new MockV3Aggregator(8, 3000 * 1e8); // 1 ETH = $3000
 
         // contracts
         uniswapV3Helper = new UniswapV3Helper(conf.swapRouter);
@@ -82,34 +82,34 @@ contract TestSetup is Test, HelperConfig, Utils {
         priceFeedL1.transferOwnership(address(market));
 
         // create liquidity pools
-        lbPoolWBTC = LiquidityPool(market.createLiquidityPool(conf.addWBTC));
-        lbPoolWETH = LiquidityPool(market.createLiquidityPool(conf.addWETH));
-        lbPoolUSDC = LiquidityPool(market.createLiquidityPool(conf.addUSDC));
-        lbPoolDAI = LiquidityPool(market.createLiquidityPool(conf.addDAI));
+        lbPoolWbtc = LiquidityPool(market.createLiquidityPool(conf.addWbtc));
+        lbPoolWeth = LiquidityPool(market.createLiquidityPool(conf.addWeth));
+        lbPoolUsdc = LiquidityPool(market.createLiquidityPool(conf.addUsdc));
+        lbPoolDai = LiquidityPool(market.createLiquidityPool(conf.addDai));
 
         // add price feeds
-        market.addPriceFeed(conf.addWBTC, conf.priceFeedWBTCUSD);
-        market.addPriceFeed(conf.addUSDC, conf.priceFeedUSDCUSD);
-        market.addPriceFeed(conf.addDAI, conf.priceFeedDAIUSD);
-        market.addPriceFeed(conf.addWETH, conf.priceFeedETHUSD);
+        market.addPriceFeed(conf.addWbtc, conf.priceFeedWbtcUsd);
+        market.addPriceFeed(conf.addUsdc, conf.priceFeedUsdcUsd);
+        market.addPriceFeed(conf.addDai, conf.priceFeedDaiUsd);
+        market.addPriceFeed(conf.addWeth, conf.priceFeedEthUsd);
         vm.stopPrank();
 
         // add liquidity to a pool to be able to open a short position
         vm.startPrank(bob);
-        writeTokenBalance(bob, conf.addWBTC, 10e8);
-        writeTokenBalance(bob, conf.addWETH, 100e18);
-        writeTokenBalance(bob, conf.addUSDC, 10000000e6);
-        writeTokenBalance(bob, conf.addDAI, 10000000e6);
+        writeTokenBalance(bob, conf.addWbtc, 10e8);
+        writeTokenBalance(bob, conf.addWeth, 100e18);
+        writeTokenBalance(bob, conf.addUsdc, 10000000e6);
+        writeTokenBalance(bob, conf.addDai, 10000000e6);
 
-        IERC20(conf.addWBTC).approve(address(lbPoolWBTC), 10e8);
-        IERC20(conf.addWETH).approve(address(lbPoolWETH), 100e18);
-        IERC20(conf.addUSDC).approve(address(lbPoolUSDC), 10000000e6);
-        IERC20(conf.addDAI).approve(address(lbPoolDAI), 10000000e6);
+        IERC20(conf.addWbtc).approve(address(lbPoolWbtc), 10e8);
+        IERC20(conf.addWeth).approve(address(lbPoolWeth), 100e18);
+        IERC20(conf.addUsdc).approve(address(lbPoolUsdc), 10000000e6);
+        IERC20(conf.addDai).approve(address(lbPoolDai), 10000000e6);
 
-        lbPoolWBTC.deposit(10e8, bob);
-        lbPoolWETH.deposit(100e18, bob);
-        lbPoolUSDC.deposit(10000000e6, bob);
-        lbPoolDAI.deposit(10000000e6, bob);
+        lbPoolWbtc.deposit(10e8, bob);
+        lbPoolWeth.deposit(100e18, bob);
+        lbPoolUsdc.deposit(10000000e6, bob);
+        lbPoolDai.deposit(10000000e6, bob);
 
         vm.stopPrank();
     }
