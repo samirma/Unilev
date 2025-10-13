@@ -16,7 +16,9 @@ function test__leveragedTradeToCloseLong1() public {
     assertEq(amount, IERC20(conf.addWbtc).balanceOf(alice));
     assertEq(0, IERC20(conf.addWbtc).balanceOf(address(positions)));
 
+    // Log USDC balance in lbPoolUsdc BEFORE open
     uint256 usdcBalanceBefore = IERC20(conf.addUsdc).balanceOf(address(lbPoolUsdc));
+    console.log("USDC balance in lbPoolUsdc BEFORE open: ", usdcBalanceBefore);
 
     vm.startPrank(alice);
     IERC20(conf.addWbtc).approve(address(positions), amount);
@@ -42,6 +44,11 @@ function test__leveragedTradeToCloseLong1() public {
 
     assertApproxEqRel(amount, IERC20(conf.addWbtc).balanceOf(alice), 0.05e18);
     assertEq(0, IERC20(conf.addWbtc).balanceOf(address(positions)));
+
+    uint256 usdcBalanceAfterClose = IERC20(conf.addUsdc).balanceOf(address(lbPoolUsdc));
+    //assertGe(usdcBalanceBefore, usdcBalanceAfter);
+    console.log("USDC balance in lbPoolUsdc AFTER close: ", usdcBalanceAfterClose);
+
 }
 
 /*

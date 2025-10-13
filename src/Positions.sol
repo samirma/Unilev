@@ -61,7 +61,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     uint256 public constant LIQUIDATION_THRESHOLD = 1000; // 10% of margin
     uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 1; // To avoid DOS attack
     uint256 public constant MAX_LEVERAGE = 3;
-    uint256 public constant BORROW_FEE = 20; // 0.2% when opening a position
+    uint256 public constant BORROW_FEE = 1; // 0.2% when opening a position
     uint256 public constant USD_DECIMALS = 18; // The standard for USD values in this contract
     uint256 public immutable LIQUIDATION_REWARD; // 10 USD : //! to be changed depending of the blockchain average gas price
 
