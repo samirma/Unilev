@@ -31,20 +31,15 @@ contract SimpleTradeShort is TestSetup {
         assertApproxEqRel(amount, IERC20(conf.addUsdc).balanceOf(alice), 0.05e18);
         assertEq(0, IERC20(conf.addUsdc).balanceOf(address(positions)));
     }
-/*
+    
+
     function test__simpleTradeStopLossAndCloseLossShort() public {
         uint128 amount = 1000e6;
         uint24 fee = 3000;
         writeTokenBalance(alice, conf.addUsdc, amount);
-        setPrice(
-            30000e6,
-            conf.addWbtc,
-            conf.addUsdc,
-            fee,
-            mockV3AggregatorWbtcUsd,
-            mockV3AggregatorUsdcUsd,
-            uniswapV3Helper
-        );
+        
+        //Mock values
+        
         vm.startPrank(alice);
         IERC20(conf.addUsdc).approve(address(positions), amount);
         market.openPosition(conf.addUsdc, conf.addWbtc, uint24(fee), true, 1, amount, 0, 40000e6);
@@ -52,15 +47,7 @@ contract SimpleTradeShort is TestSetup {
         assertApproxEqRel(amount * 2, IERC20(conf.addUsdc).balanceOf(address(positions)), 0.05e18);
 
         vm.stopPrank();
-        setPrice(
-            41000e6,
-            conf.addWbtc,
-            conf.addUsdc,
-            fee,
-            mockV3AggregatorWbtcUsd,
-            mockV3AggregatorUsdcUsd,
-            uniswapV3Helper
-        );
+        //Mock values
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
         assertEq(1, posAlice[0]);
@@ -80,15 +67,7 @@ contract SimpleTradeShort is TestSetup {
         uint128 amount = 1000e6;
         uint24 fee = 3000;
         writeTokenBalance(alice, conf.addUsdc, amount);
-        setPrice(
-            30000e6,
-            conf.addWbtc,
-            conf.addUsdc,
-            fee,
-            mockV3AggregatorWbtcUsd,
-            mockV3AggregatorUsdcUsd,
-            uniswapV3Helper
-        );
+        //Mock values
         vm.startPrank(alice);
         IERC20(conf.addUsdc).approve(address(positions), amount);
         market.openPosition(conf.addUsdc, conf.addWbtc, uint24(fee), true, 1, amount, 0, 40000e6);
@@ -124,15 +103,7 @@ contract SimpleTradeShort is TestSetup {
         uint128 amount = 1000e6;
         uint24 fee = 3000;
         writeTokenBalance(alice, conf.addUsdc, amount);
-        setPrice(
-            30000e6,
-            conf.addWbtc,
-            conf.addUsdc,
-            fee,
-            mockV3AggregatorWbtcUsd,
-            mockV3AggregatorUsdcUsd,
-            uniswapV3Helper
-        );
+        //Mock values
         vm.startPrank(alice);
         IERC20(conf.addUsdc).approve(address(positions), amount);
         market.openPosition(conf.addUsdc, conf.addWbtc, uint24(fee), true, 1, amount, 0, 40000e6);
@@ -142,15 +113,7 @@ contract SimpleTradeShort is TestSetup {
         console.logInt(pnl);
         console.log("colLeft ", uint128(colLeft));
         vm.stopPrank();
-        setPrice(
-            41000e6,
-            conf.addWbtc,
-            conf.addUsdc,
-            fee,
-            mockV3AggregatorWbtcUsd,
-            mockV3AggregatorUsdcUsd,
-            uniswapV3Helper
-        );
+        //Mock values
         (, , , , , , , , , pnl, colLeft) = market.getPositionParams(1);
         console.logInt(pnl);
         console.log("colLeft ", uint128(colLeft));
@@ -168,6 +131,5 @@ contract SimpleTradeShort is TestSetup {
         assertEq(0, IERC20(conf.addWbtc).balanceOf(address(positions)));
     }
 
-    // function test__simpleLimitOrderAndClose() public {} // TODO
-    */
+
 }

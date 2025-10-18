@@ -90,7 +90,6 @@ contract SimpleTradeLong is TestSetup {
     }
 
 
-/*
     function test__simpleTradeStopLossAndCloseLong() public {
         uint128 amount = 10e8;
         address tokenAddress = conf.addWbtc;
@@ -271,71 +270,4 @@ contract SimpleTradeLong is TestSetup {
         vm.stopPrank();
     }
 
-    function test__simpleLimitOrderAndCloseLong() public {
-        uint128 amount = 30000e6;
-        uint24 fee = 100;
-        address tokenAddress = conf.addWbtc;
-        address token1 = tokenAddress;
-        address token2 = conf.addUsdc;
-
-        writeTokenBalance(alice, token1, amount);
-
-        vm.startPrank(alice);
-        IERC20(token1).approve(address(positions), amount);
-        market.openPosition(token1, token2, uint24(fee), false, 1, amount, 40000e6, 0);
-
-        assertEq(0, IERC20(token2).balanceOf(address(positions)));
-
-        assertEq(1, positions.totalNbPos());
-        uint256[] memory posAlice = positions.getTraderPositions(alice);
-        assertEq(1, posAlice[0]);
-        assertEq(1, posAlice.length);
-        assertEq(2, positions.getPositionState(1));
-
-        market.closePosition(posAlice[0]);
-
-        // assertEq(0, ERC20(token1).balanceOf(address(positions))); // TODO check why this is not 0
-        assertApproxEqRel(amount, IERC20(token1).balanceOf(address(alice)), 0.01e18);
-
-        vm.stopPrank();
-    }
-
-    // function test__simpleLimitOrderAndLiquidate() public {
-    //     uint128 amount = 10e8;
-    //     uint24 fee = 100;
-    //     address token1 = conf.addDAI;
-    //     address token2 = conf.addUSDC;
-
-    //     writeTokenBalance(alice, token1, amount);
-    //     setPrice(
-    //         11e5,
-    //         token1,
-    //         token2,
-    //         fee,
-    //         mockV3AggregatorDAIETH,
-    //         mockV3AggregatorUSDCUSD,
-    //         uniswapV3Helper
-    //     );
-
-    //     vm.startPrank(alice);
-    //     ERC20(token1).approve(address(positions), amount);
-    //     market.openPosition(token1, token2, uint24(fee), false, 1, amount, 2e6, 0);
-
-    //     assertEq(0, ERC20(token2).balanceOf(address(positions)));
-
-    //     assertEq(1, positions.totalNbPos());
-    //     uint256[] memory posAlice = positions.getTraderPositions(alice);
-    //     assertEq(1, posAlice[0]);
-    //     assertEq(1, posAlice.length);
-    //     assertEq(2, positions.getPositionState(1));
-
-    //     market.closePosition(posAlice[0]);
-
-    //     assertEq(0, ERC20(token1).balanceOf(address(positions)));
-    //     assertApproxEqRel(amount, ERC20(token1).balanceOf(address(alice)), 0.01e18);
-
-    //     vm.stopPrank();
-    // }
-
-    */
 }
