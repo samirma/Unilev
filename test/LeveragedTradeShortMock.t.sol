@@ -4,9 +4,9 @@ pragma solidity ^0.8.0;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./utils/TestSetupMock.sol";
 
-contract LeveragedTradeShort is TestSetupMock {
+contract LeveragedTradeShortMock is TestSetupMock {
     
-function test__leveragedTradeWithoutStopLossAndLiquidateShort() public {
+    function test__leveragedTradeWithoutStopLossAndLiquidateShort() public {
         uint128 amount = 1000e6;
         uint24 fee = 3000;
         writeTokenBalance(alice, conf.addUsdc, amount);
