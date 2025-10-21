@@ -8,6 +8,8 @@ import {LiquidityPool} from "../../src/LiquidityPool.sol";
 import {PriceFeedL1} from "../../src/PriceFeedL1.sol";
 import {UniswapV3Helper} from "../../src/UniswapV3Helper.sol";
 import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
+import {MockUniswapV3Helper} from "../mocks/MockUniswapV3Helper.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "forge-std/Test.sol";
@@ -15,7 +17,7 @@ import {HelperConfig} from "../utils/HelperConfig.sol";
 import {Utils} from "./Utils.sol";
 
 contract TestSetupMock is Test, HelperConfig, Utils {
-    UniswapV3Helper public uniswapV3Helper;
+    MockUniswapV3Helper public uniswapV3Helper;
     LiquidityPoolFactory public liquidityPoolFactory;
     PriceFeedL1 public priceFeedL1;
     Market public market;
@@ -54,10 +56,12 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         mockV3AggregatorDaiUsd = new MockV3Aggregator(8, 1 * 1e8); // 1 DAI = $1
         mockV3AggregatorEthUsd = new MockV3Aggregator(8, 3000 * 1e8); // 1 ETH = $3000
 
-        // contracts
-        uniswapV3Helper = new UniswapV3Helper(conf.swapRouter);
         priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
+
+        // contracts
+        uniswapV3Helper = new MockUniswapV3Helper(address(priceFeedL1));
+
         positions = new Positions(
             address(priceFeedL1),
             address(liquidityPoolFactory),
