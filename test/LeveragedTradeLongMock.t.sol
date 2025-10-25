@@ -2,9 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./utils/TestSetup.sol";
+import "./utils/TestSetupMock.sol";
 
-contract LeveragedTradeLong is TestSetup {
+contract LeveragedTradeLongMock is TestSetupMock {
 
 
 function test__leveragedTradeToCloseLong1() public {
