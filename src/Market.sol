@@ -150,14 +150,4 @@ contract Market is IMarket, Ownable, Pausable {
         _unpause();
     }
 
-    function openPosition(
-        address _token0,
-        address _token1,
-        int24 _fee,
-        bool _isShort,
-        uint8 _leverage,
-        uint128 _amount,
-        uint160 _limitPrice,
-        uint256 _stopLossPrice
-    ) external override {}
 }
