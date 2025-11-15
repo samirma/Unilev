@@ -61,9 +61,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     uint256 public constant LIQUIDATION_THRESHOLD = 1000; // 10% of margin
     uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 1; // To avoid DOS attack
     uint256 public constant MAX_LEVERAGE = 3;
-    uint256 public constant BORROW_FEE = 0; // 0.2% when opening a position
+    uint256 public constant PROTOCOL_FEE = 50; // 0.5% when opening a position
+    uint256 public constant LIQUIDATION_FEE = 300; // 3% liquidator reward
     uint256 public constant USD_DECIMALS = 18; // The standard for USD values in this contract
-    uint256 public immutable LIQUIDATION_REWARD; // 10 USD : //! to be changed depending of the blockchain average gas price
 
     LiquidityPoolFactory public immutable LIQUIDITY_POOL_FACTORY;
     PriceFeedL1 public immutable PRICE_FEED;
@@ -78,14 +78,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         address _priceFeed,
         address _liquidityPoolFactory,
         address _liquidityPoolFactoryUniswapV3,
-        address _uniswapV3Helper,
-        uint256 _liquidationReward
+        address _uniswapV3Helper
     ) ERC721("Uniswap-MAX", "UNIMAX") Ownable(msg.sender) {
         LIQUIDITY_POOL_FACTORY_UNISWAP_V3 = _liquidityPoolFactoryUniswapV3;
         LIQUIDITY_POOL_FACTORY = LiquidityPoolFactory(_liquidityPoolFactory);
         PRICE_FEED = PriceFeedL1(_priceFeed);
         UNISWAP_V3_HELPER = UniswapV3Helper(_uniswapV3Helper);
-        LIQUIDATION_REWARD = _liquidationReward * (10**USD_DECIMALS);
     }
 
     modifier isPositionOpen(uint256 _posId) {
@@ -185,11 +183,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 amountBorrow;
 
         // take opening fees
-        uint128 liquidationReward = uint128(
-            (LIQUIDATION_REWARD * (10 ** IERC20Metadata(_token0).decimals())) /
-                (PRICE_FEED.getTokenLatestPriceInUsd(_token0))
-        );
-        _amount = _amount - liquidationReward;
+        uint128 liquidationReward = (uint128(_amount * LIQUIDATION_FEE)) / 10000;
+        _amount -= liquidationReward;
 
         if (isMargin) {
             if (_isShort) {
@@ -201,29 +196,16 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     (_amount * (_leverage - 1) * price) /
                     (10 ** IERC20Metadata(baseToken).decimals()); // Borrow quoteToken
             }
-
-            uint128 openingFeesToken1 = (uint128(totalBorrow * BORROW_FEE)) / 10000;
-            address cacheLiquidityPoolToUse = LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY)
-                .getTokenToLiquidityPools(_isShort ? baseToken : quoteToken);
-
-            // fees swap
-            SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), _amount);
-            uint256 openingFeesToken0 = UNISWAP_V3_HELPER.swapExactOutputSingle(
-                _token0,
-                _token1,
-                IUniswapV3Pool(v3Pool).fee(),
-                openingFeesToken1,
-                _amount
-            );
-
-            _amount -= uint128(openingFeesToken0);
-            totalBorrow -= openingFeesToken1;
-
-            SafeERC20.forceApprove(IERC20(_token1), cacheLiquidityPoolToUse, openingFeesToken1);
-            LiquidityPool(cacheLiquidityPoolToUse).refund(0, openingFeesToken1, 0);
-
             // Borrow funds from the pool
+            address cacheLiquidityPoolToUse = LIQUIDITY_POOL_FACTORY.getTokenToLiquidityPools(
+                _isShort ? baseToken : quoteToken
+            );
             LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
+
+            uint128 protocolFee = (uint128(totalBorrow * PROTOCOL_FEE)) / 10000;
+            _amount -= protocolFee;
+            SafeERC20.forceApprove(IERC20(_isShort ? baseToken : quoteToken), cacheLiquidityPoolToUse, protocolFee);
+            LiquidityPool(cacheLiquidityPoolToUse).refund(0, protocolFee, 0);
 
             if (_isShort) {
                 SafeERC20.forceApprove(IERC20(baseToken), address(UNISWAP_V3_HELPER), totalBorrow);
@@ -503,12 +485,23 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 // loss should not occur here but in case of, we refund the pool
                 int256 remaining = int256(int(outAmount) - int(posParms.totalBorrow));
                 uint256 loss = remaining < 0 ? uint256(-remaining) : uint256(0);
+
+                uint256 protocolFee = (inAmount * PROTOCOL_FEE) / 10000;
+                SafeERC20.forceApprove(
+                    IERC20(addTokenReceived),
+                    address(liquidityPoolToUse),
+                    protocolFee
+                );
+                liquidityPoolToUse.refund(0, protocolFee, 0);
+                amountTokenReceived -= protocolFee;
+
                 SafeERC20.forceApprove(
                     IERC20(addTokenBorrowed),
                     address(liquidityPoolToUse),
                     posParms.totalBorrow - loss
                 );
                 liquidityPoolToUse.refund(posParms.totalBorrow, 0, loss);
+
                 if (loss == 0) {
                     IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - inAmount);
                 }
