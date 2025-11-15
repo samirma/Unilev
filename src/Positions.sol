@@ -61,14 +61,15 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     uint256 public constant LIQUIDATION_THRESHOLD = 1000; // 10% of margin
     uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 1; // To avoid DOS attack
     uint256 public constant MAX_LEVERAGE = 3;
-    uint256 public constant BORROW_FEE = 0; // 0.2% when opening a position
+    uint256 public constant TREASURE_FEE = 5; // 0.05% fee for the treasure
     uint256 public constant USD_DECIMALS = 18; // The standard for USD values in this contract
-    uint256 public immutable LIQUIDATION_REWARD; // 10 USD : //! to be changed depending of the blockchain average gas price
+    uint256 public constant LIQUIDATION_REWARD = 3; // 0.03% liquidation fee
 
     LiquidityPoolFactory public immutable LIQUIDITY_POOL_FACTORY;
     PriceFeedL1 public immutable PRICE_FEED;
     UniswapV3Helper public immutable UNISWAP_V3_HELPER;
     address public immutable LIQUIDITY_POOL_FACTORY_UNISWAP_V3;
+    address public treasure;
 
     uint256 public posId = 1;
     uint256 public totalNbPos;
@@ -79,13 +80,13 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         address _liquidityPoolFactory,
         address _liquidityPoolFactoryUniswapV3,
         address _uniswapV3Helper,
-        uint256 _liquidationReward
+        address _treasure
     ) ERC721("Uniswap-MAX", "UNIMAX") Ownable(msg.sender) {
         LIQUIDITY_POOL_FACTORY_UNISWAP_V3 = _liquidityPoolFactoryUniswapV3;
         LIQUIDITY_POOL_FACTORY = LiquidityPoolFactory(_liquidityPoolFactory);
         PRICE_FEED = PriceFeedL1(_priceFeed);
         UNISWAP_V3_HELPER = UniswapV3Helper(_uniswapV3Helper);
-        LIQUIDATION_REWARD = _liquidationReward * (10**USD_DECIMALS);
+        treasure = _treasure;
     }
 
     modifier isPositionOpen(uint256 _posId) {
@@ -185,11 +186,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 amountBorrow;
 
         // take opening fees
-        uint128 liquidationReward = uint128(
-            (LIQUIDATION_REWARD * (10 ** IERC20Metadata(_token0).decimals())) /
-                (PRICE_FEED.getTokenLatestPriceInUsd(_token0))
-        );
+        uint128 liquidationReward = uint128((_amount * LIQUIDATION_REWARD) / 10000);
         _amount = _amount - liquidationReward;
+
+        uint256 treasureAmount = (_amount * TREASURE_FEE) / 10000;
+        IERC20(_token0).safeTransfer(treasure, treasureAmount);
+        _amount = _amount - uint128(treasureAmount);
 
         if (isMargin) {
             if (_isShort) {
@@ -202,25 +204,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     (10 ** IERC20Metadata(baseToken).decimals()); // Borrow quoteToken
             }
 
-            uint128 openingFeesToken1 = (uint128(totalBorrow * BORROW_FEE)) / 10000;
             address cacheLiquidityPoolToUse = LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY)
                 .getTokenToLiquidityPools(_isShort ? baseToken : quoteToken);
-
-            // fees swap
-            SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), _amount);
-            uint256 openingFeesToken0 = UNISWAP_V3_HELPER.swapExactOutputSingle(
-                _token0,
-                _token1,
-                IUniswapV3Pool(v3Pool).fee(),
-                openingFeesToken1,
-                _amount
-            );
-
-            _amount -= uint128(openingFeesToken0);
-            totalBorrow -= openingFeesToken1;
-
-            SafeERC20.forceApprove(IERC20(_token1), cacheLiquidityPoolToUse, openingFeesToken1);
-            LiquidityPool(cacheLiquidityPoolToUse).refund(0, openingFeesToken1, 0);
 
             // Borrow funds from the pool
             LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
@@ -510,10 +495,14 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                 );
                 liquidityPoolToUse.refund(posParms.totalBorrow, 0, loss);
                 if (loss == 0) {
-                    IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - inAmount);
+                    uint256 treasureAmount = ((amountTokenReceived - inAmount) * TREASURE_FEE) / 10000;
+                    IERC20(addTokenReceived).safeTransfer(treasure, treasureAmount);
+                    IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - inAmount - treasureAmount);
                 }
             } else if (state == 2) {
-                IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived);
+                uint256 treasureAmount = (amountTokenReceived * TREASURE_FEE) / 10000;
+                IERC20(addTokenReceived).safeTransfer(treasure, treasureAmount);
+                IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - treasureAmount);
             } else {
                 // when not margin, we need to swap to the other token
                 SafeERC20.forceApprove(IERC20(addTokenReceived), address(UNISWAP_V3_HELPER), amountTokenReceived);
@@ -523,7 +512,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     IUniswapV3Pool(posParms.v3Pool).fee(),
                     amountTokenReceived
                 );
-                IERC20(tokenToTrader).safeTransfer(trader, outAmount);
+                uint256 treasureAmount = (outAmount * TREASURE_FEE) / 10000;
+                IERC20(tokenToTrader).safeTransfer(treasure, treasureAmount);
+                IERC20(tokenToTrader).safeTransfer(trader, outAmount - treasureAmount);
             }
         }
 

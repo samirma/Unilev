@@ -63,7 +63,7 @@ contract TestSetup is Test, HelperConfig, Utils {
             address(liquidityPoolFactory),
             conf.liquidityPoolFactoryUniswapV3,
             address(uniswapV3Helper),
-            conf.liquidationReward
+            conf.treasure
         );
         market = new Market(
             address(positions),

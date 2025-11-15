@@ -12,11 +12,11 @@ contract HelperConfig {
         address nonfungiblePositionManager;
         address swapRouter;
         address liquidityPoolFactoryUniswapV3;
-        uint256 liquidationReward;
         address addWbtc;
         address addWeth;
         address addUsdc;
         address addDai;
+        address treasure;
     }
 
     mapping(uint256 => NetworkConfig) public chainIdToNetworkConfig;
@@ -43,11 +43,11 @@ contract HelperConfig {
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             liquidityPoolFactoryUniswapV3: 0x1F98431c8aD98523631AE4a59f267346ea31F984,
-            liquidationReward: 10,
             addWbtc: 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
             addWeth: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
             addUsdc: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
-            addDai: 0x6B175474E89094C44Da98b954EedeAC495271d0F
+            addDai: 0x6B175474E89094C44Da98b954EedeAC495271d0F,
+            treasure: 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199
         });
     }
 }

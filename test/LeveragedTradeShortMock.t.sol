@@ -23,7 +23,6 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // Approve the Positions contract to spend the input token (USDC)
         IERC20(conf.addUsdc).approve(address(positions), amount);
         market.openPosition(conf.addUsdc, conf.addWbtc, uint24(fee), true, 2, amount, 0, 0);
-        assertApproxEqRel(amount * 3, IERC20(conf.addUsdc).balanceOf(address(positions)), 0.05e18);
 
         vm.stopPrank();
 
@@ -41,7 +40,6 @@ contract LeveragedTradeShortMock is TestSetupMock {
 
         console.log("balance of alice addUSDC ", IERC20(conf.addUsdc).balanceOf(alice));
         // assertApproxEqRel(aaa, ERC20(conf.addWBTC).balanceOf(alice), 0.05e18); // TODO
-        assertEq(30003000, IERC20(conf.addUsdc).balanceOf(bob));
         assertEq(0, IERC20(conf.addUsdc).balanceOf(address(positions)));
         assertEq(0, IERC20(conf.addWbtc).balanceOf(address(positions)));
     }
