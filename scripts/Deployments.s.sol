@@ -53,7 +53,8 @@ contract Deployments is Script, HelperConfig {
             address(liquidityPoolFactory),
             conf.liquidityPoolFactoryUniswapV3,
             address(uniswapV3Helper),
-            conf.liquidationReward
+            conf.liquidationReward,
+            conf.treasure
         );
         market = new Market(
             address(positions),

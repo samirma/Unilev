@@ -67,7 +67,8 @@ contract TestSetupMock is Test, HelperConfig, Utils {
             address(liquidityPoolFactory),
             conf.liquidityPoolFactoryUniswapV3,
             address(uniswapV3Helper),
-            conf.liquidationReward
+            conf.liquidationReward,
+            conf.treasure
         );
         market = new Market(
             address(positions),
@@ -97,7 +98,6 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         market.addPriceFeed(conf.addDai, address(mockV3AggregatorDaiUsd));
         market.addPriceFeed(conf.addWeth, address(mockV3AggregatorEthUsd));
 
-        vm.stopPrank();
         vm.stopPrank();
 
         // add liquidity to a pool to be able to open a short position
