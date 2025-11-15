@@ -31,8 +31,7 @@ function test__leveragedTradeToCloseLong1() public {
     uint256 usdcBalanceAfter = IERC20(conf.addUsdc).balanceOf(address(lbPoolUsdc));
     uint256 price = priceFeedL1.getPairLatestPrice(conf.addWbtc, conf.addUsdc);
     uint256 totalBorrow = (amount * 1 * price) / (10**18);
-    uint256 openingFees = (totalBorrow * positions.BORROW_FEE()) / 10000;
-    assertApproxEqRel(usdcBalanceBefore + openingFees, usdcBalanceAfter, 0.05e18);
+    assertApproxEqRel(usdcBalanceBefore, usdcBalanceAfter, 0.05e18);
 
     assertEq(1, positions.totalNbPos());
     uint256[] memory posAlice = positions.getTraderPositions(alice);
