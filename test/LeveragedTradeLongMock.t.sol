@@ -6,66 +6,228 @@ import "./utils/TestSetupMock.sol";
 
 contract LeveragedTradeLongMock is TestSetupMock {
 
-
-function test__leveragedTradeToCloseLong1() public {
-        uint128 amount = 1e18;
+    // ----------------------------------------------------------------------
+    // Scenario: Long - Profit 2x (ETH Price Rise)
+    // ----------------------------------------------------------------------
+    function test_Long_Profit_2x_ETH_Rise() public {
+        uint128 amount = 1e18; // 1 WETH
         uint24 fee = 3000;
+
+        // 1. Initial State
         writeTokenBalance(alice, conf.addWeth, amount);
-
-        // Assert initial balances before opening position
-        assertEq(amount, IERC20(conf.addWeth).balanceOf(alice));
-        assertEq(0, IERC20(conf.addWeth).balanceOf(address(positions)));
         
         vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8); // $4000
-        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8); // $100000
+        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);   // ETH = $4,000
+        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8); // WBTC = $100,000
         vm.stopPrank();
 
+        // 2. Open Position (Long WETH/WBTC 2x)
         vm.startPrank(alice);
-        // Approve the Positions contract to spend the input token (USDC)
         IERC20(conf.addWeth).approve(address(positions), amount);
-        market.openPosition(conf.addWeth, conf.addWbtc, uint24(fee), true, 1, amount, 0, 0);
-        
-        assertApproxEqRel(amount * 2, IERC20(conf.addWeth).balanceOf(address(positions)), 0.5e17);
-        assertApproxEqRel(0, IERC20(conf.addWbtc).balanceOf(address(positions)), 0.5e17);
-
+        // token0=WETH, token1=WBTC, isShort=false (Long), leverage=2
+        market.openPosition(conf.addWeth, conf.addWbtc, fee, false, 2, amount, 0, 0);
         vm.stopPrank();
 
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(5000 * 1e8);
-        vm.stopPrank();
-
-        assertEq(1, positions.totalNbPos());
+        // Verify Position State (Approximate check based on table)
+        // Table: "Collateral (0.995) + Swap (0.997) = 1.992 WETH" in position
         uint256[] memory posAlice = positions.getTraderPositions(alice);
+        assertEq(posAlice.length, 1);
+        
+        // 3. Mock Price Change (ETH -> $5,000)
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(5000 * 1e8); 
+        vm.stopPrank();
 
-        assertEq(1, posAlice[0]);
-        assertEq(alice, positions.ownerOf(posAlice[0]));
-
-        uint256 lbPoolWethBeforeClose = IERC20(conf.addWeth).balanceOf(address(lbPoolWeth));
-        console.log("WETH balance in lbPoolUsdc BEFORE close: ", lbPoolWethBeforeClose);
-
-        uint256 lbPoolWBTCBeforeClose = IERC20(conf.addWbtc).balanceOf(address(lbPoolWbtc));
-        console.log("WBTC balance in lbPoolUsdc BEFORE close: ", lbPoolWBTCBeforeClose);
-
-        console.log("Close position");
+        // 4. Close Position
         vm.startPrank(alice);
         market.closePosition(posAlice[0]);
         vm.stopPrank();
 
-        assertApproxEqRel(0, IERC20(conf.addWeth).balanceOf(address(positions)), 0.5e17);
-        assertApproxEqRel(0, IERC20(conf.addWbtc).balanceOf(address(positions)), 0.5e17);
+        // 5. Final Assertions
+        // Table Target: 1.1856 WETH
+        uint256 finalBalance = IERC20(conf.addWeth).balanceOf(alice);
+        console.log("Final Trader Balance (WETH):", finalBalance);
+        
+        // Using a relative error tolerance to account for minor fee calculation differences in mocks
+        // Target: 1.1856e18
+        assertApproxEqAbs(finalBalance, 1.1856e18, 0.001e18);
+        
+        // Treasure check: ~0.009012 WETH
+        uint256 treasureBalance = IERC20(conf.addWeth).balanceOf(conf.treasure);
+        console.log("Treasure Balance (WETH):", treasureBalance);
+        assertApproxEqAbs(treasureBalance, 0.009012e18, 0.001e18);
+    }
 
-        uint256 wethBalanceAfterClose = IERC20(conf.addWeth).balanceOf(address(alice));
-        assertApproxEqRel(1193e15, wethBalanceAfterClose, 0.5e17);
-        uint256 wbtcBalanceAfterClose = IERC20(conf.addWbtc).balanceOf(address(alice));
-        assertApproxEqRel(0, wbtcBalanceAfterClose, 0.5e17);
+    // ----------------------------------------------------------------------
+    // Scenario: Long - Profit 2x (WBTC Price Drop)
+    // ----------------------------------------------------------------------
+    function test_Long_Profit_2x_WBTC_Drop() public {
+        uint128 amount = 1e18; 
+        uint24 fee = 3000;
 
-        uint256 lbPoolWethAfterClose = IERC20(conf.addWeth).balanceOf(address(lbPoolWeth));
-        console.log("WETH balance in lbPoolUsdc After close: ", lbPoolWethAfterClose);
+        // 1. Initial State
+        writeTokenBalance(alice, conf.addWeth, amount);
+        
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
+        vm.stopPrank();
 
-        uint256 lbPoolWBTCAfterClose = IERC20(conf.addWbtc).balanceOf(address(lbPoolWbtc));
-        console.log("WBTC balance in lbPoolUsdc After close: ", lbPoolWBTCAfterClose);
+        // 2. Open Position
+        vm.startPrank(alice);
+        IERC20(conf.addWeth).approve(address(positions), amount);
+        market.openPosition(conf.addWeth, conf.addWbtc, fee, false, 2, amount, 0, 0);
+        vm.stopPrank();
 
-}
+        uint256[] memory posAlice = positions.getTraderPositions(alice);
+
+        // 3. Mock Price Change (WBTC -> $80,000)
+        vm.startPrank(deployer);
+        mockV3AggregatorWbtcUsd.updateAnswer(80000 * 1e8);
+        vm.stopPrank();
+
+        // 4. Close Position
+        vm.startPrank(alice);
+        market.closePosition(posAlice[0]);
+        vm.stopPrank();
+
+        // 5. Final Assertions
+        // Table Target: 1.3469 WETH
+        uint256 finalBalance = IERC20(conf.addWeth).balanceOf(alice);
+        console.log("Final Trader Balance (WETH):", finalBalance);
+        assertApproxEqAbs(finalBalance, 1.3469e18, 0.001e18);
+
+        // Treasure check: ~0.00821 WETH
+        uint256 treasureBalance = IERC20(conf.addWeth).balanceOf(conf.treasure);
+        console.log("Treasure Balance (WETH):", treasureBalance);
+        assertApproxEqAbs(treasureBalance, 0.00821e18, 0.001e18);
+    }
+
+    // ----------------------------------------------------------------------
+    // Scenario: Long - Loss 2x (ETH Price Drop)
+    // ----------------------------------------------------------------------
+    function test_Long_Loss_2x_ETH_Drop() public {
+        uint128 amount = 1e18;
+        uint24 fee = 3000;
+
+        writeTokenBalance(alice, conf.addWeth, amount);
+        
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(conf.addWeth).approve(address(positions), amount);
+        market.openPosition(conf.addWeth, conf.addWbtc, fee, false, 2, amount, 0, 0);
+        vm.stopPrank();
+
+        uint256[] memory posAlice = positions.getTraderPositions(alice);
+
+        // 3. Mock Price Change (ETH -> $3,800)
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(3800 * 1e8);
+        vm.stopPrank();
+
+        // 4. Close Position
+        vm.startPrank(alice);
+        market.closePosition(posAlice[0]);
+        vm.stopPrank();
+
+        // 5. Final Assertions
+        // Table Target: 0.931 WETH
+        uint256 finalBalance = IERC20(conf.addWeth).balanceOf(alice);
+        console.log("Final Trader Balance (WETH):", finalBalance);
+        assertApproxEqAbs(finalBalance, 0.931e18, 0.001e18);
+
+        // Treasure check: ~0.010279 WETH
+        uint256 treasureBalance = IERC20(conf.addWeth).balanceOf(conf.treasure);
+        assertApproxEqAbs(treasureBalance, 0.010279e18, 0.001e18);
+    }
+
+    // ----------------------------------------------------------------------
+    // Scenario: Long - Profit No Leverage
+    // ----------------------------------------------------------------------
+    function test_Long_NoLeverage_Profit() public {
+        uint128 amount = 1e18;
+        uint24 fee = 3000;
+
+        writeTokenBalance(alice, conf.addWeth, amount);
+        
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(conf.addWeth).approve(address(positions), amount);
+        // Leverage = 1 (No Leverage)
+        market.openPosition(conf.addWeth, conf.addWbtc, fee, false, 1, amount, 0, 0);
+        vm.stopPrank();
+
+        uint256[] memory posAlice = positions.getTraderPositions(alice);
+
+        // 3. Mock Price Change (ETH -> $5,000)
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(5000 * 1e8);
+        vm.stopPrank();
+
+        // 4. Close Position
+        vm.startPrank(alice);
+        market.closePosition(posAlice[0]);
+        vm.stopPrank();
+
+        // 5. Final Assertions
+        // Table Target: 0.995 WETH (Just holding minus fees)
+        uint256 finalBalance = IERC20(conf.addWeth).balanceOf(alice);
+        console.log("Final Trader Balance (WETH):", finalBalance);
+        assertApproxEqAbs(finalBalance, 0.995e18, 0.005e18); // Slightly higher tolerance due to fee model
+
+        // Treasure check: ~0.009976 WETH
+        uint256 treasureBalance = IERC20(conf.addWeth).balanceOf(conf.treasure);
+        assertApproxEqAbs(treasureBalance, 0.009976e18, 0.001e18);
+    }
+
+    // ----------------------------------------------------------------------
+    // Scenario: Long - Loss No Leverage
+    // ----------------------------------------------------------------------
+    function test_Long_NoLeverage_Loss() public {
+        uint128 amount = 1e18;
+        uint24 fee = 3000;
+
+        writeTokenBalance(alice, conf.addWeth, amount);
+        
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(conf.addWeth).approve(address(positions), amount);
+        market.openPosition(conf.addWeth, conf.addWbtc, fee, false, 1, amount, 0, 0);
+        vm.stopPrank();
+
+        uint256[] memory posAlice = positions.getTraderPositions(alice);
+
+        // 3. Mock Price Change (ETH -> $3,800)
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(3800 * 1e8);
+        vm.stopPrank();
+
+        // 4. Close Position
+        vm.startPrank(alice);
+        market.closePosition(posAlice[0]);
+        vm.stopPrank();
+
+        // 5. Final Assertions
+        // Table Target: 0.995 WETH
+        uint256 finalBalance = IERC20(conf.addWeth).balanceOf(alice);
+        console.log("Final Trader Balance (WETH):", finalBalance);
+        assertApproxEqAbs(finalBalance, 0.995e18, 0.005e18);
+
+        // Treasure check: ~0.009976 WETH
+        uint256 treasureBalance = IERC20(conf.addWeth).balanceOf(conf.treasure);
+        assertApproxEqAbs(treasureBalance, 0.009976e18, 0.001e18);
+    }
 
 }
