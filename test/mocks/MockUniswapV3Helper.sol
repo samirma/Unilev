@@ -20,12 +20,9 @@ import {Utils} from "../utils/Utils.sol"; // Import Utils for writeTokenBalance
  * to account for fees/slippage.
  */
 contract MockUniswapV3Helper is Utils {
-
     PriceFeedL1 public immutable PRICE_FEED;
 
-    constructor(
-        address _priceFeed
-    )  { 
+    constructor(address _priceFeed) {
         PRICE_FEED = PriceFeedL1(_priceFeed);
     }
 
@@ -35,14 +32,13 @@ contract MockUniswapV3Helper is Utils {
      * @dev It updates the balances of msg.sender using Forge cheatcodes (`writeTokenBalance`).
      * @param _tokenIn The input token.
      * @param _tokenOut The output token.
-     * @param _fee The Uniswap V3 fee (unused in mock).
      * @param _amountIn The exact amount of input token to sell.
      * @return amountOut The amount of output token received.
      */
-   function swapExactInputSingle(
+    function swapExactInputSingle(
         address _tokenIn,
         address _tokenOut,
-        uint24 _fee, // unused
+        uint24 /*_fee*/, // unused
         uint256 _amountIn
     ) public returns (uint256 amountOut) {
         // --- 1. Calculate amountOut (Net Effect of Swap) ---
@@ -54,16 +50,15 @@ contract MockUniswapV3Helper is Utils {
 
         // Value of input amount in USD (18 decimals)
         uint8 tokenInDecimals = IERC20Metadata(_tokenIn).decimals();
-        uint256 valueUsd = (_amountIn * priceInUsd) / (10**tokenInDecimals);
+        uint256 valueUsd = (_amountIn * priceInUsd) / (10 ** tokenInDecimals);
 
         // Amount of tokenOut received (in its own decimals)
         uint8 tokenOutDecimals = IERC20Metadata(_tokenOut).decimals();
         // Calculate raw amountOut
-        amountOut = (valueUsd * (10**tokenOutDecimals)) / priceOutUsd;
+        amountOut = (valueUsd * (10 ** tokenOutDecimals)) / priceOutUsd;
 
         // Apply a small "fee" (0.3%) to simulate slippage/swap cost in the mock.
         amountOut = (amountOut * 997) / 1000;
-
 
         // --- 2. Simulate Balance Changes (Net Effect on msg.sender - Positions.sol) ---
 
@@ -86,7 +81,6 @@ contract MockUniswapV3Helper is Utils {
      * @dev It updates the balances of msg.sender using Forge cheatcodes (`writeTokenBalance`).
      * @param _tokenIn The input token.
      * @param _tokenOut The output token.
-     * @param _fee The Uniswap V3 fee (unused in mock).
      * @param _amountOut The exact amount of output token desired.
      * @param _amountInMaximum The maximum amount of input token to spend.
      * @return amountIn The exact amount of input token spent.
@@ -94,7 +88,7 @@ contract MockUniswapV3Helper is Utils {
     function swapExactOutputSingle(
         address _tokenIn,
         address _tokenOut,
-        uint24 _fee, // unused
+        uint24 /*_fee*/, // unused
         uint256 _amountOut,
         uint256 _amountInMaximum
     ) public returns (uint256 amountIn) {
@@ -107,12 +101,12 @@ contract MockUniswapV3Helper is Utils {
 
         // Value of output amount in USD (18 decimals)
         uint8 tokenOutDecimals = IERC20Metadata(_tokenOut).decimals();
-        uint256 valueUsd = (_amountOut * priceOutUsd) / (10**tokenOutDecimals);
+        uint256 valueUsd = (_amountOut * priceOutUsd) / (10 ** tokenOutDecimals);
 
         // Amount of tokenIn required (in its own decimals)
         uint8 tokenInDecimals = IERC20Metadata(_tokenIn).decimals();
         // Calculate raw amountIn
-        amountIn = (valueUsd * (10**tokenInDecimals)) / priceInUsd;
+        amountIn = (valueUsd * (10 ** tokenInDecimals)) / priceInUsd;
 
         // Apply a small "fee" (0.3%) to simulate slippage/swap cost.
         amountIn = (amountIn * 1003) / 1000;
@@ -122,7 +116,6 @@ contract MockUniswapV3Helper is Utils {
             // The calculated cost is too high, simulating a swap failure.
             return 0;
         }
-
 
         // --- 2. Simulate Balance Changes (Net Effect on msg.sender - Positions.sol) ---
 
