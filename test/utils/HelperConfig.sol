@@ -23,6 +23,7 @@ contract HelperConfig {
 
     constructor() {
         chainIdToNetworkConfig[1] = getMainnetForkConfig();
+        chainIdToNetworkConfig[31337] = getMainnetForkConfig();
         activeNetworkConfig = chainIdToNetworkConfig[block.chainid];
     }
 

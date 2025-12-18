@@ -228,4 +228,40 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 treasureBalance = IERC20(conf.addWeth).balanceOf(conf.treasure);
         assertApproxEqAbs(treasureBalance, 0.009976e18, 1e16);
     }
+    // ----------------------------------------------------------------------
+    // Scenario: Whitelist Fees Test
+    // ----------------------------------------------------------------------
+    function test_WhitelistFees() public {
+        uint128 amount = 1e18;
+        uint24 fee = 3000;
+        address whitelistedUser = address(0x88);
+
+        // 1. Initial State
+        writeTokenBalance(whitelistedUser, conf.addWeth, amount);
+
+        // 2. Add to Whitelist with reduced fees (0.01% treasure, 0% liquidation reward)
+        vm.startPrank(deployer);
+        feeManager.setCustomFees(whitelistedUser, 1, 0);
+        vm.stopPrank();
+
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
+        vm.stopPrank();
+
+        // 3. Open Position
+        vm.startPrank(whitelistedUser);
+        IERC20(conf.addWeth).approve(address(positions), amount);
+        market.openPosition(conf.addWeth, conf.addWbtc, fee, false, 2, amount, 0, 0);
+        vm.stopPrank();
+
+        // 4. Verification of Treasure Fee
+        // Liquidation Reward = 0
+        // Amount used for fee calc = 1e18
+        // Treasure Fee = 1e18 * 1 / 10000 = 1e14
+
+        uint256 treasureBalance = IERC20(conf.addWeth).balanceOf(conf.treasure);
+        console.log("Treasure Balance (Whitelisted):", treasureBalance);
+        assertApproxEqAbs(treasureBalance, 1e14, 100); // Allow small rounding
+    }
 }

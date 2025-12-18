@@ -9,6 +9,7 @@ import {PriceFeedL1} from "../../src/PriceFeedL1.sol";
 import {UniswapV3Helper} from "../../src/UniswapV3Helper.sol";
 import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
 import {MockUniswapV3Helper} from "../mocks/MockUniswapV3Helper.sol";
+import {FeeManager} from "../../src/FeeManager.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -22,6 +23,7 @@ contract TestSetupMock is Test, HelperConfig, Utils {
     PriceFeedL1 public priceFeedL1;
     Market public market;
     Positions public positions;
+    FeeManager public feeManager;
     MockV3Aggregator public mockV3AggregatorWbtcUsd;
     MockV3Aggregator public mockV3AggregatorUsdcUsd;
     MockV3Aggregator public mockV3AggregatorDaiUsd;
@@ -58,6 +60,7 @@ contract TestSetupMock is Test, HelperConfig, Utils {
 
         priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
+        feeManager = new FeeManager(5, 3); // 0.05% treasure fee, 0.03% liquidation reward (same as old constants)
 
         // contracts
         uniswapV3Helper = new MockUniswapV3Helper(address(priceFeedL1));
@@ -67,7 +70,8 @@ contract TestSetupMock is Test, HelperConfig, Utils {
             address(liquidityPoolFactory),
             conf.liquidityPoolFactoryUniswapV3,
             address(uniswapV3Helper),
-            conf.treasure
+            conf.treasure,
+            address(feeManager)
         );
         market = new Market(
             address(positions),
