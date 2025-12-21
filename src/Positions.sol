@@ -32,6 +32,8 @@ import {
     Positions__TOKEN_RECEIVED_NOT_CONCISTENT
 } from "./libraries/PositionTypes.sol";
 
+import {PositionLogic} from "./libraries/PositionLogic.sol";
+
 contract Positions is ERC721, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -137,22 +139,31 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint256 _stopLossPrice
     ) external onlyOwner returns (uint256) {
         // Check params
-        (
-            uint256 price,
-            address baseToken,
-            address quoteToken,
-            bool isBaseToken0,
-            address v3Pool
-        ) = checkPositionParams(
-                _token0,
-                _token1,
-                _fee,
-                _isShort,
-                _leverage,
-                _amount,
-                _limitPrice,
-                _stopLossPrice
-            );
+        // Check params
+        PositionLogic.ValidationResult memory validationResult = PositionLogic.validateOpenPosition(
+            PositionLogic.ValidationParams({
+                token0: _token0,
+                token1: _token1,
+                fee: _fee,
+                isShort: _isShort,
+                leverage: _leverage,
+                amount: _amount,
+                limitPrice: _limitPrice,
+                stopLossPrice: _stopLossPrice,
+                liquidityPoolFactoryUniswapV3: LIQUIDITY_POOL_FACTORY_UNISWAP_V3,
+                liquidityPoolFactory: address(LIQUIDITY_POOL_FACTORY),
+                priceFeed: address(PRICE_FEED),
+                maxLeverage: MAX_LEVERAGE,
+                minPositionAmountInUsd: MIN_POSITION_AMOUNT_IN_USD
+            })
+        );
+
+        address baseToken = validationResult.baseToken;
+        address quoteToken = validationResult.quoteToken;
+        uint256 price = validationResult.price;
+        address v3Pool = validationResult.v3Pool;
+        bool isBaseToken0 = validationResult.isBaseToken0;
+
         bool isMargin = _leverage != 1 || _isShort;
 
         // transfer funds to the contract (trader need to approve first)
@@ -253,107 +264,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         );
         ++totalNbPos;
         return safeMint(_trader);
-    }
-
-    function checkPositionParams(
-        address _token0,
-        address _token1,
-        uint24 _fee,
-        bool _isShort,
-        uint8 _leverage,
-        uint256 _amount,
-        uint256 _limitPrice,
-        uint256 _stopLossPrice
-    ) private view returns (uint256, address, address, bool, address) {
-        address baseToken;
-        address quoteToken;
-
-        address v3Pool = address(
-            IUniswapV3Factory(LIQUIDITY_POOL_FACTORY_UNISWAP_V3).getPool(_token0, _token1, _fee)
-        );
-
-        if (IUniswapV3Pool(v3Pool).factory() != LIQUIDITY_POOL_FACTORY_UNISWAP_V3) {
-            revert Positions__POOL_NOT_OFFICIAL(v3Pool);
-        }
-        // check token
-        if (
-            IUniswapV3Pool(v3Pool).token0() != _token0 && IUniswapV3Pool(v3Pool).token1() != _token0
-        ) {
-            revert Positions__TOKEN_NOT_SUPPORTED(_token0);
-        }
-
-        /**
-         * @dev The user need to open a long position by sending
-         * the base token and open a short position by depositing the quote token.
-         */
-        if (_isShort) {
-            quoteToken = _token0;
-            baseToken = (_token0 == IUniswapV3Pool(v3Pool).token0())
-                ? IUniswapV3Pool(v3Pool).token1()
-                : IUniswapV3Pool(v3Pool).token0();
-        } else {
-            baseToken = _token0;
-            quoteToken = (_token0 == IUniswapV3Pool(v3Pool).token0())
-                ? IUniswapV3Pool(v3Pool).token1()
-                : IUniswapV3Pool(v3Pool).token0();
-        }
-        bool isBaseToken0 = (baseToken == IUniswapV3Pool(v3Pool).token0());
-
-        // check if pair is supported by PriceFeed
-        if (!PRICE_FEED.isPairSupported(baseToken, quoteToken)) {
-            revert Positions__NO_PRICE_FEED(baseToken, quoteToken);
-        }
-
-        uint256 price = PRICE_FEED.getPairLatestPrice(baseToken, quoteToken);
-
-        // check leverage
-        if (_leverage < 1 || _leverage > MAX_LEVERAGE) {
-            revert Positions__LEVERAGE_NOT_IN_RANGE(_leverage);
-        }
-        // when margin position check if token is supported by a LiquidityPool
-        if (_leverage != 1) {
-            if (
-                _isShort &&
-                LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY).getTokenToLiquidityPools(baseToken) ==
-                address(0)
-            ) {
-                revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(baseToken);
-            }
-            if (
-                !_isShort &&
-                LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY).getTokenToLiquidityPools(quoteToken) ==
-                address(0)
-            ) {
-                revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(quoteToken);
-            }
-        }
-
-        // check amount
-        uint256 humanReadableUsd = PRICE_FEED.getAmountInUsd(_token0, _amount); // Returns value with 18 decimals
-        if (humanReadableUsd < MIN_POSITION_AMOUNT_IN_USD) {
-            revert Positions__AMOUNT_TO_SMALL(
-                IERC20Metadata(_token0).symbol(),
-                humanReadableUsd,
-                _amount
-            );
-        }
-
-        if (_isShort) {
-            if (_limitPrice > price && _limitPrice != 0) {
-                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(_limitPrice);
-            }
-            if (_stopLossPrice < price && _stopLossPrice != 0) {
-                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(_stopLossPrice);
-            }
-        } else {
-            if (_limitPrice < price && _limitPrice != 0) {
-                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(_limitPrice);
-            }
-            if (_stopLossPrice > price && _stopLossPrice != 0) {
-                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(_stopLossPrice);
-            }
-        }
-        return (price, baseToken, quoteToken, isBaseToken0, v3Pool);
     }
 
     /**
