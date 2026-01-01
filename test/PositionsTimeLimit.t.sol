@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {PositionState} from "../src/libraries/PositionTypes.sol";
 import "./utils/TestSetupMock.sol";
 
 contract PositionsTimeLimitTest is TestSetupMock {
@@ -28,13 +29,21 @@ contract PositionsTimeLimitTest is TestSetupMock {
 
         // 3. Check State before time limit (e.g. 29 days)
         vm.warp(block.timestamp + 29 days);
-        uint256 state = positions.getPositionState(posId);
-        assertEq(state, 2, "State should be 2 (Active) before 30 days");
+        PositionState state = positions.getPositionState(posId);
+        assertEq(
+            uint256(state),
+            uint256(PositionState.ACTIVE),
+            "State should be ACTIVE before 30 days"
+        );
 
         // 4. Check State after time limit (e.g. 30 days + 1 second)
         vm.warp(block.timestamp + 1 days + 1);
         state = positions.getPositionState(posId);
-        assertEq(state, 6, "State should be 6 (Time Limit) after 30 days");
+        assertEq(
+            uint256(state),
+            uint256(PositionState.EXPIRED),
+            "State should be EXPIRED after 30 days"
+        );
 
         // 5. Liquidate
         vm.startPrank(deployer); // Liquidator
@@ -80,12 +89,20 @@ contract PositionsTimeLimitTest is TestSetupMock {
         vm.warp(block.timestamp + 1 days + 1 hours);
 
         // Alice: State 6
-        uint256 stateAlice = positions.getPositionState(posIdAlice);
-        assertEq(stateAlice, 6, "Alice should be expired (1 day limit)");
+        PositionState stateAlice = positions.getPositionState(posIdAlice);
+        assertEq(
+            uint256(stateAlice),
+            uint256(PositionState.EXPIRED),
+            "Alice should be expired (1 day limit)"
+        );
 
         // Bob: State 2 (using default 30 days)
-        uint256 stateBob = positions.getPositionState(posIdBob);
-        assertEq(stateBob, 2, "Bob should still be active (default 30 days)");
+        PositionState stateBob = positions.getPositionState(posIdBob);
+        assertEq(
+            uint256(stateBob),
+            uint256(PositionState.ACTIVE),
+            "Bob should still be active (default 30 days)"
+        );
 
         // 4. Liquidate Alice
         vm.startPrank(deployer);

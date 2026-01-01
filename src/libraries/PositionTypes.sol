@@ -3,6 +3,17 @@ pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+// Enums
+enum PositionState {
+    NONE, // 0
+    TAKE_PROFIT, // 1
+    ACTIVE, // 2
+    STOP_LOSS, // 3
+    LIQUIDATABLE, // 4
+    BAD_DEBT, // 5
+    EXPIRED // 6
+}
+
 // Structs
 // prettier-ignore
 struct PositionParams {

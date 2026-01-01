@@ -29,7 +29,8 @@ import {
     Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT,
     Positions__NOT_LIQUIDABLE,
     Positions__WAIT_FOR_LIMIT_ORDER_TO_COMPLET,
-    Positions__TOKEN_RECEIVED_NOT_CONCISTENT
+    Positions__TOKEN_RECEIVED_NOT_CONCISTENT,
+    PositionState
 } from "./libraries/PositionTypes.sol";
 
 import {PositionLogic} from "./libraries/PositionLogic.sol";
@@ -84,7 +85,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         _;
     }
     modifier isLiquidable(uint256 _posId) {
-        if (getPositionState(_posId) == 2) {
+        if (getPositionState(_posId) == PositionState.ACTIVE) {
             revert Positions__POSITION_NOT_LIQUIDABLE_YET(_posId);
         }
         _;
@@ -307,7 +308,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         address trader = ownerOf(_posId);
         PositionParams memory posParms = openPositions[_posId];
         bool isMargin = posParms.leverage != 1 || posParms.isShort;
-        uint256 state = getPositionState(_posId);
+        PositionState state = getPositionState(_posId);
         LiquidityPool liquidityPoolToUse = LiquidityPool(
             LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY).getTokenToLiquidityPools(
                 posParms.isShort ? address(posParms.baseToken) : address(posParms.quoteToken)
@@ -357,7 +358,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
         // These state assume that the oracle price and the uniswap price are CONCISTENT
         // state 1+classic
-        if (state == 1 && !isMargin) {
+        if (state == PositionState.TAKE_PROFIT && !isMargin) {
             if (addTokenBorrowed != addTokenReceived) {
                 revert Positions__TOKEN_RECEIVED_NOT_CONCISTENT(
                     addTokenBorrowed,
@@ -409,7 +410,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                         amountTokenReceived - inAmount - treasureAmount
                     );
                 }
-            } else if (state == 2) {
+            } else if (state == PositionState.ACTIVE) {
                 uint256 treasureAmount = (amountTokenReceived * treasureFee) / 10000;
                 IERC20(addTokenReceived).safeTransfer(treasure, treasureAmount);
                 IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - treasureAmount);
@@ -476,9 +477,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
      * - 6. The position is liquidable by time limit
      * @param _posId position Id
      */
-    function getPositionState(uint256 _posId) public view returns (uint256) {
+    function getPositionState(uint256 _posId) public view returns (PositionState) {
         if (_ownerOf(_posId) == address(0)) {
-            return 0;
+            return PositionState.NONE;
         }
         bool isShort = openPositions[_posId].isShort;
         uint256 breakEvenLimit = openPositions[_posId].breakEvenLimit;
@@ -494,24 +495,24 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
         // closable because of take profit
         if (isShort) {
-            if (limitPrice != 0 && price < limitPrice) return 1;
-            if (breakEvenLimit != 0 && price >= breakEvenLimit) return 5;
-            if (lidTresh != 0 && price >= lidTresh) return 4;
-            if (stopLossPrice != 0 && price >= stopLossPrice) return 3;
+            if (limitPrice != 0 && price < limitPrice) return PositionState.TAKE_PROFIT;
+            if (breakEvenLimit != 0 && price >= breakEvenLimit) return PositionState.BAD_DEBT;
+            if (lidTresh != 0 && price >= lidTresh) return PositionState.LIQUIDATABLE;
+            if (stopLossPrice != 0 && price >= stopLossPrice) return PositionState.STOP_LOSS;
         } else {
-            if (limitPrice != 0 && price > limitPrice) return 1;
-            if (breakEvenLimit != 0 && price <= breakEvenLimit) return 5;
-            if (lidTresh != 0 && price <= lidTresh) return 4;
-            if (stopLossPrice != 0 && price <= stopLossPrice) return 3;
+            if (limitPrice != 0 && price > limitPrice) return PositionState.TAKE_PROFIT;
+            if (breakEvenLimit != 0 && price <= breakEvenLimit) return PositionState.BAD_DEBT;
+            if (lidTresh != 0 && price <= lidTresh) return PositionState.LIQUIDATABLE;
+            if (stopLossPrice != 0 && price <= stopLossPrice) return PositionState.STOP_LOSS;
         }
 
         if (
             block.timestamp - openPositions[_posId].timestamp >
             feeManager.getPositionLifeTime(_ownerOf(_posId))
         ) {
-            return 6;
+            return PositionState.EXPIRED;
         }
-        return 2;
+        return PositionState.ACTIVE;
     }
 
     function getPositionParams(
@@ -608,8 +609,8 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         // start form the highest posId and stop when the all positions are found
         uint256 posId_;
         for (uint256 i = posId - 1; i > 0; --i) {
-            uint state = getPositionState(i);
-            if (state != 2 && state != 0) {
+            PositionState state = getPositionState(i);
+            if (state != PositionState.ACTIVE && state != PositionState.NONE) {
                 liquidablePositions[posId_] = i;
                 if (++posId_ == totalNbPos) {
                     break;
