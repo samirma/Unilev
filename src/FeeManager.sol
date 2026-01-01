@@ -14,6 +14,10 @@ contract FeeManager is Ownable {
     uint256 public defaultTreasureFee;
     uint256 public defaultLiquidationReward;
 
+    // Position Life Time
+    uint256 public defaultPositionLifeTime = 30 days;
+    mapping(address => uint256) public customLifeTimes;
+
     // Mapping from trader address to their custom fees
     mapping(address => FeeParams) public customFees;
 
@@ -66,6 +70,43 @@ contract FeeManager is Ownable {
         defaultTreasureFee = _treasureFee;
         defaultLiquidationReward = _liquidationReward;
         emit DefaultFeesUpdated(_treasureFee, _liquidationReward);
+    }
+
+    /**
+     * @notice Set the default position life time
+     * @param _defaultPositionLifeTime The new default position life time
+     */
+    function setDefaultPositionLifeTime(uint256 _defaultPositionLifeTime) external onlyOwner {
+        defaultPositionLifeTime = _defaultPositionLifeTime;
+    }
+
+    /**
+     * @notice Set a custom position life time for a specific address
+     * @param _trader The trader address
+     * @param _lifeTime The custom life time
+     */
+    function setCustomPositionLifeTime(address _trader, uint256 _lifeTime) external onlyOwner {
+        customLifeTimes[_trader] = _lifeTime;
+    }
+
+    /**
+     * @notice Remove the custom position life time for a specific address
+     * @param _trader The trader address
+     */
+    function removeCustomPositionLifeTime(address _trader) external onlyOwner {
+        delete customLifeTimes[_trader];
+    }
+
+    /**
+     * @notice Get the position life time for a trader
+     * @param _trader The trader address
+     * @return The position life time
+     */
+    function getPositionLifeTime(address _trader) external view returns (uint256) {
+        if (customLifeTimes[_trader] != 0) {
+            return customLifeTimes[_trader];
+        }
+        return defaultPositionLifeTime;
     }
 
     /**

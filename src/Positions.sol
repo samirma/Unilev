@@ -298,6 +298,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
      * - 3. The position crossed over the stop loss
      * - 4. Liquidation threshold => no bad debt
      * - 5. Protocol loss => bad debt
+     * - 6. The position is liquidable by time limit
      */
     function _closePosition(
         address _liquidator,
@@ -472,6 +473,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
      * - 3. The position crossed over the stop loss
      * - 4. The position is liquidable => no bad debt
      * - 5. The position is liquidable => bad debt
+     * - 6. The position is liquidable by time limit
      * @param _posId position Id
      */
     function getPositionState(uint256 _posId) public view returns (uint256) {
@@ -501,6 +503,13 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
             if (breakEvenLimit != 0 && price <= breakEvenLimit) return 5;
             if (lidTresh != 0 && price <= lidTresh) return 4;
             if (stopLossPrice != 0 && price <= stopLossPrice) return 3;
+        }
+
+        if (
+            block.timestamp - openPositions[_posId].timestamp >
+            feeManager.getPositionLifeTime(_ownerOf(_posId))
+        ) {
+            return 6;
         }
         return 2;
     }
