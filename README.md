@@ -199,7 +199,6 @@ https://docs.uniswap.org/contracts/v3/guides/providing-liquidity/the-full-contra
 https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps
 
 
-
 # Dashboard
 
 The project includes a Next.js dashboard to interact with the protocol.
