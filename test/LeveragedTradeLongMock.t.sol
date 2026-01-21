@@ -264,4 +264,79 @@ contract LeveragedTradeLongMock is TestSetupMock {
         console.log("Treasure Balance (Whitelisted):", treasureBalance);
         assertApproxEqAbs(treasureBalance, 1e14, 100); // Allow small rounding
     }
+
+    // ----------------------------------------------------------------------
+    // Scenario: Multiple Liquidations via Market Contract
+    // ----------------------------------------------------------------------
+    function test_MultipleLiquidations_Market() public {
+        uint128 amountAlice = 1e18; // 1 WETH
+        uint128 amountBob = 2e18; // 2 WETH
+        uint24 fee = 3000;
+
+        // 1. Initial State
+        writeTokenBalance(alice, conf.addWeth, amountAlice);
+        writeTokenBalance(bob, conf.addWeth, amountBob);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8); // ETH = $4,000
+        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8); // WBTC = $100,000
+        vm.stopPrank();
+
+        // 2. Open Positions
+        vm.startPrank(alice);
+        IERC20(conf.addWeth).approve(address(positions), amountAlice);
+        market.openPosition(conf.addWeth, conf.addWbtc, fee, false, 2, amountAlice, 0, 0);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        IERC20(conf.addWeth).approve(address(positions), amountBob);
+        market.openPosition(conf.addWeth, conf.addWbtc, fee, false, 3, amountBob, 0, 0);
+        vm.stopPrank();
+
+        uint256[] memory posAlice = positions.getTraderPositions(alice);
+        uint256[] memory posBob = positions.getTraderPositions(bob);
+
+        assertEq(posAlice.length, 1);
+        assertEq(posBob.length, 1);
+
+        // 3. Mock Price Change to trigger liquidations (ETH price drop significantly)
+        // Alice leverage 2x: breakEvenLimit = 4000 - (4000 * 0.5) = 2000
+        // Bob leverage 3x: breakEvenLimit = 4000 - (4000 * 1/3) = 2666.6
+        // Liquidation Threshold 10%
+        // Alice lidTresh = 2000 * 1.1 = 2200
+        // Bob lidTresh = 2666.6 * 1.1 = 2933.2
+
+        vm.startPrank(deployer);
+        mockV3AggregatorEthUsd.updateAnswer(2100 * 1e8); // Both should be liquidatable
+        vm.stopPrank();
+
+        // 4. Verify they are liquidatable
+        uint256[] memory liquidablePos = market.getLiquidablePositions();
+
+        // Count non-zero IDs
+        uint256 count = 0;
+        for (uint256 i = 0; i < liquidablePos.length; i++) {
+            if (liquidablePos[i] != 0) count++;
+        }
+        assertTrue(count >= 2, "Should have at least 2 liquidable positions");
+
+        // 5. Liquidate via Market
+        uint256 liquidatorBalanceBefore = IERC20(conf.addWeth).balanceOf(deployer);
+
+        vm.startPrank(deployer);
+        market.liquidatePositions(liquidablePos);
+        vm.stopPrank();
+
+        // 6. Final Assertions
+        assertEq(positions.getTraderPositions(alice).length, 0, "Alice position should be closed");
+        assertEq(positions.getTraderPositions(bob).length, 0, "Bob position should be closed");
+
+        uint256 liquidatorBalanceAfter = IERC20(conf.addWeth).balanceOf(deployer);
+        assertTrue(
+            liquidatorBalanceAfter > liquidatorBalanceBefore,
+            "Liquidator should receive rewards"
+        );
+
+        console.log("Liquidator reward (WETH):", liquidatorBalanceAfter - liquidatorBalanceBefore);
+    }
 }
