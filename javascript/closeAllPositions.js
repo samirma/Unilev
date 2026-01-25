@@ -1,5 +1,5 @@
 const { ethers } = require("ethers");
-const { getAbi, getEnvVars, setupProviderAndWallet } = require("./utils");
+const { getMarketAbi, getEnvVars, setupProviderAndWallet } = require("./utils");
 
 async function main() {
     // --- Environment Setup ---
@@ -10,7 +10,7 @@ async function main() {
     console.log(`Trader: ${wallet.address}`);
 
     // --- Contract Instances ---
-    const marketAbi = getAbi("Market");
+    const marketAbi = getMarketAbi();
     const marketContract = new ethers.Contract(env.MARKET_ADDRESS, marketAbi, wallet);
 
     try {

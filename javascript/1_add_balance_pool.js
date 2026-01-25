@@ -3,7 +3,7 @@
 // Configuration is loaded from a .env file.
 
 const { ethers } = require("ethers");
-const { getAbi, getErc20Abi, getEnvVars, setupProviderAndWallet } = require("./utils");
+const { getErc20Abi, getEnvVars, setupProviderAndWallet, getPriceFeedL1Abi, getPositionsAbi, getLiquidityPoolFactoryAbi, getLiquidityPoolAbi, getUniswapV3HelperAbi } = require("./utils");
 const { logPoolBalances } = require("./balance");
 
 async function main() {
@@ -16,11 +16,11 @@ async function main() {
 
   // --- Contract Instances ---
   const erc20Abi = getErc20Abi();
-  const priceFeedL1Abi = getAbi("PriceFeedL1");
-  const positionsAbi = getAbi("Positions");
-  const liquidityPoolFactoryAbi = getAbi("LiquidityPoolFactory");
-  const liquidityPoolAbi = getAbi("LiquidityPool");
-  const uniswapV3HelperAbi = getAbi("UniswapV3Helper");
+  const priceFeedL1Abi = getPriceFeedL1Abi();
+  const positionsAbi = getPositionsAbi();
+  const liquidityPoolFactoryAbi = getLiquidityPoolFactoryAbi();
+  const liquidityPoolAbi = getLiquidityPoolAbi();
+  const uniswapV3HelperAbi = getUniswapV3HelperAbi();
 
   const wethContract = new ethers.Contract(env.WETH, erc20Abi, wallet);
   const daiContract = new ethers.Contract(env.DAI, erc20Abi, wallet);

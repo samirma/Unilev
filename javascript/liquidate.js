@@ -1,23 +1,7 @@
 const { ethers } = require("ethers");
-const fs = require("fs");
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
-
-/**
- * Loads the contract ABI from the JSON file.
- * @param {string} contractName The name of the contract.
- * @returns {object} The contract ABI.
- */
-function getAbi(contractName) {
-    try {
-        const abiPath = path.resolve(__dirname, `../out/${contractName}.sol/${contractName}.json`);
-        const abiFile = fs.readFileSync(abiPath, "utf8");
-        return JSON.parse(abiFile).abi;
-    } catch (error) {
-        console.error(`Error loading contract ABI for ${contractName}:`, error.message);
-        process.exit(1);
-    }
-}
+const { getMarketAbi } = require("./utils");
 
 async function main() {
     const { RPC_URL, PRIVATE_KEY, MARKET_ADDRESS } = process.env;
@@ -27,7 +11,7 @@ async function main() {
         process.exit(1);
     }
 
-    const marketAbi = getAbi("Market");
+    const marketAbi = getMarketAbi();
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 

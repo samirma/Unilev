@@ -3,7 +3,7 @@
 // Configuration is loaded from a .env file.
 
 const { ethers } = require("ethers");
-const { getAbi, getErc20Abi, getTokenBalance, getEnvVars, setupProviderAndWallet } = require("./utils");
+const { getErc20Abi, getTokenBalance, getEnvVars, setupProviderAndWallet, getPriceFeedL1Abi, getPositionsAbi, getLiquidityPoolFactoryAbi, getLiquidityPoolAbi } = require("./utils");
 
 function logHeader(title, subtitle = "") {
   console.log("\n========================================================");
@@ -16,7 +16,7 @@ async function logWalletBalances(env, provider, wallet) {
   logHeader("💰 WALLET BALANCES", `Address: ${wallet.address}`);
 
   const erc20Abi = getErc20Abi();
-  const priceFeedL1Abi = getAbi("PriceFeedL1");
+  const priceFeedL1Abi = getPriceFeedL1Abi();
   const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
 
   const ethBalance = await provider.getBalance(wallet.address);
@@ -38,7 +38,7 @@ async function logWalletBalances(env, provider, wallet) {
 
 async function logPositionBalances(env, provider, wallet) {
   const erc20Abi = getErc20Abi();
-  const priceFeedL1Abi = getAbi("PriceFeedL1");
+  const priceFeedL1Abi = getPriceFeedL1Abi();
   const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
 
   const wethContract = new ethers.Contract(env.WETH, erc20Abi, provider);
@@ -55,10 +55,10 @@ async function logPositionBalances(env, provider, wallet) {
 
 async function logPoolBalances(env, provider) {
   const erc20Abi = getErc20Abi();
-  const priceFeedL1Abi = getAbi("PriceFeedL1");
-  const positionsAbi = getAbi("Positions");
-  const liquidityPoolFactoryAbi = getAbi("LiquidityPoolFactory");
-  const liquidityPoolAbi = getAbi("LiquidityPool");
+  const priceFeedL1Abi = getPriceFeedL1Abi();
+  const positionsAbi = getPositionsAbi();
+  const liquidityPoolFactoryAbi = getLiquidityPoolFactoryAbi();
+  const liquidityPoolAbi = getLiquidityPoolAbi();
 
   const wethContract = new ethers.Contract(env.WETH, erc20Abi, provider);
   const daiContract = new ethers.Contract(env.DAI, erc20Abi, provider);
@@ -101,8 +101,8 @@ async function logPoolBalances(env, provider) {
 
 async function logTreasureBalances(env, provider) {
   const erc20Abi = getErc20Abi();
-  const priceFeedL1Abi = getAbi("PriceFeedL1");
-  const positionsAbi = getAbi("Positions");
+  const priceFeedL1Abi = getPriceFeedL1Abi();
+  const positionsAbi = getPositionsAbi();
 
   const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
   const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider);

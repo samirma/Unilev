@@ -1,5 +1,5 @@
 const { ethers } = require("ethers");
-const { getAbi, getErc20Abi, getEnvVars, setupProviderAndWallet, logPositionDetails } = require("./utils");
+const { getErc20Abi, getEnvVars, setupProviderAndWallet, logPositionDetails, getMarketAbi, getPositionsAbi, getPriceFeedL1Abi } = require("./utils");
 
 async function main() {
     // --- Environment Setup ---
@@ -9,14 +9,14 @@ async function main() {
     console.log(`Checking all active positions...`);
 
     // --- Contract Instances ---
-    const marketAbi = getAbi("Market");
+    const marketAbi = getMarketAbi();
     const marketContract = new ethers.Contract(env.MARKET_ADDRESS, marketAbi, provider);
 
     // Positions contract is ERC721
-    const positionsAbi = getAbi("Positions");
+    const positionsAbi = getPositionsAbi();
     const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider);
 
-    const priceFeedL1Abi = getAbi("PriceFeedL1");
+    const priceFeedL1Abi = getPriceFeedL1Abi();
     const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
 
     try {
@@ -42,7 +42,7 @@ async function main() {
             }
         }
 
-        console.log(`Total Active Positions: ${activeCount}`);
+        console.log(`Total Positions: ${activeCount}`);
 
     } catch (error) {
         console.error("\n❌ An error occurred:", error.message || error);

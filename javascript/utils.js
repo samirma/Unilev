@@ -100,14 +100,55 @@ function setupProviderAndWallet(rpcUrl, privateKey) {
     return { provider, wallet };
 }
 
-module.exports = {
-    getAbi,
-    getErc20Abi,
-    getTokenBalance,
-    getEnvVars,
-    setupProviderAndWallet,
-    calculateTokenAmountFromUsd
-};
+/**
+ * Returns the Market contract ABI.
+ * @returns {object} The Market ABI.
+ */
+function getMarketAbi() {
+    return getAbi("Market");
+}
+
+/**
+ * Returns the Positions contract ABI.
+ * @returns {object} The Positions ABI.
+ */
+function getPositionsAbi() {
+    return getAbi("Positions");
+}
+
+/**
+ * Returns the PriceFeedL1 contract ABI.
+ * @returns {object} The PriceFeedL1 ABI.
+ */
+function getPriceFeedL1Abi() {
+    return getAbi("PriceFeedL1");
+}
+
+/**
+ * Returns the LiquidityPoolFactory contract ABI.
+ * @returns {object} The LiquidityPoolFactory ABI.
+ */
+function getLiquidityPoolFactoryAbi() {
+    return getAbi("LiquidityPoolFactory");
+}
+
+/**
+ * Returns the LiquidityPool contract ABI.
+ * @returns {object} The LiquidityPool ABI.
+ */
+function getLiquidityPoolAbi() {
+    return getAbi("LiquidityPool");
+}
+
+/**
+ * Returns the UniswapV3Helper contract ABI.
+ * @returns {object} The UniswapV3Helper ABI.
+ */
+function getUniswapV3HelperAbi() {
+    return getAbi("UniswapV3Helper");
+}
+
+
 
 /**
  * Calculates the amount of tokens for a given USD value.
@@ -204,7 +245,12 @@ async function logPositionDetails(posId, marketContract, priceFeedL1Contract, pr
 }
 
 module.exports = {
-    getAbi,
+    getMarketAbi,
+    getPositionsAbi,
+    getPriceFeedL1Abi,
+    getLiquidityPoolFactoryAbi,
+    getLiquidityPoolAbi,
+    getUniswapV3HelperAbi,
     getErc20Abi,
     getTokenBalance,
     getEnvVars,

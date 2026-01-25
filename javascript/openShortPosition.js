@@ -1,5 +1,5 @@
 const { ethers } = require("ethers");
-const { getAbi, getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails } = require("./utils");
+const { getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails, getMarketAbi, getPriceFeedL1Abi } = require("./utils");
 
 
 async function main() {
@@ -11,8 +11,8 @@ async function main() {
 
     // --- Contract Instances ---
     const erc20Abi = getErc20Abi();
-    const marketAbi = getAbi("Market");
-    const priceFeedL1Abi = getAbi("PriceFeedL1");
+    const marketAbi = getMarketAbi();
+    const priceFeedL1Abi = getPriceFeedL1Abi();
 
     // We are using WBTC as collateral to short WETH
     // token0 = WBTC (Collateral)
