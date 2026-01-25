@@ -30,12 +30,12 @@ function getAbi(contractName) {
  * @returns {object} The ERC20 contract ABI.
  */
 function getErc20Abi() {
-    return [
-        "function name() view returns (string)",
-        "function symbol() view returns (string)",
-        "function decimals() view returns (uint8)",
-        "function balanceOf(address) view returns (uint256)"
-    ];
+  return [
+    "function name() view returns (string)",
+    "function symbol() view returns (string)",
+    "function decimals() view returns (uint8)",
+    "function balanceOf(address) view returns (uint256)"
+  ];
 }
 
 /**
@@ -45,20 +45,20 @@ function getErc20Abi() {
  * @param {ethers.Contract} priceFeedL1Contract The PriceFeedL1 contract instance.
  */
 async function getTokenBalance(contract, address, priceFeedL1Contract) {
-    const [name, symbol, decimals, balance] = await Promise.all([
-        contract.name(),
-        contract.symbol(),
-        contract.decimals(),
-        contract.balanceOf(address)
-    ]);
+  const [name, symbol, decimals, balance] = await Promise.all([
+    contract.name(),
+    contract.symbol(),
+    contract.decimals(),
+    contract.balanceOf(address)
+  ]);
 
-    const formattedBalance = ethers.formatUnits(balance, decimals);
+  const formattedBalance = ethers.formatUnits(balance, decimals);
 
-    // Fetch the USD value from the PriceFeedL1 contract
-    const usdValueBigInt = await priceFeedL1Contract.getAmountInUSD(await contract.getAddress(), balance);
-    const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2); // PriceFeedL1 returns USD with 18 decimals
+  // Fetch the USD value from the PriceFeedL1 contract
+  const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(await contract.getAddress(), balance);
+  const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2); // PriceFeedL1 returns USD with 18 decimals
 
-    console.log(`- ${name} (${symbol}): ${formattedBalance} (~$${usdValue} USD)`);
+  console.log(`- ${name} (${symbol}): ${formattedBalance} (~$${usdValue} USD)`);
 }
 
 /**
@@ -73,10 +73,10 @@ async function main() {
   ];
 
   for (const v of requiredVars) {
-      if (!envVars[v]) {
-          console.error(`Error: Ensure ${v} is set in ../.env`);
-          process.exit(1);
-      }
+    if (!envVars[v]) {
+      console.error(`Error: Ensure ${v} is set in ../.env`);
+      process.exit(1);
+    }
   }
 
   // --- Correctly Checksum Addresses ---
@@ -115,7 +115,7 @@ async function main() {
     const ethBalance = await provider.getBalance(wallet.address);
     const formattedEthBalance = ethers.formatEther(ethBalance);
     // Use WETH address to get the price of ETH from PriceFeedL1
-    const ethUsdValueBigInt = await priceFeedL1Contract.getAmountInUSD(WETH, ethBalance);
+    const ethUsdValueBigInt = await priceFeedL1Contract.getAmountInUsd(WETH, ethBalance);
     const ethUsdValue = parseFloat(ethers.formatUnits(ethUsdValueBigInt, 18)).toFixed(2);
     console.log(`- ETH: ${formattedEthBalance} (~$${ethUsdValue} USD)`);
 
