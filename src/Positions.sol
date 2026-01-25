@@ -66,7 +66,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         LIQUIDITY_POOL_FACTORY_UNISWAP_V3 = _liquidityPoolFactoryUniswapV3;
         LIQUIDITY_POOL_FACTORY = LiquidityPoolFactory(_liquidityPoolFactory);
         PRICE_FEED = PriceFeedL1(_priceFeed);
-        UNISWAP_V3_HELPER = UniswapV3Helper(_uniswapV3Helper);
+        UNISWAP_V3_HELPER = UniswapV3Helper(payable(_uniswapV3Helper));
         treasure = _treasure;
         feeManager = FeeManager(_feeManager);
     }

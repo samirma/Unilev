@@ -2,189 +2,121 @@
 // It now uses the PriceFeedL1 contract to fetch the USD price of each asset and calculate the USD value of the balances.
 // Configuration is loaded from a .env file.
 
-// Import necessary libraries
 const { ethers } = require("ethers");
-const fs = require("fs");
-const path = require("path");
-require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
+const { getAbi, getErc20Abi, getTokenBalance, getEnvVars, setupProviderAndWallet } = require("./utils");
 
-/**
- * Loads the contract ABI from the JSON file.
- * @param {string} contractName The name of the contract.
- * @returns {object} The contract ABI.
- */
-function getAbi(contractName) {
-  try {
-    const abiPath = path.resolve(__dirname, `../out/${contractName}.sol/${contractName}.json`);
-    const abiFile = fs.readFileSync(abiPath, "utf8");
-    return JSON.parse(abiFile).abi;
-  } catch (error) {
-    console.error(`Error loading contract ABI for ${contractName}:`, error.message);
-    console.error("Please ensure the contract has been compiled and the ABI file is in the correct path.");
-    process.exit(1);
-  }
+async function logWalletBalances(env, provider, wallet) {
+  console.log(`Fetching balances for wallet: ${wallet.address}`);
+  console.log("----------------------------------------------------\n");
+  console.log("Token Balances:");
+
+  const erc20Abi = getErc20Abi();
+  const priceFeedL1Abi = getAbi("PriceFeedL1");
+  const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
+
+  const ethBalance = await provider.getBalance(wallet.address);
+  const formattedEthBalance = ethers.formatEther(ethBalance);
+  const ethUsdValueBigInt = await priceFeedL1Contract.getAmountInUsd(env.WETH, ethBalance);
+  const ethUsdValue = parseFloat(ethers.formatUnits(ethUsdValueBigInt, 18)).toFixed(2);
+  console.log(`- ETH: ${formattedEthBalance} (~$${ethUsdValue} USD)`);
+
+  const wethContract = new ethers.Contract(env.WETH, erc20Abi, provider);
+  const daiContract = new ethers.Contract(env.DAI, erc20Abi, provider);
+  const usdcContract = new ethers.Contract(env.USDC, erc20Abi, provider);
+  const wbtcContract = new ethers.Contract(env.WBTC, erc20Abi, provider);
+
+  await getTokenBalance(wethContract, wallet.address, priceFeedL1Contract);
+  await getTokenBalance(daiContract, wallet.address, priceFeedL1Contract);
+  await getTokenBalance(usdcContract, wallet.address, priceFeedL1Contract);
+  await getTokenBalance(wbtcContract, wallet.address, priceFeedL1Contract);
 }
 
-/**
- * Loads a standard ERC20 ABI.
- * @returns {object} The ERC20 contract ABI.
- */
-function getErc20Abi() {
-  return [
-    "function name() view returns (string)",
-    "function symbol() view returns (string)",
-    "function decimals() view returns (uint8)",
-    "function balanceOf(address) view returns (uint256)"
-  ];
+async function logPositionBalances(env, provider, wallet) {
+  const erc20Abi = getErc20Abi();
+  const priceFeedL1Abi = getAbi("PriceFeedL1");
+  const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
+
+  const wethContract = new ethers.Contract(env.WETH, erc20Abi, provider);
+  const daiContract = new ethers.Contract(env.DAI, erc20Abi, provider);
+  const usdcContract = new ethers.Contract(env.USDC, erc20Abi, provider);
+  const wbtcContract = new ethers.Contract(env.WBTC, erc20Abi, provider);
+
+  console.log("\nPositions Contract Balances (Address: " + env.POSITIONS_ADDRESS + "):");
+  await getTokenBalance(wethContract, env.POSITIONS_ADDRESS, priceFeedL1Contract);
+  await getTokenBalance(daiContract, env.POSITIONS_ADDRESS, priceFeedL1Contract);
+  await getTokenBalance(usdcContract, env.POSITIONS_ADDRESS, priceFeedL1Contract);
+  await getTokenBalance(wbtcContract, env.POSITIONS_ADDRESS, priceFeedL1Contract);
 }
 
-/**
- * Fetches and displays the balance of a specific ERC20 token using PriceFeedL1.
- * @param {ethers.Contract} contract The ethers.js contract instance.
- * @param {string} address The wallet address to check.
- * @param {ethers.Contract} priceFeedL1Contract The PriceFeedL1 contract instance.
- */
-async function getTokenBalance(contract, address, priceFeedL1Contract) {
-  const [name, symbol, decimals, balance] = await Promise.all([
-    contract.name(),
-    contract.symbol(),
-    contract.decimals(),
-    contract.balanceOf(address)
-  ]);
-
-  const formattedBalance = ethers.formatUnits(balance, decimals);
-
-  // Fetch the USD value from the PriceFeedL1 contract
-  const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(await contract.getAddress(), balance);
-  const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2); // PriceFeedL1 returns USD with 18 decimals
-
-  console.log(`- ${name} (${symbol}): ${formattedBalance} (~$${usdValue} USD)`);
-}
-
-/**
- * The main function that connects to the blockchain and fetches balances.
- */
-async function main() {
-  // --- Environment Variable Setup & Validation ---
-  const envVars = process.env;
-
-  const requiredVars = [
-    "RPC_URL", "PRIVATE_KEY", "WETH", "DAI", "USDC", "WBTC", "PRICEFEEDL1_ADDRESS", "POSITIONS_ADDRESS"
-  ];
-
-  for (const v of requiredVars) {
-    if (!envVars[v]) {
-      console.error(`Error: Ensure ${v} is set in ../.env`);
-      process.exit(1);
-    }
-  }
-
-  // --- Correctly Checksum Addresses ---
-  const WETH = ethers.getAddress(envVars.WETH);
-  const DAI = ethers.getAddress(envVars.DAI);
-  const USDC = ethers.getAddress(envVars.USDC);
-  const WBTC = ethers.getAddress(envVars.WBTC);
-  const PRICEFEEDL1_ADDRESS = ethers.getAddress(envVars.PRICEFEEDL1_ADDRESS);
-  const POSITIONS_ADDRESS = ethers.getAddress(envVars.POSITIONS_ADDRESS);
-  const PRIVATE_KEY = envVars.PRIVATE_KEY;
-  const RPC_URL = envVars.RPC_URL;
-
-  // --- Load ABIs ---
+async function logPoolBalances(env, provider, wallet) {
   const erc20Abi = getErc20Abi();
   const priceFeedL1Abi = getAbi("PriceFeedL1");
   const positionsAbi = getAbi("Positions");
   const liquidityPoolFactoryAbi = getAbi("LiquidityPoolFactory");
   const liquidityPoolAbi = getAbi("LiquidityPool");
 
-  // --- Provider & Wallet Setup ---
-  const provider = new ethers.JsonRpcProvider(RPC_URL);
-  const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-  console.log(`Fetching balances for wallet: ${wallet.address}`);
-  console.log("----------------------------------------------------\n");
+  const wethContract = new ethers.Contract(env.WETH, erc20Abi, provider);
+  const daiContract = new ethers.Contract(env.DAI, erc20Abi, provider);
+  const usdcContract = new ethers.Contract(env.USDC, erc20Abi, provider);
+  const wbtcContract = new ethers.Contract(env.WBTC, erc20Abi, provider);
 
-  // --- Contract Instances ---
-  const wethContract = new ethers.Contract(WETH, erc20Abi, provider);
-  const daiContract = new ethers.Contract(DAI, erc20Abi, provider);
-  const usdcContract = new ethers.Contract(USDC, erc20Abi, provider);
-  const wbtcContract = new ethers.Contract(WBTC, erc20Abi, provider);
+  const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
+  const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider);
 
-  // --- Price Feed Contract Instance ---
-  // --- Price Feed Contract Instance ---
-  const priceFeedL1Contract = new ethers.Contract(PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
-
-  // --- Positions Contract Instance ---
-  const positionsContract = new ethers.Contract(POSITIONS_ADDRESS, positionsAbi, provider);
-
-  // --- Liquidity Pool Factory Instance ---
-  // Fetch factory address from Positions contract
   const liquidityPoolFactoryAddress = await positionsContract.LIQUIDITY_POOL_FACTORY();
   const liquidityPoolFactoryContract = new ethers.Contract(liquidityPoolFactoryAddress, liquidityPoolFactoryAbi, provider);
 
-  try {
-    // --- Fetch and Display Balances ---
-    console.log("Token Balances:");
+  console.log("\nLiquidity Pools:");
+  const tokens = [
+    { contract: wethContract, name: "WETH" },
+    { contract: daiContract, name: "DAI" },
+    { contract: usdcContract, name: "USDC" },
+    { contract: wbtcContract, name: "WBTC" }
+  ];
 
-    // ETH Balance
-    const ethBalance = await provider.getBalance(wallet.address);
-    const formattedEthBalance = ethers.formatEther(ethBalance);
-    // Use WETH address to get the price of ETH from PriceFeedL1
-    const ethUsdValueBigInt = await priceFeedL1Contract.getAmountInUsd(WETH, ethBalance);
-    const ethUsdValue = parseFloat(ethers.formatUnits(ethUsdValueBigInt, 18)).toFixed(2);
-    console.log(`- ETH: ${formattedEthBalance} (~$${ethUsdValue} USD)`);
+  for (const token of tokens) {
+    const tokenAddress = await token.contract.getAddress();
+    const poolAddress = await liquidityPoolFactoryContract.getTokenToLiquidityPools(tokenAddress);
 
-    // Fetch ERC20 token balances
-    await getTokenBalance(wethContract, wallet.address, priceFeedL1Contract);
-    await getTokenBalance(daiContract, wallet.address, priceFeedL1Contract);
-    await getTokenBalance(usdcContract, wallet.address, priceFeedL1Contract);
-    await getTokenBalance(wbtcContract, wallet.address, priceFeedL1Contract);
+    if (poolAddress !== ethers.ZeroAddress) {
+      const poolContract = new ethers.Contract(poolAddress, liquidityPoolAbi, provider);
+      const rawTotalAsset = await poolContract.rawTotalAsset();
+      const decimals = await token.contract.decimals();
+      const formattedAsset = ethers.formatUnits(rawTotalAsset, decimals);
 
-    console.log("\nPositions Contract Balances (Address: " + POSITIONS_ADDRESS + "):");
-    await getTokenBalance(wethContract, POSITIONS_ADDRESS, priceFeedL1Contract);
-    await getTokenBalance(daiContract, POSITIONS_ADDRESS, priceFeedL1Contract);
-    await getTokenBalance(usdcContract, POSITIONS_ADDRESS, priceFeedL1Contract);
-    await getTokenBalance(wbtcContract, POSITIONS_ADDRESS, priceFeedL1Contract);
+      const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(tokenAddress, rawTotalAsset);
+      const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2);
 
-    console.log("\nLiquidity Pools:");
-    const tokens = [
-      { contract: wethContract, name: "WETH" },
-      { contract: daiContract, name: "DAI" },
-      { contract: usdcContract, name: "USDC" },
-      { contract: wbtcContract, name: "WBTC" }
-    ];
-
-    for (const token of tokens) {
-      const tokenAddress = await token.contract.getAddress();
-      const poolAddress = await liquidityPoolFactoryContract.getTokenToLiquidityPools(tokenAddress);
-
-      if (poolAddress !== ethers.ZeroAddress) {
-        const poolContract = new ethers.Contract(poolAddress, liquidityPoolAbi, provider);
-        const rawTotalAsset = await poolContract.rawTotalAsset();
-        const decimals = await token.contract.decimals();
-        const formattedAsset = ethers.formatUnits(rawTotalAsset, decimals);
-
-        // Calculate USD value
-        const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(tokenAddress, rawTotalAsset);
-        const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2);
-
-        console.log(`- ${token.name} Pool (${poolAddress}): ${formattedAsset} (~$${usdValue} USD)`);
-      } else {
-        console.log(`- ${token.name} Pool: Not Found`);
-      }
+      console.log(`- ${token.name} Pool (${poolAddress}): ${formattedAsset} (~$${usdValue} USD)`);
+    } else {
+      console.log(`- ${token.name} Pool: Not Found`);
     }
-
-    console.log("\n====================================================");
-    console.log("✅ Balance check complete!");
-    console.log("====================================================");
-
-  } catch (error) {
-    console.error("\n❌ An error occurred while fetching balances:");
-    console.error(error.reason || error);
-    process.exit(1);
   }
 }
 
-// --- Script Execution ---
-main().catch((error) => {
-  console.error("An unexpected error occurred in the main execution:", error);
-  process.exit(1);
-});
+async function logBalances(env, provider, wallet) {
+  try {
+    await logWalletBalances(env, provider, wallet);
+    await logPositionBalances(env, provider, wallet);
+    await logPoolBalances(env, provider, wallet);
+  } catch (error) {
+    console.error("\n❌ An error occurred while fetching balances:");
+    console.error(error.reason || error);
+    throw error;
+  }
+}
+
+async function main() {
+  const env = getEnvVars();
+  const { provider, wallet } = setupProviderAndWallet(env.RPC_URL, env.PRIVATE_KEY);
+  await logBalances(env, provider, wallet);
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error("An unexpected error occurred in the main execution:", error);
+    process.exit(1);
+  });
+}
+
+module.exports = { logBalances, logWalletBalances, logPositionBalances, logPoolBalances };
