@@ -5,10 +5,15 @@
 const { ethers } = require("ethers");
 const { getAbi, getErc20Abi, getTokenBalance, getEnvVars, setupProviderAndWallet } = require("./utils");
 
+function logHeader(title, subtitle = "") {
+  console.log("\n========================================================");
+  console.log(` ${title}`);
+  if (subtitle) console.log(` ${subtitle}`);
+  console.log("========================================================");
+}
+
 async function logWalletBalances(env, provider, wallet) {
-  console.log(`Fetching balances for wallet: ${wallet.address}`);
-  console.log("----------------------------------------------------\n");
-  console.log("Token Balances:");
+  logHeader("💰 WALLET BALANCES", `Address: ${wallet.address}`);
 
   const erc20Abi = getErc20Abi();
   const priceFeedL1Abi = getAbi("PriceFeedL1");
@@ -18,7 +23,7 @@ async function logWalletBalances(env, provider, wallet) {
   const formattedEthBalance = ethers.formatEther(ethBalance);
   const ethUsdValueBigInt = await priceFeedL1Contract.getAmountInUsd(env.WETH, ethBalance);
   const ethUsdValue = parseFloat(ethers.formatUnits(ethUsdValueBigInt, 18)).toFixed(2);
-  console.log(`- ETH: ${formattedEthBalance} (~$${ethUsdValue} USD)`);
+  console.log(`  ETH    : ${formattedEthBalance.padEnd(20)} (~$ ${ethUsdValue} USD)`);
 
   const wethContract = new ethers.Contract(env.WETH, erc20Abi, provider);
   const daiContract = new ethers.Contract(env.DAI, erc20Abi, provider);
@@ -41,14 +46,14 @@ async function logPositionBalances(env, provider, wallet) {
   const usdcContract = new ethers.Contract(env.USDC, erc20Abi, provider);
   const wbtcContract = new ethers.Contract(env.WBTC, erc20Abi, provider);
 
-  console.log("\nPositions Contract Balances (Address: " + env.POSITIONS_ADDRESS + "):");
+  logHeader("📉 POSITION CONTRACT BALANCES", `Address: ${env.POSITIONS_ADDRESS}`);
   await getTokenBalance(wethContract, env.POSITIONS_ADDRESS, priceFeedL1Contract);
   await getTokenBalance(daiContract, env.POSITIONS_ADDRESS, priceFeedL1Contract);
   await getTokenBalance(usdcContract, env.POSITIONS_ADDRESS, priceFeedL1Contract);
   await getTokenBalance(wbtcContract, env.POSITIONS_ADDRESS, priceFeedL1Contract);
 }
 
-async function logPoolBalances(env, provider, wallet) {
+async function logPoolBalances(env, provider) {
   const erc20Abi = getErc20Abi();
   const priceFeedL1Abi = getAbi("PriceFeedL1");
   const positionsAbi = getAbi("Positions");
@@ -66,7 +71,7 @@ async function logPoolBalances(env, provider, wallet) {
   const liquidityPoolFactoryAddress = await positionsContract.LIQUIDITY_POOL_FACTORY();
   const liquidityPoolFactoryContract = new ethers.Contract(liquidityPoolFactoryAddress, liquidityPoolFactoryAbi, provider);
 
-  console.log("\nLiquidity Pools:");
+  logHeader("🏊 LIQUIDITY POOLS");
   const tokens = [
     { contract: wethContract, name: "WETH" },
     { contract: daiContract, name: "DAI" },
@@ -87,18 +92,48 @@ async function logPoolBalances(env, provider, wallet) {
       const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(tokenAddress, rawTotalAsset);
       const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2);
 
-      console.log(`- ${token.name} Pool (${poolAddress}): ${formattedAsset} (~$${usdValue} USD)`);
+      console.log(`  ${token.name.padEnd(6)} : ${formattedAsset.padEnd(20)} (~$ ${usdValue} USD)`);
     } else {
-      console.log(`- ${token.name} Pool: Not Found`);
+      console.log(`  ${token.name.padEnd(6)} : Pool Not Found`);
     }
   }
+}
+
+async function logTreasureBalances(env, provider) {
+  const erc20Abi = getErc20Abi();
+  const priceFeedL1Abi = getAbi("PriceFeedL1");
+  const positionsAbi = getAbi("Positions");
+
+  const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
+  const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider);
+
+  const treasureAddress = await positionsContract.treasure();
+
+  logHeader("💎 TREASURE CONTRACT BALANCES", `Address: ${treasureAddress}`);
+
+  const ethBalance = await provider.getBalance(treasureAddress);
+  const formattedEthBalance = ethers.formatEther(ethBalance);
+  const ethUsdValueBigInt = await priceFeedL1Contract.getAmountInUsd(env.WETH, ethBalance);
+  const ethUsdValue = parseFloat(ethers.formatUnits(ethUsdValueBigInt, 18)).toFixed(2);
+  console.log(`  ETH    : ${formattedEthBalance.padEnd(20)} (~$ ${ethUsdValue} USD)`);
+
+  const wethContract = new ethers.Contract(env.WETH, erc20Abi, provider);
+  const daiContract = new ethers.Contract(env.DAI, erc20Abi, provider);
+  const usdcContract = new ethers.Contract(env.USDC, erc20Abi, provider);
+  const wbtcContract = new ethers.Contract(env.WBTC, erc20Abi, provider);
+
+  await getTokenBalance(wethContract, treasureAddress, priceFeedL1Contract);
+  await getTokenBalance(daiContract, treasureAddress, priceFeedL1Contract);
+  await getTokenBalance(usdcContract, treasureAddress, priceFeedL1Contract);
+  await getTokenBalance(wbtcContract, treasureAddress, priceFeedL1Contract);
 }
 
 async function logBalances(env, provider, wallet) {
   try {
     await logWalletBalances(env, provider, wallet);
     await logPositionBalances(env, provider, wallet);
-    await logPoolBalances(env, provider, wallet);
+    await logTreasureBalances(env, provider);
+    await logPoolBalances(env, provider);
   } catch (error) {
     console.error("\n❌ An error occurred while fetching balances:");
     console.error(error.reason || error);
@@ -119,4 +154,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { logBalances, logWalletBalances, logPositionBalances, logPoolBalances };
+module.exports = { logBalances, logWalletBalances, logPositionBalances, logPoolBalances, logTreasureBalances };

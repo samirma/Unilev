@@ -3,7 +3,7 @@
 // Configuration is loaded from a .env file.
 
 const { ethers } = require("ethers");
-const { getAbi, getErc20Abi, getTokenBalance, getEnvVars, setupProviderAndWallet } = require("./utils");
+const { getAbi, getErc20Abi, getEnvVars, setupProviderAndWallet } = require("./utils");
 const { logPoolBalances } = require("./balance");
 
 async function main() {

@@ -55,7 +55,7 @@ async function getTokenBalance(contract, address, priceFeedL1Contract) {
     const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(await contract.getAddress(), balance);
     const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2); // PriceFeedL1 returns USD with 18 decimals
 
-    console.log(`- ${name} (${symbol}): ${formattedBalance} (~$${usdValue} USD)`);
+    console.log(`  ${symbol.padEnd(6)} : ${formattedBalance.padEnd(20)} (~$ ${usdValue} USD)`);
 }
 
 /**
