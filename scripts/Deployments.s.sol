@@ -11,7 +11,7 @@ import {FeeManager} from "../src/FeeManager.sol";
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol"; // Added for logging
-import "../test/utils/HelperConfig.sol";
+import "./HelperConfig.sol";
 
 contract Deployments is Script, HelperConfig {
     UniswapV3Helper public uniswapV3Helper;

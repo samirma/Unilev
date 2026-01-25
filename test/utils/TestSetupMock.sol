@@ -14,7 +14,7 @@ import {FeeManager} from "../../src/FeeManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "forge-std/Test.sol";
-import {HelperConfig} from "../utils/HelperConfig.sol";
+import {HelperConfig} from "../../scripts/HelperConfig.sol";
 import {Utils} from "./Utils.sol";
 
 contract TestSetupMock is Test, HelperConfig, Utils {
