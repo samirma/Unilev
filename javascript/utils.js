@@ -31,6 +31,7 @@ function getErc20Abi() {
         "function decimals() view returns (uint8)",
         "function balanceOf(address) view returns (uint256)",
         "function approve(address spender, uint256 amount) public returns (bool)",
+        "function allowance(address owner, address spender) view returns (uint256)",
         "function deposit() public payable"
     ];
 }
@@ -104,5 +105,45 @@ module.exports = {
     getErc20Abi,
     getTokenBalance,
     getEnvVars,
-    setupProviderAndWallet
+    setupProviderAndWallet,
+    calculateTokenAmountFromUsd
 };
+
+/**
+ * Calculates the amount of tokens for a given USD value.
+ * @param {string} tokenAddress The address of the token.
+ * @param {ethers.Contract} priceFeedL1Contract The PriceFeedL1 contract.
+ * @param {string} usdAmount The amount in USD (e.g., "10").
+ * @returns {Promise<bigint>} The calculated token amount.
+ */
+async function calculateTokenAmountFromUsd(tokenAddress, priceFeedL1Contract, usdAmount) {
+    const priceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(tokenAddress);
+    const targetUsdValue = ethers.parseUnits(usdAmount, 18);
+    // priceInUsd has 18 decimals, targetUsdValue has 18 decimals
+    // we want result to have 18 decimals (or token decimals? Market usually expects 18 or match token?)
+    // Market expects token amount in token decimals usually, but verify caller usage.
+    // Based on `1_add_balance_pool.js`:
+    // amount = (targetUsd * 10^decimals) / price
+
+    // We need the token contract to get decimals, or assume 18 if not available here?
+    // Let's pass contract or fetch it. To be truly generic, let's fetch decimals here.
+    // However, to keep it simple and avoid creating provider here, maybe pass decimals or contract?
+    // Let's rely on standard ERC20 generic call if we have provider, but we only have address.
+    // Let's act simple: Assume caller handles decimals or we return amount in 18 decimals if standard?
+    // Wait, `1_add_balance_pool.js` gets decimals.
+    // Let's update signature to take decimals or a provider/contract.
+    // Easier: take tokenDecimals as arg.
+
+    // Re-reading `1_add_balance_pool.js`:
+    // tokenAmountToDeposit = (targetUsdValue * BigInt(10n ** tokenDecimals)) / priceInUsd;
+
+    return { targetUsdValue, priceInUsd }; // Helper might be too specific if we don't pass decimals.
+}
+
+// Actually, let's make it robust.
+async function calculateTokenAmountFromUsd(contract, priceFeedL1Contract, usdAmount) {
+    const decimals = await contract.decimals();
+    const priceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(await contract.getAddress());
+    const targetUsdValue = ethers.parseUnits(usdAmount, 18);
+    return (targetUsdValue * BigInt(10n ** decimals)) / priceInUsd;
+}
