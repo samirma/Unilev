@@ -116,34 +116,99 @@ module.exports = {
  * @param {string} usdAmount The amount in USD (e.g., "10").
  * @returns {Promise<bigint>} The calculated token amount.
  */
-async function calculateTokenAmountFromUsd(tokenAddress, priceFeedL1Contract, usdAmount) {
+async function calculateTokenAmountFromUsd(tokenContract, priceFeedL1Contract, usdAmount) {
+    const decimals = await tokenContract.decimals();
+    const tokenAddress = await tokenContract.getAddress();
     const priceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(tokenAddress);
-    const targetUsdValue = ethers.parseUnits(usdAmount, 18);
-    // priceInUsd has 18 decimals, targetUsdValue has 18 decimals
-    // we want result to have 18 decimals (or token decimals? Market usually expects 18 or match token?)
-    // Market expects token amount in token decimals usually, but verify caller usage.
-    // Based on `1_add_balance_pool.js`:
-    // amount = (targetUsd * 10^decimals) / price
-
-    // We need the token contract to get decimals, or assume 18 if not available here?
-    // Let's pass contract or fetch it. To be truly generic, let's fetch decimals here.
-    // However, to keep it simple and avoid creating provider here, maybe pass decimals or contract?
-    // Let's rely on standard ERC20 generic call if we have provider, but we only have address.
-    // Let's act simple: Assume caller handles decimals or we return amount in 18 decimals if standard?
-    // Wait, `1_add_balance_pool.js` gets decimals.
-    // Let's update signature to take decimals or a provider/contract.
-    // Easier: take tokenDecimals as arg.
-
-    // Re-reading `1_add_balance_pool.js`:
-    // tokenAmountToDeposit = (targetUsdValue * BigInt(10n ** tokenDecimals)) / priceInUsd;
-
-    return { targetUsdValue, priceInUsd }; // Helper might be too specific if we don't pass decimals.
-}
-
-// Actually, let's make it robust.
-async function calculateTokenAmountFromUsd(contract, priceFeedL1Contract, usdAmount) {
-    const decimals = await contract.decimals();
-    const priceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(await contract.getAddress());
     const targetUsdValue = ethers.parseUnits(usdAmount, 18);
     return (targetUsdValue * BigInt(10n ** decimals)) / priceInUsd;
 }
+
+/**
+ * Fetches and logs details of a position.
+ * @param {string|number} posId The position ID.
+ * @param {ethers.Contract} marketContract The Market contract instance.
+ * @param {ethers.Contract} priceFeedL1Contract The PriceFeedL1 contract instance.
+ * @param {ethers.Provider} provider The ethers provider.
+ */
+async function logPositionDetails(posId, marketContract, priceFeedL1Contract, provider) {
+    try {
+        const params = await marketContract.getPositionParams(posId);
+        // params: baseToken, quoteToken, positionSize, timestamp, isShort, leverage, ...
+
+        const [
+            baseToken, quoteToken, positionSize, , isShort, leverage, , , , currentPnL, collateralLeft
+        ] = params;
+
+        // Fetch symbols
+        const erc20Abi = getErc20Abi();
+        const baseTokenContract = new ethers.Contract(baseToken, erc20Abi, provider);
+        const quoteTokenContract = new ethers.Contract(quoteToken, erc20Abi, provider);
+
+        const [baseSymbol, baseDecimals, quoteSymbol] = await Promise.all([
+            baseTokenContract.symbol(),
+            baseTokenContract.decimals(),
+            quoteTokenContract.symbol()
+        ]);
+
+        const token0 = isShort ? baseToken : quoteToken;
+        const token1 = isShort ? quoteToken : baseToken;
+        const symbol0 = isShort ? baseSymbol : quoteSymbol;
+        const symbol1 = isShort ? quoteSymbol : baseSymbol;
+
+        // Calculate USD value
+        // Note: positionSize is essentially the collateral size + borrowed (if margin) or just amount?
+        // In openShortPosition, we logged 'amount'. Market.PositionOpened emits 'amount'.
+        // getPositionParams returns 'positionSize'. 
+        // For short: positionSize = amountBorrow (baseToken).
+        // Let's rely on what we have. The user liked the previous output.
+        // Previous output used `parsedLog.args.amount` which was the input/margin amount.
+        // `getPositionParams` gives the Total size of the position found in the market.
+        // This might be slightly different context but for "View All Positions", showing Position Size is appropriate.
+        // Let's stick to showing Position Size as per `checkLiquidablePositions.js` logic but enhanced.
+
+        // Wait, for `openShortPosition.js` we want to show the details of the *opened* position.
+        // If we use the generic `logPositionDetails` which pulls from `getPositionParams`, it will show valid data.
+
+        // Calculate USD for the Position Size
+        const usdAmountBigInt = await priceFeedL1Contract.getAmountInUsd(baseToken, positionSize);
+        const usdAmount = parseFloat(ethers.formatUnits(usdAmountBigInt, 18)).toFixed(2);
+
+        // Fetch Position State
+        // Enum: 0=NONE, 1=TAKE_PROFIT, 2=ACTIVE, 3=STOP_LOSS, 4=LIQUIDATABLE, 5=BAD_DEBT, 6=EXPIRED
+        // We need to call Positions contract for this
+        const env = getEnvVars();
+        const positionsAbi = getAbi("Positions");
+        const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider);
+
+        const stateInt = await positionsContract.getPositionState(posId);
+        const states = ["NONE", "TAKE_PROFIT", "ACTIVE", "STOP_LOSS", "LIQUIDATABLE", "BAD_DEBT", "EXPIRED"];
+        const stateStr = states[Number(stateInt)] || "UNKNOWN";
+        const isLiquidable = stateStr === "LIQUIDATABLE" || stateStr === "BAD_DEBT";
+
+        console.log("\n--- Position Details ---");
+        console.log(`Position ID: ${posId}`);
+        console.log(`State: ${stateStr}`);
+        console.log(`Liquidable: ${isLiquidable ? "Yes" : "No"}`);
+        console.log(`Type: ${isShort ? "SHORT" : "LONG"} ${leverage}x`);
+        console.log(`Token0 (Collateral): ${token0} (${symbol0})`);
+        console.log(`Token1 (Target): ${token1} (${symbol1})`);
+        console.log(`Size: ${ethers.formatUnits(positionSize, baseDecimals)} ${baseSymbol} (~$${usdAmount})`);
+        console.log(`PnL: ${currentPnL}`);
+        console.log(`Collateral Left: ${collateralLeft}`);
+        console.log("------------------------\n");
+
+    } catch (error) {
+        console.error(`Failed to fetch details for Position ${posId}:`, error.message);
+    }
+}
+
+module.exports = {
+    getAbi,
+    getErc20Abi,
+    getTokenBalance,
+    getEnvVars,
+    setupProviderAndWallet,
+    calculateTokenAmountFromUsd,
+    logPositionDetails
+};

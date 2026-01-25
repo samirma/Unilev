@@ -1,5 +1,6 @@
 const { ethers } = require("ethers");
-const { getAbi, getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd } = require("./utils");
+const { getAbi, getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails } = require("./utils");
+
 
 async function main() {
     // --- Environment Setup ---
@@ -23,8 +24,6 @@ async function main() {
     const marketContract = new ethers.Contract(env.MARKET_ADDRESS, marketAbi, wallet);
     const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
 
-    let nonce = await wallet.getNonce();
-
     try {
         // --- 1. Calculate Amount of WBTC for $10 ---
         console.log("Calculating WBTC amount for $10...");
@@ -33,13 +32,20 @@ async function main() {
 
         console.log(`Amount: ${ethers.formatUnits(positionAmount, decimals)} WBTC`);
 
+        const balance = await token0Contract.balanceOf(wallet.address);
+        console.log(`Wallet WBTC Balance: ${ethers.formatUnits(balance, decimals)}`);
+
+        if (balance < positionAmount) {
+            console.error("❌ Insufficient WBTC Balance!");
+            process.exit(1);
+        }
+
         // --- 2. Approve Positions Contract ---
         console.log("Approving Positions contract...");
         // Note: Market.sol calls SafeERC20.forceApprove, but we must approve POSITIONS directly as it pulls funds from msg.sender (Trader)
-        const txApprove = await token0Contract.approve(env.POSITIONS_ADDRESS, positionAmount, { nonce: nonce });
+        const txApprove = await token0Contract.approve(env.POSITIONS_ADDRESS, positionAmount);
         await txApprove.wait();
         console.log("- Approved Positions.");
-        nonce++;
 
         // --- 3. Open Short Position ---
         console.log("Opening Short Position...");
@@ -69,13 +75,26 @@ async function main() {
             positionAmount,
             limitPrice,
             stopLossPrice,
-            { gasLimit: 5000000, nonce: nonce }
+            { gasLimit: 5000000, nonce: txApprove.nonce + 1 }
         );
 
         console.log(`Transaction sent: ${txOpen.hash}`);
-        await txOpen.wait();
+        const receipt = await txOpen.wait();
         console.log("Position opened successfully!");
-        nonce++;
+
+
+
+        // --- 4. Parse Event Logs ---
+        for (const log of receipt.logs) {
+            try {
+                const parsedLog = marketContract.interface.parseLog(log);
+                if (parsedLog && parsedLog.name === "PositionOpened") {
+                    await logPositionDetails(parsedLog.args.posId, marketContract, priceFeedL1Contract, provider);
+                }
+            } catch (e) {
+                // Ignore logs that don't belong to the Market contract
+            }
+        }
 
     } catch (error) {
         console.error("\n❌ An error occurred:", error.message || error);

@@ -106,7 +106,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
     function safeMint(address to) private returns (uint256) {
         uint256 _posId = posId;
         ++posId;
-        _safeMint(to, _posId);
+        _mint(to, _posId);
         return _posId;
     }
 
