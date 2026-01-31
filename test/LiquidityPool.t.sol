@@ -73,13 +73,20 @@ contract LiquidityPoolTest is TestSetup {
         );
 
         vm.stopPrank();
+    }
 
+    function testWithdrawNoDeposit() public {
         vm.startPrank(alice);
+        uint256 depositAmount = 10e8;
 
-        pool.withdraw(pool.balanceOf(alice), alice, alice);
-        uint256 balanceWithdrawAll = asset.balanceOf(alice);
-        assertEq(balanceDeposit, balanceWithdrawAll, "User should have remaining shares");
+        uint256 balanceDeposit = asset.balanceOf(alice);
+        pool.deposit(depositAmount, alice);
 
+        vm.stopPrank();
+
+        vm.startPrank(carol);
+        vm.expectRevert();
+        pool.withdraw(1e8, carol, carol);
         vm.stopPrank();
     }
 
