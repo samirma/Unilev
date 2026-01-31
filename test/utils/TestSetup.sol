@@ -14,7 +14,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/Test.sol";
 import {HelperConfig} from "../../scripts/HelperConfig.sol";
 import {Utils} from "./Utils.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
 
 contract TestSetup is Test, HelperConfig, Utils {
     UniswapV3Helper public uniswapV3Helper;
@@ -41,17 +40,6 @@ contract TestSetup is Test, HelperConfig, Utils {
 
     function setUp() public virtual {
         conf = getActiveNetworkConfig();
-
-        // Deploy Mock Tokens and update conf
-        MockERC20 wbtc = new MockERC20("Wrapped BTC", "WBTC", 8);
-        MockERC20 weth = new MockERC20("Wrapped Ether", "WETH", 18);
-        MockERC20 usdc = new MockERC20("USDC", "USDC", 6);
-        MockERC20 dai = new MockERC20("DAI", "DAI", 18);
-
-        conf.addWbtc = address(wbtc);
-        conf.addWeth = address(weth);
-        conf.addUsdc = address(usdc);
-        conf.addDai = address(dai);
 
         // create users
         deployer = address(0x01);
