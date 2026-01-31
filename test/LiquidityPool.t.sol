@@ -51,6 +51,8 @@ contract LiquidityPoolTest is TestSetup {
     function testWithdraw() public {
         vm.startPrank(alice);
         uint256 depositAmount = 10e8;
+
+        uint256 balanceDeposit = asset.balanceOf(alice);
         pool.deposit(depositAmount, alice);
 
         uint256 withdrawAmount = 5e8;
@@ -69,6 +71,15 @@ contract LiquidityPoolTest is TestSetup {
             depositAmount - sharesBurned,
             "User should have remaining shares"
         );
+
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+
+        pool.withdraw(pool.balanceOf(alice), alice, alice);
+        uint256 balanceWithdrawAll = asset.balanceOf(alice);
+        assertEq(balanceDeposit, balanceWithdrawAll, "User should have remaining shares");
+
         vm.stopPrank();
     }
 
