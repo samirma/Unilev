@@ -29,6 +29,7 @@ contract PositionsTimeLimitTest is TestSetupMock {
 
         // 3. Check State before time limit (e.g. 29 days)
         vm.warp(block.timestamp + 29 days);
+        vm.roll(block.number + (29 days / 12 seconds) - 100); // Not enough blocks to expire
         PositionState state = positions.getPositionState(posId);
         assertEq(
             uint256(state),
@@ -36,8 +37,9 @@ contract PositionsTimeLimitTest is TestSetupMock {
             "State should be ACTIVE before 30 days"
         );
 
-        // 4. Check State after time limit (e.g. 30 days + 1 second)
+        // 4. Check State after time limit (e.g. 30 days + 1 second and enough blocks)
         vm.warp(block.timestamp + 1 days + 1);
+        vm.roll(block.number + (1 days / 12 seconds) + 100 + 1); // Add extra 100+1 blocks to ensure expiration
         state = positions.getPositionState(posId);
         assertEq(
             uint256(state),
@@ -69,6 +71,7 @@ contract PositionsTimeLimitTest is TestSetupMock {
 
         // Set custom time limit only for Alice: 1 day
         feeManager.setCustomPositionLifeTime(alice, 1 days);
+        feeManager.setCustomPositionLifeBlocks(alice, 1 days / 12 seconds);
         vm.stopPrank();
 
         // 2. Open Positions (Alice and Bob)
@@ -86,7 +89,9 @@ contract PositionsTimeLimitTest is TestSetupMock {
         uint256 posIdBob = positions.getTraderPositions(bob)[0];
 
         // 3. Forward time (Alice should expire, Bob should not)
+        // Alice needs both time AND blocks to pass her custom 1-day limit
         vm.warp(block.timestamp + 1 days + 1 hours);
+        vm.roll(block.number + (1 days / 12 seconds) + 100 + 1); // Add extra 100+1 blocks to ensure expiration
 
         // Alice: State 6
         PositionState stateAlice = positions.getPositionState(posIdAlice);

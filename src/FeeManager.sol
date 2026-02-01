@@ -14,9 +14,14 @@ contract FeeManager is Ownable {
     uint256 public defaultTreasureFee;
     uint256 public defaultLiquidationReward;
 
-    // Position Life Time
+    // Position Life Time (timestamp-based - kept for backward compatibility)
     uint256 public defaultPositionLifeTime = 30 days;
     mapping(address => uint256) public customLifeTimes;
+    
+    // Position Life Time (block-based - more manipulation-resistant)
+    uint256 public constant AVG_BLOCK_TIME = 12 seconds; // Ethereum average block time
+    uint256 public defaultPositionLifeBlocks = (30 days) / 12 seconds; // ~216000 blocks
+    mapping(address => uint256) public customLifeBlocks;
 
     // Mapping from trader address to their custom fees
     mapping(address => FeeParams) public customFees;
@@ -100,13 +105,50 @@ contract FeeManager is Ownable {
     /**
      * @notice Get the position life time for a trader
      * @param _trader The trader address
-     * @return The position life time
+     * @return The position life time in seconds
      */
     function getPositionLifeTime(address _trader) external view returns (uint256) {
         if (customLifeTimes[_trader] != 0) {
             return customLifeTimes[_trader];
         }
         return defaultPositionLifeTime;
+    }
+    
+    /**
+     * @notice Get the position life time in blocks for a trader
+     * @param _trader The trader address
+     * @return The position life time in blocks
+     */
+    function getPositionLifeBlocks(address _trader) external view returns (uint256) {
+        if (customLifeBlocks[_trader] != 0) {
+            return customLifeBlocks[_trader];
+        }
+        return defaultPositionLifeBlocks;
+    }
+    
+    /**
+     * @notice Set the default position life time in blocks
+     * @param _defaultPositionLifeBlocks The new default position life time in blocks
+     */
+    function setDefaultPositionLifeBlocks(uint256 _defaultPositionLifeBlocks) external onlyOwner {
+        defaultPositionLifeBlocks = _defaultPositionLifeBlocks;
+    }
+    
+    /**
+     * @notice Set a custom position life time in blocks for a specific address
+     * @param _trader The trader address
+     * @param _lifeBlocks The custom life time in blocks
+     */
+    function setCustomPositionLifeBlocks(address _trader, uint256 _lifeBlocks) external onlyOwner {
+        customLifeBlocks[_trader] = _lifeBlocks;
+    }
+    
+    /**
+     * @notice Remove the custom position life time in blocks for a specific address
+     * @param _trader The trader address
+     */
+    function removeCustomPositionLifeBlocks(address _trader) external onlyOwner {
+        delete customLifeBlocks[_trader];
     }
 
     /**

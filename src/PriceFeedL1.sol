@@ -9,11 +9,28 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 
 // Errors
 error PriceFeedL1__TOKEN_NOT_SUPPORTED(address token);
+error PriceFeedL1__STALE_PRICE(address token);
+error PriceFeedL1__PRICE_TOO_OLD(address token, uint256 age);
+error PriceFeedL1__INVALID_PRICE(address token, int256 price);
+error PriceFeedL1__ANSWER_IN_ROUND_INVALID(address token);
 
 contract PriceFeedL1 is Ownable {
     mapping(address => AggregatorV3Interface) public tokenToPriceFeedUsd;
-
+    
+    uint256 public stalenessThreshold = 1 hours; // Maximum acceptable price age (configurable)
+    uint256 public constant MAX_PRICE_DEVIATION = 500; // 5% max deviation between updates (basis points)
+    mapping(address => uint256) public lastPrices; // Track last prices for deviation checks
+    mapping(address => uint256) public lastUpdateTime; // Track last update times
+    
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @notice Set the staleness threshold for price feeds (owner only)
+     * @param _newThreshold New staleness threshold in seconds
+     */
+    function setStalenessThreshold(uint256 _newThreshold) external onlyOwner {
+        stalenessThreshold = _newThreshold;
+    }
 
     /**
      * @notice Add a token to the price feed.
@@ -52,9 +69,23 @@ contract PriceFeedL1 is Ownable {
         }
         (uint80 roundId, int256 price, , uint256 updatedAt, uint80 answeredInRound) = priceFeed
             .latestRoundData();
-        if (price <= 0 || updatedAt == 0 || answeredInRound < roundId) {
-            revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token); // Reusing error for simplicity, or could define a new one like STALE_PRICE
+        
+        if (price <= 0) {
+            revert PriceFeedL1__INVALID_PRICE(_token, price);
         }
+        if (updatedAt == 0) {
+            revert PriceFeedL1__STALE_PRICE(_token);
+        }
+        if (answeredInRound < roundId) {
+            revert PriceFeedL1__ANSWER_IN_ROUND_INVALID(_token);
+        }
+        
+        // Check price freshness
+        uint256 priceAge = block.timestamp - updatedAt;
+        if (priceAge > stalenessThreshold) {
+            revert PriceFeedL1__PRICE_TOO_OLD(_token, priceAge);
+        }
+        
         uint8 decimals = priceFeed.decimals();
         if (decimals <= 18) {
             return uint256(price) * 10 ** (18 - decimals);
