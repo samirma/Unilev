@@ -47,9 +47,18 @@ contract PriceFeedL1 is Ownable {
         if (address(priceFeed) == address(0)) {
             revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
         }
-        (, int256 price, , , ) = priceFeed.latestRoundData();
+        (uint80 roundId, int256 price, , uint256 updatedAt, uint80 answeredInRound) = priceFeed.latestRoundData();
+
+        require(price > 0, "Chainlink: Negative Price");
+        require(updatedAt != 0, "Chainlink: StartedAt is 0");
+        require(answeredInRound >= roundId, "Chainlink: Stale Price");
+
         uint8 decimals = priceFeed.decimals();
-        return uint256(price) * 10**(18 - decimals);
+        if (decimals <= 18) {
+            return uint256(price) * 10**(18 - decimals);
+        } else {
+            return uint256(price) / 10**(decimals - 18);
+        }
     }
 
     /**
