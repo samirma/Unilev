@@ -138,7 +138,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         uint128 _amount,
         uint160 _limitPrice,
         uint256 _stopLossPrice
-    ) external onlyOwner returns (uint256) {
+    ) external onlyOwner nonReentrant returns (uint256) {
         // Check params
         // Check params
         PositionLogic.ValidationResult memory validationResult = PositionLogic.validateOpenPosition(
@@ -207,11 +207,18 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
 
             if (_isShort) {
                 SafeERC20.forceApprove(IERC20(baseToken), address(UNISWAP_V3_HELPER), totalBorrow);
+
+                uint256 priceBaseToQuote = PRICE_FEED.getPairLatestPrice(baseToken, quoteToken);
+                uint256 minOut = (totalBorrow * priceBaseToQuote) /
+                    (10 ** IERC20Metadata(baseToken).decimals());
+                minOut = (minOut * 9500) / 10000;
+
                 amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
                     baseToken,
                     quoteToken,
                     IUniswapV3Pool(v3Pool).fee(),
-                    totalBorrow
+                    totalBorrow,
+                    minOut
                 );
             } else {
                 if (_leverage != 1) {
@@ -220,11 +227,18 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                         address(UNISWAP_V3_HELPER),
                         totalBorrow
                     );
+
+                    uint256 priceQuoteToBase = PRICE_FEED.getPairLatestPrice(quoteToken, baseToken);
+                    uint256 minOut = (totalBorrow * priceQuoteToBase) /
+                        (10 ** IERC20Metadata(quoteToken).decimals());
+                    minOut = (minOut * 9500) / 10000;
+
                     amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
                         quoteToken,
                         baseToken,
                         IUniswapV3Pool(v3Pool).fee(),
-                        totalBorrow
+                        totalBorrow,
+                        minOut
                     );
                 }
             }
@@ -421,11 +435,18 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
                     address(UNISWAP_V3_HELPER),
                     amountTokenReceived
                 );
+
+                uint256 price = PRICE_FEED.getPairLatestPrice(addTokenReceived, tokenToTrader);
+                uint256 minOut = (amountTokenReceived * price) /
+                    (10 ** IERC20Metadata(addTokenReceived).decimals());
+                minOut = (minOut * 9500) / 10000;
+
                 uint256 outAmount = UNISWAP_V3_HELPER.swapExactInputSingle(
                     addTokenReceived,
                     tokenToTrader,
                     IUniswapV3Pool(posParms.v3Pool).fee(),
-                    amountTokenReceived
+                    amountTokenReceived,
+                    minOut
                 );
                 uint256 treasureAmount = (outAmount * treasureFee) / 10000;
                 IERC20(tokenToTrader).safeTransfer(treasure, treasureAmount);
@@ -576,11 +597,17 @@ contract Positions is ERC721, Ownable, ReentrancyGuard {
         // if swap cannot be done with amountInMaximum
         if (swapCost == 0) {
             SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), amountInMaximum);
+
+            uint256 price = PRICE_FEED.getPairLatestPrice(_token0, _token1);
+            uint256 minOut = (amountInMaximum * price) / (10 ** IERC20Metadata(_token0).decimals());
+            minOut = (minOut * 9500) / 10000;
+
             uint256 out = UNISWAP_V3_HELPER.swapExactInputSingle(
                 _token0,
                 _token1,
                 _fee,
-                amountInMaximum
+                amountInMaximum,
+                minOut
             );
             return (amountInMaximum, out);
         } else {

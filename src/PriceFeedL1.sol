@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {
+    AggregatorV3Interface
+} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -33,7 +35,8 @@ contract PriceFeedL1 is Ownable {
      */
     function getPairLatestPrice(address _token0, address _token1) public view returns (uint256) {
         return
-            (getTokenLatestPriceInUsd(_token0) * (10 ** uint256(IERC20Metadata(_token1).decimals()))) /
+            (getTokenLatestPriceInUsd(_token0) *
+                (10 ** uint256(IERC20Metadata(_token1).decimals()))) /
             getTokenLatestPriceInUsd(_token1);
     }
 
@@ -47,9 +50,17 @@ contract PriceFeedL1 is Ownable {
         if (address(priceFeed) == address(0)) {
             revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token);
         }
-        (, int256 price, , , ) = priceFeed.latestRoundData();
+        (uint80 roundId, int256 price, , uint256 updatedAt, uint80 answeredInRound) = priceFeed
+            .latestRoundData();
+        if (price <= 0 || updatedAt == 0 || answeredInRound < roundId) {
+            revert PriceFeedL1__TOKEN_NOT_SUPPORTED(_token); // Reusing error for simplicity, or could define a new one like STALE_PRICE
+        }
         uint8 decimals = priceFeed.decimals();
-        return uint256(price) * 10**(18 - decimals);
+        if (decimals <= 18) {
+            return uint256(price) * 10 ** (18 - decimals);
+        } else {
+            return uint256(price) / 10 ** (decimals - 18);
+        }
     }
 
     /**
@@ -61,7 +72,7 @@ contract PriceFeedL1 is Ownable {
     function getAmountInUsd(address _token, uint256 _amount) public view returns (uint256) {
         uint256 priceInUsd = getTokenLatestPriceInUsd(_token); // This is already normalized to 18 decimals
         uint8 tokenDecimals = IERC20Metadata(_token).decimals();
-        return (_amount * priceInUsd) / (10**tokenDecimals);
+        return (_amount * priceInUsd) / (10 ** tokenDecimals);
     }
 
     function isPairSupported(address _token0, address _token1) public view returns (bool) {

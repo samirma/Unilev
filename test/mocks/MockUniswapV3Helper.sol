@@ -39,7 +39,8 @@ contract MockUniswapV3Helper is Utils {
         address _tokenIn,
         address _tokenOut,
         uint24 /*_fee*/, // unused
-        uint256 _amountIn
+        uint256 _amountIn,
+        uint256 _amountOutMinimum
     ) public returns (uint256 amountOut) {
         // --- 1. Calculate amountOut (Net Effect of Swap) ---
 
@@ -59,6 +60,10 @@ contract MockUniswapV3Helper is Utils {
 
         // Apply a small "fee" (0.3%) to simulate slippage/swap cost in the mock.
         amountOut = (amountOut * 997) / 1000;
+
+        if (amountOut < _amountOutMinimum) {
+            revert("Amount out less than minimum");
+        }
 
         // --- 2. Simulate Balance Changes (Net Effect on msg.sender - Positions.sol) ---
 

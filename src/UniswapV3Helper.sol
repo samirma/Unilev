@@ -19,7 +19,8 @@ contract UniswapV3Helper {
         address _tokenIn,
         address _tokenOut,
         uint24 _fee,
-        uint256 _amountIn
+        uint256 _amountIn,
+        uint256 _amountOutMinimum
     ) public returns (uint256 amountOut) {
         // Transfer the tokens from Positions.sol to this contract
         SafeERC20.safeTransferFrom(IERC20(_tokenIn), msg.sender, address(this), _amountIn);
@@ -35,7 +36,7 @@ contract UniswapV3Helper {
                 recipient: msg.sender,
                 deadline: block.timestamp,
                 amountIn: _amountIn,
-                amountOutMinimum: 0,
+                amountOutMinimum: _amountOutMinimum,
                 sqrtPriceLimitX96: 0
             });
 
@@ -45,7 +46,8 @@ contract UniswapV3Helper {
     function swapExactInputSingleEth(
         address _tokenOut,
         uint24 _fee,
-        uint256 _amountIn
+        uint256 _amountIn,
+        uint256 _amountOutMinimum
     ) public payable returns (uint256 amountOut) {
         // Wrap ETH to WETH
         address weth = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // Mainnet WETH
@@ -74,7 +76,7 @@ contract UniswapV3Helper {
                 recipient: msg.sender,
                 deadline: block.timestamp,
                 amountIn: _amountIn,
-                amountOutMinimum: 0,
+                amountOutMinimum: _amountOutMinimum,
                 sqrtPriceLimitX96: 0
             });
 
