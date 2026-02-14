@@ -41,7 +41,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
     // Variables
     uint256 public constant LIQUIDATION_THRESHOLD = 1000; // 10% of margin
-    uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 100e18;
+    uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 1e18;
     uint256 public constant MAX_LEVERAGE = 3;
     uint256 public constant USD_DECIMALS = 18; // The standard for USD values in this contract
 
@@ -335,10 +335,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
      * - 5. Protocol loss => bad debt
      * - 6. The position is liquidable by time limit
      */
-    function _closePosition(
-        address _liquidator,
-        uint256 _posId
-    ) internal isPositionOpen(_posId) {
+    function _closePosition(address _liquidator, uint256 _posId) internal isPositionOpen(_posId) {
         address trader = ownerOf(_posId);
         PositionParams memory posParms = openPositions[_posId];
         bool isMargin = posParms.leverage != 1 || posParms.isShort;
@@ -552,10 +549,10 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         address positionOwner = _ownerOf(_posId);
         uint256 timeBasedExpiry = feeManager.getPositionLifeTime(positionOwner);
         uint256 blockBasedExpiry = feeManager.getPositionLifeBlocks(positionOwner);
-        
+
         bool timeExpired = block.timestamp - openPositions[_posId].timestamp > timeBasedExpiry;
         bool blocksExpired = block.number - openPositions[_posId].blockNumber > blockBasedExpiry;
-        
+
         // Position expires if BOTH time AND blocks have passed (prevents manipulation)
         if (timeExpired && blocksExpired) {
             return PositionState.EXPIRED;
