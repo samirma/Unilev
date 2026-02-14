@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const runLatestPath = path.join(__dirname, '../broadcast/Deployments.s.sol/1/run-latest.json');
+const runLatestPath = path.join(__dirname, '../broadcast/Deployments.s.sol/137/run-latest.json');
 const envPath = path.join(__dirname, '../.env');
 
 // Read and parse the run-latest.json file
