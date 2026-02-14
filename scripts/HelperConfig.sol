@@ -77,7 +77,7 @@ contract HelperConfig {
             addWeth: 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619,
             addUsdc: 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174,
             addDai: 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063,
-            treasure: 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199
+            treasure: 0xBB6B5fD8AC1Fa2f4b20Dbd0d4b278b0E64ecA5DA
         });
     }
 }
