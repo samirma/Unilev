@@ -10,7 +10,6 @@ import {UniswapV3Helper} from "../src/UniswapV3Helper.sol";
 import {FeeManager} from "../src/FeeManager.sol";
 
 import "forge-std/Script.sol";
-import "forge-std/console.sol"; // Added for logging
 import "./HelperConfig.sol";
 
 contract Deployments is Script, HelperConfig {
@@ -34,14 +33,6 @@ contract Deployments is Script, HelperConfig {
 
     function run() public {
         conf = getActiveNetworkConfig();
-
-        // Logging statements to debug configuration
-        console.log("--- Debug Logs ---");
-        console.log("Using priceFeedETHUSD:", conf.priceFeedEthUsd);
-        console.log("Using priceFeedWBTCUSD:", conf.priceFeedWbtcUsd);
-        console.log("Using priceFeedUSDCUSD:", conf.priceFeedUsdcUsd);
-        console.log("Using priceFeedDAIUSD:", conf.priceFeedDaiUsd);
-        console.log("--- End Debug Logs ---");
 
         vm.startBroadcast();
 
@@ -76,16 +67,24 @@ contract Deployments is Script, HelperConfig {
         priceFeedL1.transferOwnership(address(market));
 
         // create liquidity pools
-        lbPoolWBTC = LiquidityPool(market.createLiquidityPool(conf.addWbtc));
-        lbPoolWETH = LiquidityPool(market.createLiquidityPool(conf.addWeth));
-        lbPoolUSDC = LiquidityPool(market.createLiquidityPool(conf.addUsdc));
-        lbPoolDAI = LiquidityPool(market.createLiquidityPool(conf.addDai));
+        address[] memory tokens = new address[](4);
+        tokens[0] = conf.wbtc;
+        tokens[1] = conf.weth;
+        tokens[2] = conf.usdc;
+        tokens[3] = conf.dai;
+        address[] memory pools = market.createLiquidityPools(tokens);
+        lbPoolWBTC = LiquidityPool(pools[0]);
+        lbPoolWETH = LiquidityPool(pools[1]);
+        lbPoolUSDC = LiquidityPool(pools[2]);
+        lbPoolDAI = LiquidityPool(pools[3]);
 
         // add price feeds
-        market.addPriceFeed(conf.addWbtc, conf.priceFeedWbtcUsd);
-        market.addPriceFeed(conf.addUsdc, conf.priceFeedUsdcUsd);
-        market.addPriceFeed(conf.addWeth, conf.priceFeedEthUsd);
-        market.addPriceFeed(conf.addDai, conf.priceFeedDaiUsd);
+        address[] memory priceFeeds = new address[](4);
+        priceFeeds[0] = conf.priceFeedWbtcUsd;
+        priceFeeds[1] = conf.priceFeedEthUsd;
+        priceFeeds[2] = conf.priceFeedUsdcUsd;
+        priceFeeds[3] = conf.priceFeedDaiUsd;
+        market.addPriceFeeds(tokens, priceFeeds);
 
         vm.stopBroadcast();
     }

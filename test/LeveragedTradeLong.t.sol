@@ -11,25 +11,25 @@ function test__leveragedTradeToCloseLong1() public {
     uint128 amount = 1e8;
     uint24 fee = 3000;
     
-    writeTokenBalance(alice, conf.addWbtc, amount);
+    writeTokenBalance(alice, conf.wbtc, amount);
 
-    assertEq(amount, IERC20(conf.addWbtc).balanceOf(alice));
-    assertEq(0, IERC20(conf.addWbtc).balanceOf(address(positions)));
+    assertEq(amount, IERC20(conf.wbtc).balanceOf(alice));
+    assertEq(0, IERC20(conf.wbtc).balanceOf(address(positions)));
 
     // Log USDC balance in lbPoolUsdc BEFORE open
-    uint256 usdcBalanceBefore = IERC20(conf.addUsdc).balanceOf(address(lbPoolUsdc));
+    uint256 usdcBalanceBefore = IERC20(conf.usdc).balanceOf(address(lbPoolUsdc));
     console.log("USDC balance in lbPoolUsdc BEFORE open: ", usdcBalanceBefore);
 
     vm.startPrank(alice);
-    IERC20(conf.addWbtc).approve(address(positions), amount);
+    IERC20(conf.wbtc).approve(address(positions), amount);
     console.log("Open position");
-    market.openPosition(conf.addWbtc, conf.addUsdc, uint24(fee), false, 2, amount, 0, 0);
+    market.openPosition(conf.wbtc, conf.usdc, uint24(fee), false, 2, amount, 0, 0);
 
-    assertEq(0, IERC20(conf.addWbtc).balanceOf(alice));
-    assertApproxEqRel(amount * 2, IERC20(conf.addWbtc).balanceOf(address(positions)), 0.05e18);
+    assertEq(0, IERC20(conf.wbtc).balanceOf(alice));
+    assertApproxEqRel(amount * 2, IERC20(conf.wbtc).balanceOf(address(positions)), 0.05e18);
 
-    uint256 usdcBalanceAfter = IERC20(conf.addUsdc).balanceOf(address(lbPoolUsdc));
-    uint256 price = priceFeedL1.getPairLatestPrice(conf.addWbtc, conf.addUsdc);
+    uint256 usdcBalanceAfter = IERC20(conf.usdc).balanceOf(address(lbPoolUsdc));
+    uint256 price = priceFeedL1.getPairLatestPrice(conf.wbtc, conf.usdc);
     uint256 totalBorrow = (amount * 1 * price) / (10**18);
     assertApproxEqRel(usdcBalanceBefore, usdcBalanceAfter, 0.05e18);
 
@@ -41,10 +41,10 @@ function test__leveragedTradeToCloseLong1() public {
     console.log("Close position");
     market.closePosition(posAlice[0]);
 
-    assertApproxEqRel(amount, IERC20(conf.addWbtc).balanceOf(alice), 0.05e18);
-    assertEq(0, IERC20(conf.addWbtc).balanceOf(address(positions)));
+    assertApproxEqRel(amount, IERC20(conf.wbtc).balanceOf(alice), 0.05e18);
+    assertEq(0, IERC20(conf.wbtc).balanceOf(address(positions)));
 
-    uint256 usdcBalanceAfterClose = IERC20(conf.addUsdc).balanceOf(address(lbPoolUsdc));
+    uint256 usdcBalanceAfterClose = IERC20(conf.usdc).balanceOf(address(lbPoolUsdc));
     //assertGe(usdcBalanceBefore, usdcBalanceAfter);
     console.log("USDC balance in lbPoolUsdc AFTER close: ", usdcBalanceAfterClose);
 

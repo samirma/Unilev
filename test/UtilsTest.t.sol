@@ -6,7 +6,7 @@ import "./utils/TestSetup.sol";
 contract UtilsTest is TestSetup {
     
     function test__getLiquidityPool() public view {
-        address pool = market.getTokenToLiquidityPools(conf.addWbtc);
+        address pool = market.getTokenToLiquidityPools(conf.wbtc);
         assertEq(pool, address(lbPoolWbtc));
     }
 

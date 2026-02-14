@@ -142,6 +142,24 @@ contract Market is IMarket, Ownable, Pausable {
         emit PriceFeedAdded(_token, _priceFeed);
     }
 
+    function addPriceFeeds(address[] calldata _tokens, address[] calldata _priceFeeds) external onlyOwner whenNotPaused {
+        uint256 len = _tokens.length;
+        for (uint256 i; i < len; ++i) {
+            PRICE_FEED.addPriceFeed(_tokens[i], _priceFeeds[i]);
+            emit PriceFeedAdded(_tokens[i], _priceFeeds[i]);
+        }
+    }
+
+    function createLiquidityPools(address[] calldata _tokens) external onlyOwner whenNotPaused returns (address[] memory) {
+        uint256 len = _tokens.length;
+        address[] memory pools = new address[](len);
+        for (uint256 i; i < len; ++i) {
+            pools[i] = LIQUIDITY_POOL_FACTORY.createLiquidityPool(_tokens[i]);
+            emit LiquidityPoolCreated(_tokens[i], msg.sender);
+        }
+        return pools;
+    }
+
     function pause() external onlyOwner {
         _pause();
     }

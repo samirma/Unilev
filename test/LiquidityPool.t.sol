@@ -13,7 +13,7 @@ contract LiquidityPoolTest is TestSetup {
     function setUp() public override {
         super.setUp();
         pool = lbPoolWbtc;
-        asset = IERC20(conf.addWbtc);
+        asset = IERC20(conf.wbtc);
 
         // Ensure alice has some funds and approves the pool
         vm.startPrank(alice);

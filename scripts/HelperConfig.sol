@@ -12,10 +12,10 @@ contract HelperConfig {
         address nonfungiblePositionManager;
         address swapRouter;
         address liquidityPoolFactoryUniswapV3;
-        address addWbtc;
-        address addWeth;
-        address addUsdc;
-        address addDai;
+        address wbtc;
+        address weth;
+        address usdc;
+        address dai;
         address treasure;
     }
 
@@ -48,10 +48,10 @@ contract HelperConfig {
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             liquidityPoolFactoryUniswapV3: 0x1F98431c8aD98523631AE4a59f267346ea31F984,
-            addWbtc: 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
-            addWeth: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
-            addUsdc: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
-            addDai: 0x6B175474E89094C44Da98b954EedeAC495271d0F,
+            wbtc: 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
+            weth: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
+            usdc: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
+            dai: 0x6B175474E89094C44Da98b954EedeAC495271d0F,
             treasure: 0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199
         });
     }
@@ -73,10 +73,10 @@ contract HelperConfig {
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             liquidityPoolFactoryUniswapV3: 0x1F98431c8aD98523631AE4a59f267346ea31F984,
-            addWbtc: 0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6,
-            addWeth: 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619,
-            addUsdc: 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174,
-            addDai: 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063,
+            wbtc: 0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6,
+            weth: 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619,
+            usdc: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359,
+            dai: 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063,
             treasure: 0xBB6B5fD8AC1Fa2f4b20Dbd0d4b278b0E64ecA5DA
         });
     }

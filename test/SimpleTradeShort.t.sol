@@ -9,17 +9,17 @@ contract SimpleTradeShort is TestSetup {
     function test__simpleTradeToCloseShort1() public {
         uint128 amount = 1000e6;
         uint24 fee = 3000;
-        writeTokenBalance(alice, conf.addUsdc, amount);
+        writeTokenBalance(alice, conf.usdc, amount);
 
-        assertEq(amount, IERC20(conf.addUsdc).balanceOf(alice));
-        assertEq(0, IERC20(conf.addUsdc).balanceOf(address(positions)));
+        assertEq(amount, IERC20(conf.usdc).balanceOf(alice));
+        assertEq(0, IERC20(conf.usdc).balanceOf(address(positions)));
 
         vm.startPrank(alice);
-        IERC20(conf.addUsdc).approve(address(positions), amount);
-        market.openPosition(conf.addUsdc, conf.addWbtc, uint24(fee), true, 1, amount, 0, 0);
+        IERC20(conf.usdc).approve(address(positions), amount);
+        market.openPosition(conf.usdc, conf.wbtc, uint24(fee), true, 1, amount, 0, 0);
 
-        assertEq(0, IERC20(conf.addUsdc).balanceOf(alice));
-        assertApproxEqRel(amount * 2, IERC20(conf.addUsdc).balanceOf(address(positions)), 0.05e18);
+        assertEq(0, IERC20(conf.usdc).balanceOf(alice));
+        assertApproxEqRel(amount * 2, IERC20(conf.usdc).balanceOf(address(positions)), 0.05e18);
 
         assertEq(1, positions.totalNbPos());
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -28,8 +28,8 @@ contract SimpleTradeShort is TestSetup {
 
         market.closePosition(posAlice[0]);
 
-        assertApproxEqRel(amount, IERC20(conf.addUsdc).balanceOf(alice), 0.05e18);
-        assertEq(0, IERC20(conf.addUsdc).balanceOf(address(positions)));
+        assertApproxEqRel(amount, IERC20(conf.usdc).balanceOf(alice), 0.05e18);
+        assertEq(0, IERC20(conf.usdc).balanceOf(address(positions)));
     }
     
 }

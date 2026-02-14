@@ -90,30 +90,30 @@ contract TestSetup is Test, HelperConfig, Utils {
         priceFeedL1.transferOwnership(address(market));
 
         // create liquidity pools
-        lbPoolWbtc = LiquidityPool(market.createLiquidityPool(conf.addWbtc));
-        lbPoolWeth = LiquidityPool(market.createLiquidityPool(conf.addWeth));
-        lbPoolUsdc = LiquidityPool(market.createLiquidityPool(conf.addUsdc));
-        lbPoolDai = LiquidityPool(market.createLiquidityPool(conf.addDai));
+        lbPoolWbtc = LiquidityPool(market.createLiquidityPool(conf.wbtc));
+        lbPoolWeth = LiquidityPool(market.createLiquidityPool(conf.weth));
+        lbPoolUsdc = LiquidityPool(market.createLiquidityPool(conf.usdc));
+        lbPoolDai = LiquidityPool(market.createLiquidityPool(conf.dai));
 
         // add price feeds
-        market.addPriceFeed(conf.addWbtc, conf.priceFeedWbtcUsd);
-        market.addPriceFeed(conf.addUsdc, conf.priceFeedUsdcUsd);
-        market.addPriceFeed(conf.addDai, conf.priceFeedDaiUsd);
-        market.addPriceFeed(conf.addWeth, conf.priceFeedEthUsd);
+        market.addPriceFeed(conf.wbtc, conf.priceFeedWbtcUsd);
+        market.addPriceFeed(conf.usdc, conf.priceFeedUsdcUsd);
+        market.addPriceFeed(conf.dai, conf.priceFeedDaiUsd);
+        market.addPriceFeed(conf.weth, conf.priceFeedEthUsd);
         
         vm.stopPrank();
 
         // add liquidity to a pool to be able to open a short position
         vm.startPrank(bob);
-        writeTokenBalance(bob, conf.addWbtc, 10e8);
-        writeTokenBalance(bob, conf.addWeth, 100e18);
-        writeTokenBalance(bob, conf.addUsdc, 10000000e6);
-        writeTokenBalance(bob, conf.addDai, 10000000e6);
+        writeTokenBalance(bob, conf.wbtc, 10e8);
+        writeTokenBalance(bob, conf.weth, 100e18);
+        writeTokenBalance(bob, conf.usdc, 10000000e6);
+        writeTokenBalance(bob, conf.dai, 10000000e6);
 
-        IERC20(conf.addWbtc).approve(address(lbPoolWbtc), 10e8);
-        IERC20(conf.addWeth).approve(address(lbPoolWeth), 100e18);
-        IERC20(conf.addUsdc).approve(address(lbPoolUsdc), 10000000e6);
-        IERC20(conf.addDai).approve(address(lbPoolDai), 10000000e6);
+        IERC20(conf.wbtc).approve(address(lbPoolWbtc), 10e8);
+        IERC20(conf.weth).approve(address(lbPoolWeth), 100e18);
+        IERC20(conf.usdc).approve(address(lbPoolUsdc), 10000000e6);
+        IERC20(conf.dai).approve(address(lbPoolDai), 10000000e6);
 
         lbPoolWbtc.deposit(10e8, bob);
         lbPoolWeth.deposit(100e18, bob);
