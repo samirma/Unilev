@@ -66,25 +66,24 @@ contract Deployments is Script, HelperConfig {
         liquidityPoolFactory.transferOwnership(address(market));
         priceFeedL1.transferOwnership(address(market));
 
-        // create liquidity pools
+        // initialize tokens (create pools + add price feeds)
         address[] memory tokens = new address[](4);
         tokens[0] = conf.wbtc;
         tokens[1] = conf.weth;
         tokens[2] = conf.usdc;
         tokens[3] = conf.dai;
-        address[] memory pools = market.createLiquidityPools(tokens);
-        lbPoolWBTC = LiquidityPool(pools[0]);
-        lbPoolWETH = LiquidityPool(pools[1]);
-        lbPoolUSDC = LiquidityPool(pools[2]);
-        lbPoolDAI = LiquidityPool(pools[3]);
 
-        // add price feeds
         address[] memory priceFeeds = new address[](4);
         priceFeeds[0] = conf.priceFeedWbtcUsd;
         priceFeeds[1] = conf.priceFeedEthUsd;
         priceFeeds[2] = conf.priceFeedUsdcUsd;
         priceFeeds[3] = conf.priceFeedDaiUsd;
-        market.addPriceFeeds(tokens, priceFeeds);
+
+        address[] memory pools = market.initializeTokens(tokens, priceFeeds);
+        lbPoolWBTC = LiquidityPool(pools[0]);
+        lbPoolWETH = LiquidityPool(pools[1]);
+        lbPoolUSDC = LiquidityPool(pools[2]);
+        lbPoolDAI = LiquidityPool(pools[3]);
 
         vm.stopBroadcast();
     }
