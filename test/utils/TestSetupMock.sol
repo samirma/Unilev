@@ -14,7 +14,7 @@ import {FeeManager} from "../../src/FeeManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "forge-std/Test.sol";
-import {HelperConfig} from "../utils/HelperConfig.sol";
+import {HelperConfig} from "../../scripts/HelperConfig.sol";
 import {Utils} from "./Utils.sol";
 
 contract TestSetupMock is Test, HelperConfig, Utils {
@@ -84,36 +84,40 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         // add position addres to the factory
         liquidityPoolFactory.addPositionsAddress(address(positions));
 
+        // Set a longer staleness threshold for mock testing (365 days for time limit tests)
+        // Must be done BEFORE transferring ownership
+        priceFeedL1.setStalenessThreshold(365 days);
+
         // transfer ownership
         positions.transferOwnership(address(market));
         liquidityPoolFactory.transferOwnership(address(market));
         priceFeedL1.transferOwnership(address(market));
 
         // create liquidity pools
-        lbPoolWbtc = LiquidityPool(market.createLiquidityPool(conf.addWbtc));
-        lbPoolWeth = LiquidityPool(market.createLiquidityPool(conf.addWeth));
-        lbPoolUsdc = LiquidityPool(market.createLiquidityPool(conf.addUsdc));
-        lbPoolDai = LiquidityPool(market.createLiquidityPool(conf.addDai));
+        lbPoolWbtc = LiquidityPool(market.createLiquidityPool(conf.wbtc));
+        lbPoolWeth = LiquidityPool(market.createLiquidityPool(conf.weth));
+        lbPoolUsdc = LiquidityPool(market.createLiquidityPool(conf.usdc));
+        lbPoolDai = LiquidityPool(market.createLiquidityPool(conf.dai));
 
         // add price feeds
-        market.addPriceFeed(conf.addWbtc, address(mockV3AggregatorWbtcUsd));
-        market.addPriceFeed(conf.addUsdc, address(mockV3AggregatorUsdcUsd));
-        market.addPriceFeed(conf.addDai, address(mockV3AggregatorDaiUsd));
-        market.addPriceFeed(conf.addWeth, address(mockV3AggregatorEthUsd));
+        market.addPriceFeed(conf.wbtc, address(mockV3AggregatorWbtcUsd));
+        market.addPriceFeed(conf.usdc, address(mockV3AggregatorUsdcUsd));
+        market.addPriceFeed(conf.dai, address(mockV3AggregatorDaiUsd));
+        market.addPriceFeed(conf.weth, address(mockV3AggregatorEthUsd));
 
         vm.stopPrank();
 
         // add liquidity to a pool to be able to open a short position
         vm.startPrank(bob);
-        writeTokenBalance(bob, conf.addWbtc, 10e8);
-        writeTokenBalance(bob, conf.addWeth, 100e18);
-        writeTokenBalance(bob, conf.addUsdc, 10000000e6);
-        writeTokenBalance(bob, conf.addDai, 10000000e6);
+        writeTokenBalance(bob, conf.wbtc, 10e8);
+        writeTokenBalance(bob, conf.weth, 100e18);
+        writeTokenBalance(bob, conf.usdc, 10000000e6);
+        writeTokenBalance(bob, conf.dai, 10000000e6);
 
-        IERC20(conf.addWbtc).approve(address(lbPoolWbtc), 10e8);
-        IERC20(conf.addWeth).approve(address(lbPoolWeth), 100e18);
-        IERC20(conf.addUsdc).approve(address(lbPoolUsdc), 10000000e6);
-        IERC20(conf.addDai).approve(address(lbPoolDai), 10000000e6);
+        IERC20(conf.wbtc).approve(address(lbPoolWbtc), 10e8);
+        IERC20(conf.weth).approve(address(lbPoolWeth), 100e18);
+        IERC20(conf.usdc).approve(address(lbPoolUsdc), 10000000e6);
+        IERC20(conf.dai).approve(address(lbPoolDai), 10000000e6);
 
         lbPoolWbtc.deposit(10e8, bob);
         lbPoolWeth.deposit(100e18, bob);

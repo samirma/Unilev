@@ -7,10 +7,10 @@ import "../src/LiquidityPoolFactory.sol";
 import "../src/LiquidityPool.sol";
 import "../src/PriceFeedL1.sol";
 import {UniswapV3Helper} from "../src/UniswapV3Helper.sol";
+import {FeeManager} from "../src/FeeManager.sol";
 
 import "forge-std/Script.sol";
-import "forge-std/console.sol"; // Added for logging
-import "../test/utils/HelperConfig.sol";
+import "./HelperConfig.sol";
 
 contract Deployments is Script, HelperConfig {
     UniswapV3Helper public uniswapV3Helper;
@@ -18,10 +18,11 @@ contract Deployments is Script, HelperConfig {
     PriceFeedL1 public priceFeedL1;
     Market public market;
     Positions public positions;
+    FeeManager public feeManager;
     LiquidityPool public lbPoolWBTC;
     LiquidityPool public lbPoolWETH;
     LiquidityPool public lbPoolUSDC;
-    LiquidityPool public lbPoolDAI; // Added for DAI
+    LiquidityPool public lbPoolDAI;
 
     address public alice;
     address public bob;
@@ -33,14 +34,6 @@ contract Deployments is Script, HelperConfig {
     function run() public {
         conf = getActiveNetworkConfig();
 
-        // Logging statements to debug configuration
-        console.log("--- Debug Logs ---");
-        console.log("Using priceFeedETHUSD:", conf.priceFeedETHUSD);
-        console.log("Using priceFeedWBTCUSD:", conf.priceFeedWBTCUSD);
-        console.log("Using priceFeedUSDCUSD:", conf.priceFeedUSDCUSD);
-        console.log("Using priceFeedDAIUSD:", conf.priceFeedDAIUSD);
-        console.log("--- End Debug Logs ---");
-
         vm.startBroadcast();
 
         /// deployments
@@ -48,12 +41,14 @@ contract Deployments is Script, HelperConfig {
         uniswapV3Helper = new UniswapV3Helper(conf.swapRouter);
         priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
+        feeManager = new FeeManager(5, 3);
         positions = new Positions(
             address(priceFeedL1),
             address(liquidityPoolFactory),
             conf.liquidityPoolFactoryUniswapV3,
             address(uniswapV3Helper),
-            conf.treasure
+            conf.treasure,
+            address(feeManager)
         );
         market = new Market(
             address(positions),
@@ -72,16 +67,24 @@ contract Deployments is Script, HelperConfig {
         priceFeedL1.transferOwnership(address(market));
 
         // create liquidity pools
-        lbPoolWBTC = LiquidityPool(market.createLiquidityPool(conf.addWBTC));
-        lbPoolWETH = LiquidityPool(market.createLiquidityPool(conf.addWETH));
-        lbPoolUSDC = LiquidityPool(market.createLiquidityPool(conf.addUSDC));
-        lbPoolDAI = LiquidityPool(market.createLiquidityPool(conf.addDAI)); // Added for DAI
+        address[] memory tokens = new address[](4);
+        tokens[0] = conf.wbtc;
+        tokens[1] = conf.weth;
+        tokens[2] = conf.usdc;
+        tokens[3] = conf.dai;
+        address[] memory pools = market.createLiquidityPools(tokens);
+        lbPoolWBTC = LiquidityPool(pools[0]);
+        lbPoolWETH = LiquidityPool(pools[1]);
+        lbPoolUSDC = LiquidityPool(pools[2]);
+        lbPoolDAI = LiquidityPool(pools[3]);
 
         // add price feeds
-        market.addPriceFeed(conf.addWBTC, conf.priceFeedWBTCUSD);
-        market.addPriceFeed(conf.addUSDC, conf.priceFeedUSDCUSD);
-        market.addPriceFeed(conf.addWETH, conf.priceFeedETHUSD);
-        market.addPriceFeed(conf.addDAI, conf.priceFeedDAIUSD); // Added for DAI
+        address[] memory priceFeeds = new address[](4);
+        priceFeeds[0] = conf.priceFeedWbtcUsd;
+        priceFeeds[1] = conf.priceFeedEthUsd;
+        priceFeeds[2] = conf.priceFeedUsdcUsd;
+        priceFeeds[3] = conf.priceFeedDaiUsd;
+        market.addPriceFeeds(tokens, priceFeeds);
 
         vm.stopBroadcast();
     }

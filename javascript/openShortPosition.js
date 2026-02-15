@@ -1,153 +1,111 @@
 const { ethers } = require("ethers");
-const fs = require("fs");
-const path = require("path");
-require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
-
-/**
- * Loads the contract ABI from the JSON file.
- * @param {string} contractName The name of the contract.
- * @returns {object} The contract ABI.
- */
-function getAbi(contractName) {
-  try {
-    const abiPath = path.resolve(__dirname, `../out/${contractName}.sol/${contractName}.json`);
-    const abiFile = fs.readFileSync(abiPath, "utf8");
-    return JSON.parse(abiFile).abi;
-  } catch (error) {
-    console.error(`Error loading contract ABI for ${contractName}:`, error.message);
-    console.error("Please ensure the contract has been compiled and the ABI file is in the correct path.");
-    process.exit(1);
-  }
-}
-
-/**
- * Loads a standard ERC20 ABI.
- * @returns {object} The ERC20 contract ABI.
- */
-function getErc20Abi() {
-    return [
-        "function approve(address spender, uint256 amount) public returns (bool)",
-        "function balanceOf(address account) view returns (uint256)"
-    ];
-}
+const { getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails, getMarketAbi, getPriceFeedL1Abi } = require("./utils");
 
 
-/**
- * The main function that connects to the blockchain, opens, verifies, and closes a short position.
- */
 async function main() {
-  // --- Environment Variable Setup & Validation ---
-  const { RPC_URL, PRIVATE_KEY, MARKET_ADDRESS, POSITIONS_ADDRESS, USDC, WETH } = process.env;
+    // --- Environment Setup ---
+    const env = getEnvVars();
+    const { provider, wallet } = setupProviderAndWallet(env.RPC_URL, env.PRIVATE_KEY);
 
-  if (!RPC_URL || !PRIVATE_KEY || !MARKET_ADDRESS || !POSITIONS_ADDRESS || !USDC || !WETH) {
-    console.error(
-      "Error: Ensure RPC_URL, PRIVATE_KEY, MARKET_ADDRESS, POSITIONS_ADDRESS, USDC, and WETH are set in ../.env"
-    );
-    process.exit(1);
-  }
+    console.log(`Open Short Position Script started. Using wallet: ${wallet.address}`);
 
-  // --- Load ABIs ---
-  const marketAbi = getAbi("Market");
-  const positionsAbi = getAbi("Positions");
-  const erc20Abi = getErc20Abi();
+    // --- Contract Instances ---
+    const erc20Abi = getErc20Abi();
+    const marketAbi = getMarketAbi();
+    const priceFeedL1Abi = getPriceFeedL1Abi();
 
-  // --- Provider & Wallet Setup ---
-  const provider = new ethers.JsonRpcProvider(RPC_URL);
-  const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-  console.log(`Using wallet address: ${wallet.address}`);
+    // We are using WBTC as collateral to short WETH
+    // token0 = WBTC (Collateral)
+    // token1 = WETH (Short Target)
+    const token0Address = env.WBTC; // Collateral
+    const token1Address = env.WETH; // Shield/Target
 
-  // --- Contract Instances ---
-  const marketContract = new ethers.Contract(MARKET_ADDRESS, marketAbi, wallet);
-  const positionsContract = new ethers.Contract(POSITIONS_ADDRESS, positionsAbi, wallet);
-  const usdcContract = new ethers.Contract(USDC, erc20Abi, wallet);
+    const token0Contract = new ethers.Contract(token0Address, erc20Abi, wallet);
+    const marketContract = new ethers.Contract(env.MARKET_ADDRESS, marketAbi, wallet);
+    const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
 
-  // --- Get initial nonce ---
-  let nonce = await wallet.getNonce();
+    try {
+        // --- 1. Calculate Amount of WBTC for $10 ---
+        console.log("Calculating WBTC amount for $10...");
+        const positionAmount = await calculateTokenAmountFromUsd(token0Contract, priceFeedL1Contract, "10");
+        const decimals = await token0Contract.decimals();
 
-  // --- Position Parameters ---
-  const collateralAmount = ethers.parseUnits("1000", 6); // 1000 USDC (6 decimals)
-  const positionSize = ethers.parseEther("1");           // 1 WETH (18 decimals)
-  const isLong = false; // This is a short position
+        console.log(`Amount: ${ethers.formatUnits(positionAmount, decimals)} WBTC`);
 
-  try {
-    // --- Approve USDC for collateral ---
-    console.log("\n1. Approving Market contract to spend USDC...");
-    const approveTx = await usdcContract.approve(MARKET_ADDRESS, collateralAmount, { nonce: nonce });
-    console.log(`Approval transaction sent! Hash: ${approveTx.hash}`);
-    await approveTx.wait();
-    console.log("Approval successful!");
-    nonce++;
+        const balance = await token0Contract.balanceOf(wallet.address);
+        console.log(`Wallet WBTC Balance: ${ethers.formatUnits(balance, decimals)}`);
 
-    // --- Open the Short Position ---
-    console.log("\n2. Opening short position...");
-    const openPositionTx = await marketContract.openPosition(
-        WETH,               // Index Token (the asset we are shorting)
-        USDC,               // Collateral Token
-        collateralAmount,   // Collateral Amount
-        positionSize,       // Size of the position
-        isLong,             // isLong = false for short
-        0,                  // referralCode
-        { nonce: nonce }
-    );
-    console.log(`Open position transaction sent! Hash: ${openPositionTx.hash}`);
-    const receipt = await openPositionTx.wait();
-    console.log("Position opened successfully!");
-    nonce++;
-    
-    // NOTE: We need to parse the event logs to get the positionId
-    const positionId = 0; // In a real scenario, you would parse this from the transaction receipt's events.
-                          // For this example, we assume it's the first position (ID 0).
-    console.log(`Position opened with ID: ${positionId}`);
+        if (balance < positionAmount) {
+            console.error("❌ Insufficient WBTC Balance!");
+            process.exit(1);
+        }
+
+        // --- 2. Approve Positions Contract ---
+        console.log("Approving Positions contract...");
+        // Note: Market.sol calls SafeERC20.forceApprove, but we must approve POSITIONS directly as it pulls funds from msg.sender (Trader)
+        const txApprove = await token0Contract.approve(env.POSITIONS_ADDRESS, positionAmount);
+        await txApprove.wait();
+        console.log("- Approved Positions.");
+
+        // --- 3. Open Short Position ---
+        console.log("Opening Short Position...");
+
+        // Params:
+        // address _token0 (Collateral - WBTC)
+        // address _token1 (Target - WETH)
+        // uint24 _fee (3000 -> 0.3%)
+        // bool _isShort (true)
+        // uint8 _leverage (1)
+        // uint128 _amount (positionAmount)
+        // uint160 _limitPrice (0)
+        // uint256 _stopLossPrice (0)
+
+        const fee = 3000;
+        const isShort = true;
+        const leverage = 1;
+        const limitPrice = 0;
+        const stopLossPrice = 0;
+
+        const txOpen = await marketContract.openPosition(
+            token0Address,
+            token1Address,
+            fee,
+            isShort,
+            leverage,
+            positionAmount,
+            limitPrice,
+            stopLossPrice,
+            { gasLimit: 5000000, nonce: txApprove.nonce + 1 }
+        );
+
+        console.log(`Transaction sent: ${txOpen.hash}`);
+        const receipt = await txOpen.wait();
+        console.log("Position opened successfully!");
 
 
-    // --- Verify the Position was Opened ---
-    console.log("\n3. Verifying the position...");
-    const position = await positionsContract.getPosition(positionId);
-    
-    if (position.size === 0n) {
-        throw new Error("Position verification failed: Position not found or size is zero.");
+
+        // --- 4. Parse Event Logs ---
+        for (const log of receipt.logs) {
+            try {
+                const parsedLog = marketContract.interface.parseLog(log);
+                if (parsedLog && parsedLog.name === "PositionOpened") {
+                    await logPositionDetails(parsedLog.args.posId, marketContract, priceFeedL1Contract, provider);
+                }
+            } catch (e) {
+                // Ignore logs that don't belong to the Market contract
+            }
+        }
+
+    } catch (error) {
+        console.error("\n❌ An error occurred:", error.message || error);
+        if (error.data) {
+            console.error("Error Data:", error.data);
+        }
+        process.exit(1);
     }
-    console.log("Position details fetched successfully:");
-    console.log({
-        owner: position.owner,
-        collateralToken: position.collateralToken,
-        indexToken: position.indexToken,
-        collateralAmount: ethers.formatUnits(position.collateralAmount, 6),
-        size: ethers.formatEther(position.size),
-        isLong: position.isLong,
-    });
-    console.log("Verification successful!");
-
-
-    // --- Close the Position ---
-    console.log("\n4. Closing the position...");
-    const closePositionTx = await marketContract.closePosition(positionId, { nonce: nonce });
-    console.log(`Close position transaction sent! Hash: ${closePositionTx.hash}`);
-    await closePositionTx.wait();
-    console.log("Position closed successfully!");
-
-    // --- Verify the Position was Closed ---
-    console.log("\n5. Verifying the position is closed...");
-    const closedPosition = await positionsContract.getPosition(positionId);
-    if (closedPosition.size === 0n && closedPosition.owner === ethers.ZeroAddress) {
-        console.log("Verification successful: Position has been deleted.");
-    } else {
-        console.error("Verification failed: Position still exists.");
-    }
-    
-    console.log("\n====================================================");
-    console.log("✅ Short position workflow completed successfully!");
-    console.log("====================================================");
-
-  } catch (error) {
-    console.error("\n❌ An error occurred during the process:");
-    console.error(error.reason || error);
-    process.exit(1);
-  }
 }
 
-// --- Script Execution ---
 main().catch((error) => {
-  console.error("An unexpected error occurred in the main execution:", error);
-  process.exit(1);
+    console.error("An unexpected error occurred:", error);
+    process.exit(1);
 });

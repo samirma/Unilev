@@ -8,7 +8,7 @@ contract SimpleTradeLong is TestSetup {
     function test__simpleTradeToCloseLong1() public {
         uint128 amount = 10e8;
 
-        address tokenAddress = conf.addWbtc;
+        address tokenAddress = conf.wbtc;
 
         IERC20 tokenErc20 = IERC20(tokenAddress);
 
@@ -19,7 +19,7 @@ contract SimpleTradeLong is TestSetup {
 
         vm.startPrank(alice);
         tokenErc20.approve(address(positions), amount);
-        market.openPosition(tokenAddress, conf.addUsdc, uint24(3000), false, 1, amount, 0, 0);
+        market.openPosition(tokenAddress, conf.usdc, uint24(3000), false, 1, amount, 0, 0);
 
         assertApproxEqAbs(0, tokenErc20.balanceOf(alice), 1e6);
         assertApproxEqAbs(amount, tokenErc20.balanceOf(address(positions)), 1e6);
@@ -36,7 +36,7 @@ contract SimpleTradeLong is TestSetup {
     }
 
     function test__simpleTradeToCloseLong2() public {
-        address tokenAddress = conf.addWbtc;
+        address tokenAddress = conf.wbtc;
 
         IERC20 tokenErc20 = IERC20(tokenAddress);
 
@@ -47,7 +47,7 @@ contract SimpleTradeLong is TestSetup {
 
         vm.startPrank(alice);
         tokenErc20.approve(address(positions), 10e8);
-        market.openPosition(tokenAddress, conf.addUsdc, uint24(3000), false, 1, 10e8, 0, 0);
+        market.openPosition(tokenAddress, conf.usdc, uint24(3000), false, 1, 10e8, 0, 0);
 
         assertApproxEqAbs(0, tokenErc20.balanceOf(alice), 1e6);
         assertApproxEqAbs(10e8, tokenErc20.balanceOf(address(positions)), 1e6);
@@ -69,7 +69,7 @@ contract SimpleTradeLong is TestSetup {
         ) = // int128 collateralLeft_
             market.getPositionParams(posAlice[0]);
         assertEq(baseToken_, tokenAddress);
-        assertEq(quoteToken_, conf.addUsdc);
+        assertEq(quoteToken_, conf.usdc);
         //assertEq(positionSize_, 999900000);
         assertEq(timestamp_, block.timestamp);
         assertEq(isShort_, false);

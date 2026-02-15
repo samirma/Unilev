@@ -24,7 +24,8 @@ struct PositionParams {
     uint128 positionSize;      // Amount (in baseToken if long / quoteToken if short) of token traded
     uint256 initialPrice;      // Price of the position when opened
     uint128 liquidationReward; // Amount (in baseToken if long / quoteToken if short) of token to pay to the liquidator, refund if no liquidation
-    uint64 timestamp;          // Timestamp of position creation
+    uint64 timestamp;          // Timestamp of position creation (used for expiration)
+    uint64 blockNumber;        // Block number of position creation (used for manipulation-resistant expiration)
     bool isShort;              // True if short, false if long
     bool isBaseToken0;         // True if the baseToken is the token0 (in the uniswapV3Pool) 
     uint8 leverage;            // Leverage of position => 0 if no leverage
