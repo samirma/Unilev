@@ -120,13 +120,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         return this.onERC721Received.selector;
     }
 
-    function safeMint(address to) private returns (uint256) {
-        uint256 _posId = posId;
-        ++posId;
-        _mint(to, _posId);
-        return _posId;
-    }
-
     function safeBurn(uint256 _posId) private {
         _burn(_posId);
     }
@@ -156,7 +149,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         uint160 _limitPrice,
         uint256 _stopLossPrice
     ) external onlyOwner nonReentrant whenNotPaused returns (uint256) {
-        // Check params
+        // Cache storage variable to avoid multiple SLOADs
+        uint256 currentPosId = posId;
+        
         // Check params
         PositionLogic.ValidationResult memory validationResult = PositionLogic.validateOpenPosition(
             PositionLogic.ValidationParams({
@@ -190,10 +185,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         // Compute parameters
         uint256 breakEvenLimit;
         uint256 totalBorrow;
-        uint256 tokenIdLiquidity;
         uint256 amountBorrow;
 
-        (uint256 treasureFee, uint256 liquidationRewardRate) = feeManager.getFees(_trader);
+        (uint128 treasureFee, uint128 liquidationRewardRate) = feeManager.getFees(_trader);
 
         // take opening fees
         uint128 liquidationReward = uint128((_amount * liquidationRewardRate) / 10000);
@@ -278,27 +272,32 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             positionSize = _amount;
         }
 
-        openPositions[posId] = PositionParams(
-            v3Pool,
-            IERC20(baseToken),
-            IERC20(quoteToken),
-            _amount,
-            positionSize,
-            price,
-            liquidationReward,
-            uint64(block.timestamp),
-            uint64(block.number),
-            _isShort,
-            isBaseToken0,
-            _leverage,
-            totalBorrow,
-            breakEvenLimit,
-            _limitPrice,
-            _stopLossPrice,
-            tokenIdLiquidity
-        );
-        ++totalNbPos;
-        return safeMint(_trader);
+        openPositions[currentPosId] = PositionParams({
+            initialPrice: price,
+            totalBorrow: totalBorrow,
+            breakEvenLimit: breakEvenLimit,
+            stopLossPrice: _stopLossPrice,
+            v3Pool: v3Pool,
+            limitPrice: _limitPrice,
+            baseToken: IERC20(baseToken),
+            quoteToken: IERC20(quoteToken),
+            collateralSize: _amount,
+            positionSize: positionSize,
+            liquidationReward: liquidationReward,
+            timestamp: uint64(block.timestamp),
+            blockNumber: uint64(block.number),
+            isShort: _isShort,
+            isBaseToken0: isBaseToken0,
+            leverage: _leverage
+        });
+        
+        unchecked {
+            ++totalNbPos;
+            ++posId;
+        }
+        
+        _mint(_trader, currentPosId);
+        return currentPosId;
     }
 
     /**
@@ -346,7 +345,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             )
         );
 
-        (uint256 treasureFee, ) = feeManager.getFees(trader);
+        (uint128 treasureFee, ) = feeManager.getFees(trader);
 
         uint256 amount0;
         uint256 amount1;
@@ -471,7 +470,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             }
         }
 
-        --totalNbPos;
+        unchecked { --totalNbPos; }
         delete openPositions[_posId];
         safeBurn(_posId);
         IERC20(addTokenInitiallySupplied).safeTransfer(_liquidator, posParms.liquidationReward);
@@ -644,12 +643,17 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         uint256[] memory traderPositions = new uint[](nbOfPositions);
         // start form the highest posId and stop when the all positions are found
         uint256 posId_;
-        for (uint256 i = posId - 1; i > 0; --i) {
+        for (uint256 i = posId - 1; i > 0; ) {
             if (_ownerOf(i) == _traderAdd) {
                 traderPositions[posId_] = i;
-                if (++posId_ == nbOfPositions) {
-                    break;
+                unchecked {
+                    if (++posId_ == nbOfPositions) {
+                        break;
+                    }
+                    --i;
                 }
+            } else {
+                unchecked { --i; }
             }
         }
         return traderPositions;
@@ -659,13 +663,18 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         uint256[] memory liquidablePositions = new uint[](totalNbPos);
         // start form the highest posId and stop when the all positions are found
         uint256 posId_;
-        for (uint256 i = posId - 1; i > 0; --i) {
+        for (uint256 i = posId - 1; i > 0; ) {
             PositionState state = getPositionState(i);
             if (state != PositionState.ACTIVE && state != PositionState.NONE) {
                 liquidablePositions[posId_] = i;
-                if (++posId_ == totalNbPos) {
-                    break;
+                unchecked {
+                    if (++posId_ == totalNbPos) {
+                        break;
+                    }
+                    --i;
                 }
+            } else {
+                unchecked { --i; }
             }
         }
         return liquidablePositions;

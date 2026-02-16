@@ -52,15 +52,19 @@ library PositionLogic {
             )
         );
 
-        if (IUniswapV3Pool(result.v3Pool).factory() != params.liquidityPoolFactoryUniswapV3) {
+        // Cache pool contract to avoid repeated external calls
+        IUniswapV3Pool pool = IUniswapV3Pool(result.v3Pool);
+
+        if (pool.factory() != params.liquidityPoolFactoryUniswapV3) {
             revert Positions__POOL_NOT_OFFICIAL(result.v3Pool);
         }
 
+        // Cache token addresses
+        address poolToken0 = pool.token0();
+        address poolToken1 = pool.token1();
+
         // check token
-        if (
-            IUniswapV3Pool(result.v3Pool).token0() != params.token0 &&
-            IUniswapV3Pool(result.v3Pool).token1() != params.token0
-        ) {
+        if (poolToken0 != params.token0 && poolToken1 != params.token0) {
             revert Positions__TOKEN_NOT_SUPPORTED(params.token0);
         }
 
@@ -70,16 +74,12 @@ library PositionLogic {
          */
         if (params.isShort) {
             result.quoteToken = params.token0;
-            result.baseToken = (params.token0 == IUniswapV3Pool(result.v3Pool).token0())
-                ? IUniswapV3Pool(result.v3Pool).token1()
-                : IUniswapV3Pool(result.v3Pool).token0();
+            result.baseToken = (params.token0 == poolToken0) ? poolToken1 : poolToken0;
         } else {
             result.baseToken = params.token0;
-            result.quoteToken = (params.token0 == IUniswapV3Pool(result.v3Pool).token0())
-                ? IUniswapV3Pool(result.v3Pool).token1()
-                : IUniswapV3Pool(result.v3Pool).token0();
+            result.quoteToken = (params.token0 == poolToken0) ? poolToken1 : poolToken0;
         }
-        result.isBaseToken0 = (result.baseToken == IUniswapV3Pool(result.v3Pool).token0());
+        result.isBaseToken0 = (result.baseToken == poolToken0);
 
         // check if pair is supported by PriceFeed
         if (!PriceFeedL1(params.priceFeed).isPairSupported(result.baseToken, result.quoteToken)) {

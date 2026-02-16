@@ -47,7 +47,7 @@ interface IMarket {
 
     // --------------- Liquidator/Keeper Zone ---------------
 
-    function liquidatePositions(uint256[] memory _posIds) external;
+    function liquidatePositions(uint256[] calldata _posIds) external;
 
     function liquidatePosition(uint256 _posId) external;
 

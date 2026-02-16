@@ -56,15 +56,13 @@ contract SimpleTradeLong is TestSetup {
         uint256[] memory posAlice = market.getTraderPositions(alice);
         (
             address baseToken_,
-            address quoteToken_,
-            uint128 positionSize_,
+            address quoteToken_,,
             uint64 timestamp_,
             bool isShort_,
             uint8 leverage_,
             uint256 breakEvenLimit_,
             uint160 limitPrice_,
-            uint256 stopLossPrice_,
-            int128 currentPnL_,
+            uint256 stopLossPrice_,,
 
         ) = // int128 collateralLeft_
             market.getPositionParams(posAlice[0]);

@@ -17,23 +17,39 @@ enum PositionState {
 // Structs
 // prettier-ignore
 struct PositionParams {
-    address v3Pool;      // Pool to trade
-    IERC20 baseToken;           // Token to trade => should be token0 or token1 of v3Pool
-    IERC20 quoteToken;          // Token to trade => should be the other token of v3Pool
+    // Slot 0: 32 bytes
+    uint256 initialPrice;      // Price of the position when opened
+    
+    // Slot 1: 32 bytes
+    uint256 totalBorrow;       // Total borrow in baseToken if long or quoteToken if short
+    
+    // Slot 2: 32 bytes
+    uint256 breakEvenLimit;    // After this limit the position is undercollateralize => 0 if no leverage or short
+    
+    // Slot 3: 32 bytes
+    uint256 stopLossPrice;     // Stop loss price => 0 if no stop loss
+    
+    // Slot 4: 20 + 12 = 32 bytes
+    address v3Pool;            // Pool to trade
+    uint160 limitPrice;        // Limit order price => 0 if no limit order
+    
+    // Slot 5: 20 + 20 = 40 bytes -> 8 bytes overflow
+    IERC20 baseToken;          // Token to trade => should be token0 or token1 of v3Pool
+    IERC20 quoteToken;         // Token to trade => should be the other token of v3Pool
+    
+    // Slot 6: 16 + 16 = 32 bytes
     uint128 collateralSize;    // Total collateral for the position
     uint128 positionSize;      // Amount (in baseToken if long / quoteToken if short) of token traded
-    uint256 initialPrice;      // Price of the position when opened
-    uint128 liquidationReward; // Amount (in baseToken if long / quoteToken if short) of token to pay to the liquidator, refund if no liquidation
+    
+    // Slot 7: 16 + 8 + 8 = 32 bytes
+    uint128 liquidationReward; // Amount (in baseToken if long / quoteToken if short) of token to pay to the liquidator
     uint64 timestamp;          // Timestamp of position creation (used for expiration)
     uint64 blockNumber;        // Block number of position creation (used for manipulation-resistant expiration)
+    
+    // Slot 8: 1 + 1 + 1 + 29 bytes padding = 32 bytes
     bool isShort;              // True if short, false if long
     bool isBaseToken0;         // True if the baseToken is the token0 (in the uniswapV3Pool) 
     uint8 leverage;            // Leverage of position => 0 if no leverage
-    uint256 totalBorrow;       // Total borrow in baseToken if long or quoteToken if short
-    uint256 breakEvenLimit;    // After this limit the position is undercollateralize => 0 if no leverage or short
-    uint160 limitPrice;        // Limit order price => 0 if no limit order
-    uint256 stopLossPrice;     // Stop loss price => 0 if no stop loss
-    uint256 tokenIdLiquidity;  // TokenId of the liquidity position NFT => 0 if no liquidity position
 }
 
 // Errors

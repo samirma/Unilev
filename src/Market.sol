@@ -103,7 +103,7 @@ contract Market is IMarket, Ownable, Pausable {
     }
 
     // --------------- Liquidator/Keeper Zone ----------------
-    function liquidatePositions(uint256[] memory _posIds) external whenNotPaused {
+    function liquidatePositions(uint256[] calldata _posIds) external whenNotPaused {
         uint256 len = _posIds.length;
 
         for (uint256 i; i < len; ++i) {

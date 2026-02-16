@@ -18,9 +18,6 @@ contract PriceFeedL1 is Ownable {
     mapping(address => AggregatorV3Interface) public tokenToPriceFeedUsd;
     
     uint256 public stalenessThreshold = 1 hours; // Maximum acceptable price age (configurable)
-    uint256 public constant MAX_PRICE_DEVIATION = 500; // 5% max deviation between updates (basis points)
-    mapping(address => uint256) public lastPrices; // Track last prices for deviation checks
-    mapping(address => uint256) public lastUpdateTime; // Track last update times
     
     constructor() Ownable(msg.sender) {}
     

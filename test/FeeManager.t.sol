@@ -16,7 +16,7 @@ contract FeeManagerTest is Test {
         feeManager = new FeeManager(5, 3);
     }
 
-    function test_InitialState() public {
+    function test_InitialState() public view {
         assertEq(feeManager.defaultTreasureFee(), 5);
         assertEq(feeManager.defaultLiquidationReward(), 3);
         assertEq(feeManager.owner(), owner);

@@ -29,8 +29,6 @@ function test__leveragedTradeToCloseLong1() public {
     assertApproxEqRel(amount * 2, IERC20(conf.wbtc).balanceOf(address(positions)), 0.05e18);
 
     uint256 usdcBalanceAfter = IERC20(conf.usdc).balanceOf(address(lbPoolUsdc));
-    uint256 price = priceFeedL1.getPairLatestPrice(conf.wbtc, conf.usdc);
-    uint256 totalBorrow = (amount * 1 * price) / (10**18);
     assertApproxEqRel(usdcBalanceBefore, usdcBalanceAfter, 0.05e18);
 
     assertEq(1, positions.totalNbPos());

@@ -52,7 +52,6 @@ contract LiquidityPoolTest is TestSetup {
         vm.startPrank(alice);
         uint256 depositAmount = 10e8;
 
-        uint256 balanceDeposit = asset.balanceOf(alice);
         pool.deposit(depositAmount, alice);
 
         uint256 withdrawAmount = 5e8;
@@ -79,7 +78,6 @@ contract LiquidityPoolTest is TestSetup {
         vm.startPrank(alice);
         uint256 depositAmount = 10e8;
 
-        uint256 balanceDeposit = asset.balanceOf(alice);
         pool.deposit(depositAmount, alice);
 
         vm.stopPrank();
@@ -110,7 +108,7 @@ contract LiquidityPoolTest is TestSetup {
         vm.stopPrank();
     }
 
-    function testShares() public {
+    function testShares() public view {
         uint256 assets = 100e8;
         uint256 expectedShares = pool.previewDeposit(assets);
         assertEq(expectedShares, assets, "Preview deposit should match assets 1:1 initially");

@@ -5,34 +5,34 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract FeeManager is Ownable {
     struct FeeParams {
-        uint256 treasureFee;
-        uint256 liquidationReward;
+        uint128 treasureFee;
+        uint128 liquidationReward;
         bool isCustom;
     }
 
-    // Default fees
-    uint256 public defaultTreasureFee;
-    uint256 public defaultLiquidationReward;
+    // Default fees - packed into a single slot
+    uint128 public defaultTreasureFee;
+    uint128 public defaultLiquidationReward;
 
     // Position Life Time (timestamp-based - kept for backward compatibility)
-    uint256 public defaultPositionLifeTime = 30 days;
-    mapping(address => uint256) public customLifeTimes;
+    uint64 public defaultPositionLifeTime = uint64(30 days);
+    mapping(address => uint64) public customLifeTimes;
     
     // Position Life Time (block-based - more manipulation-resistant)
     uint256 public constant AVG_BLOCK_TIME = 12 seconds; // Ethereum average block time
-    uint256 public defaultPositionLifeBlocks = (30 days) / 12 seconds; // ~216000 blocks
-    mapping(address => uint256) public customLifeBlocks;
+    uint64 public defaultPositionLifeBlocks = uint64((30 days) / 12 seconds); // ~216000 blocks
+    mapping(address => uint64) public customLifeBlocks;
 
     // Mapping from trader address to their custom fees
     mapping(address => FeeParams) public customFees;
 
-    event CustomFeeSet(address indexed trader, uint256 treasureFee, uint256 liquidationReward);
+    event CustomFeeSet(address indexed trader, uint128 treasureFee, uint128 liquidationReward);
     event CustomFeeRemoved(address indexed trader);
-    event DefaultFeesUpdated(uint256 treasureFee, uint256 liquidationReward);
+    event DefaultFeesUpdated(uint128 treasureFee, uint128 liquidationReward);
 
     constructor(
-        uint256 _defaultTreasureFee,
-        uint256 _defaultLiquidationReward
+        uint128 _defaultTreasureFee,
+        uint128 _defaultLiquidationReward
     ) Ownable(msg.sender) {
         defaultTreasureFee = _defaultTreasureFee;
         defaultLiquidationReward = _defaultLiquidationReward;
@@ -46,8 +46,8 @@ contract FeeManager is Ownable {
      */
     function setCustomFees(
         address _trader,
-        uint256 _treasureFee,
-        uint256 _liquidationReward
+        uint128 _treasureFee,
+        uint128 _liquidationReward
     ) external onlyOwner {
         customFees[_trader] = FeeParams({
             treasureFee: _treasureFee,
@@ -71,7 +71,7 @@ contract FeeManager is Ownable {
      * @param _treasureFee The new default treasure fee
      * @param _liquidationReward The new default liquidation reward
      */
-    function setDefaultFees(uint256 _treasureFee, uint256 _liquidationReward) external onlyOwner {
+    function setDefaultFees(uint128 _treasureFee, uint128 _liquidationReward) external onlyOwner {
         defaultTreasureFee = _treasureFee;
         defaultLiquidationReward = _liquidationReward;
         emit DefaultFeesUpdated(_treasureFee, _liquidationReward);
@@ -81,7 +81,7 @@ contract FeeManager is Ownable {
      * @notice Set the default position life time
      * @param _defaultPositionLifeTime The new default position life time
      */
-    function setDefaultPositionLifeTime(uint256 _defaultPositionLifeTime) external onlyOwner {
+    function setDefaultPositionLifeTime(uint64 _defaultPositionLifeTime) external onlyOwner {
         defaultPositionLifeTime = _defaultPositionLifeTime;
     }
 
@@ -90,7 +90,7 @@ contract FeeManager is Ownable {
      * @param _trader The trader address
      * @param _lifeTime The custom life time
      */
-    function setCustomPositionLifeTime(address _trader, uint256 _lifeTime) external onlyOwner {
+    function setCustomPositionLifeTime(address _trader, uint64 _lifeTime) external onlyOwner {
         customLifeTimes[_trader] = _lifeTime;
     }
 
@@ -107,7 +107,7 @@ contract FeeManager is Ownable {
      * @param _trader The trader address
      * @return The position life time in seconds
      */
-    function getPositionLifeTime(address _trader) external view returns (uint256) {
+    function getPositionLifeTime(address _trader) external view returns (uint64) {
         if (customLifeTimes[_trader] != 0) {
             return customLifeTimes[_trader];
         }
@@ -119,7 +119,7 @@ contract FeeManager is Ownable {
      * @param _trader The trader address
      * @return The position life time in blocks
      */
-    function getPositionLifeBlocks(address _trader) external view returns (uint256) {
+    function getPositionLifeBlocks(address _trader) external view returns (uint64) {
         if (customLifeBlocks[_trader] != 0) {
             return customLifeBlocks[_trader];
         }
@@ -130,7 +130,7 @@ contract FeeManager is Ownable {
      * @notice Set the default position life time in blocks
      * @param _defaultPositionLifeBlocks The new default position life time in blocks
      */
-    function setDefaultPositionLifeBlocks(uint256 _defaultPositionLifeBlocks) external onlyOwner {
+    function setDefaultPositionLifeBlocks(uint64 _defaultPositionLifeBlocks) external onlyOwner {
         defaultPositionLifeBlocks = _defaultPositionLifeBlocks;
     }
     
@@ -139,7 +139,7 @@ contract FeeManager is Ownable {
      * @param _trader The trader address
      * @param _lifeBlocks The custom life time in blocks
      */
-    function setCustomPositionLifeBlocks(address _trader, uint256 _lifeBlocks) external onlyOwner {
+    function setCustomPositionLifeBlocks(address _trader, uint64 _lifeBlocks) external onlyOwner {
         customLifeBlocks[_trader] = _lifeBlocks;
     }
     
@@ -159,7 +159,7 @@ contract FeeManager is Ownable {
      */
     function getFees(
         address _trader
-    ) external view returns (uint256 treasureFee, uint256 liquidationReward) {
+    ) external view returns (uint128 treasureFee, uint128 liquidationReward) {
         FeeParams memory params = customFees[_trader];
         if (params.isCustom) {
             return (params.treasureFee, params.liquidationReward);
