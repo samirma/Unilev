@@ -179,6 +179,11 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
         bool isMargin = _leverage != 1 || _isShort;
 
+        uint8 baseDecimals = IERC20Metadata(baseToken).decimals();
+        uint8 quoteDecimals = IERC20Metadata(quoteToken).decimals();
+        uint256 baseDecimalsPow = 10 ** baseDecimals;
+        uint256 quoteDecimalsPow = 10 ** quoteDecimals;
+
         // transfer funds to the contract (trader need to approve first)
         IERC20(_token0).safeTransferFrom(_trader, address(this), _amount);
 
@@ -199,17 +204,15 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
         if (isMargin) {
             if (_isShort) {
-                // breakEven = price + price/leverage (short becomes underwater when price rises)
                 breakEvenLimit = price + (price * 10000) / (uint256(_leverage) * 10000);
                 totalBorrow =
-                    (_amount * (10 ** IERC20Metadata(baseToken).decimals()) * _leverage) /
-                    price; // Borrow baseToken
+                    (_amount * baseDecimalsPow * _leverage) /
+                    price;
             } else {
-                // breakEven = price - price/leverage (long becomes underwater when price drops)
                 breakEvenLimit = price - (price * 10000) / (uint256(_leverage) * 10000);
                 totalBorrow =
                     (_amount * (_leverage - 1) * price) /
-                    (10 ** IERC20Metadata(baseToken).decimals()); // Borrow quoteToken
+                    baseDecimalsPow;
             }
 
             address cacheLiquidityPoolToUse = LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY)
@@ -222,8 +225,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                 SafeERC20.forceApprove(IERC20(baseToken), address(UNISWAP_V3_HELPER), totalBorrow);
 
                 uint256 priceBaseToQuote = PRICE_FEED.getPairLatestPrice(baseToken, quoteToken);
-                uint256 minOut = (totalBorrow * priceBaseToQuote) /
-                    (10 ** IERC20Metadata(baseToken).decimals());
+                uint256 minOut = (totalBorrow * priceBaseToQuote) / baseDecimalsPow;
                 minOut = (minOut * 9500) / 10000;
 
                 amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
@@ -242,11 +244,10 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                     );
 
                     uint256 priceQuoteToBase = PRICE_FEED.getPairLatestPrice(quoteToken, baseToken);
-                    uint256 minOut = (totalBorrow * priceQuoteToBase) /
-                        (10 ** IERC20Metadata(quoteToken).decimals());
+                    uint256 minOut = (totalBorrow * priceQuoteToBase) / quoteDecimalsPow;
                     minOut = (minOut * 9500) / 10000;
 
-                    amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
+                amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
                         quoteToken,
                         baseToken,
                         IUniswapV3Pool(v3Pool).fee(),
@@ -487,12 +488,12 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         uint256 _posId,
         uint256 _newStopLossPrice
     ) external onlyOwner isPositionOwned(_trader, _posId) nonReentrant whenNotPaused {
-        // check params
+        PositionParams storage pos = openPositions[_posId];
         uint256 price = PRICE_FEED.getPairLatestPrice(
-            address(openPositions[_posId].baseToken),
-            address(openPositions[_posId].quoteToken)
+            address(pos.baseToken),
+            address(pos.quoteToken)
         );
-        if (openPositions[_posId].isShort) {
+        if (pos.isShort) {
             if (_newStopLossPrice < price) {
                 revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(_newStopLossPrice);
             }
@@ -501,7 +502,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                 revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(_newStopLossPrice);
             }
         }
-        openPositions[_posId].stopLossPrice = _newStopLossPrice;
+        pos.stopLossPrice = _newStopLossPrice;
     }
 
     /**
@@ -518,19 +519,19 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         if (_ownerOf(_posId) == address(0)) {
             return PositionState.NONE;
         }
-        bool isShort = openPositions[_posId].isShort;
-        uint256 breakEvenLimit = openPositions[_posId].breakEvenLimit;
-        uint160 limitPrice = openPositions[_posId].limitPrice;
-        uint256 stopLossPrice = openPositions[_posId].stopLossPrice;
+        PositionParams storage pos = openPositions[_posId];
+        bool isShort = pos.isShort;
+        uint256 breakEvenLimit = pos.breakEvenLimit;
+        uint160 limitPrice = pos.limitPrice;
+        uint256 stopLossPrice = pos.stopLossPrice;
         uint256 price = PRICE_FEED.getPairLatestPrice(
-            address(openPositions[_posId].baseToken),
-            address(openPositions[_posId].quoteToken)
+            address(pos.baseToken),
+            address(pos.quoteToken)
         );
         uint256 lidTresh = isShort
             ? (breakEvenLimit * (10000 - LIQUIDATION_THRESHOLD)) / 10000
             : (breakEvenLimit * (LIQUIDATION_THRESHOLD + 10000)) / 10000;
 
-        // closable because of take profit
         if (isShort) {
             if (limitPrice != 0 && price < limitPrice) return PositionState.TAKE_PROFIT;
             if (breakEvenLimit != 0 && price >= breakEvenLimit) return PositionState.BAD_DEBT;
@@ -543,16 +544,13 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             if (stopLossPrice != 0 && price <= stopLossPrice) return PositionState.STOP_LOSS;
         }
 
-        // Check both timestamp-based and block-based expiration for manipulation resistance
-        // [MED-002] Using block numbers prevents timestamp manipulation by miners
         address positionOwner = _ownerOf(_posId);
         uint256 timeBasedExpiry = feeManager.getPositionLifeTime(positionOwner);
         uint256 blockBasedExpiry = feeManager.getPositionLifeBlocks(positionOwner);
 
-        bool timeExpired = block.timestamp - openPositions[_posId].timestamp > timeBasedExpiry;
-        bool blocksExpired = block.number - openPositions[_posId].blockNumber > blockBasedExpiry;
+        bool timeExpired = block.timestamp - pos.timestamp > timeBasedExpiry;
+        bool blocksExpired = block.number - pos.blockNumber > blockBasedExpiry;
 
-        // Position expires if BOTH time AND blocks have passed (prevents manipulation)
         if (timeExpired && blocksExpired) {
             return PositionState.EXPIRED;
         }
@@ -578,17 +576,18 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             int128 collateralLeft_
         )
     {
-        baseToken_ = address(openPositions[_posId].baseToken);
-        quoteToken_ = address(openPositions[_posId].quoteToken);
-        positionSize_ = openPositions[_posId].positionSize;
-        timestamp_ = openPositions[_posId].timestamp;
-        isShort_ = openPositions[_posId].isShort;
-        leverage_ = openPositions[_posId].leverage;
-        breakEvenLimit_ = openPositions[_posId].breakEvenLimit;
-        limitPrice_ = openPositions[_posId].limitPrice;
-        stopLossPrice_ = openPositions[_posId].stopLossPrice;
+        PositionParams storage pos = openPositions[_posId];
+        baseToken_ = address(pos.baseToken);
+        quoteToken_ = address(pos.quoteToken);
+        positionSize_ = pos.positionSize;
+        timestamp_ = pos.timestamp;
+        isShort_ = pos.isShort;
+        leverage_ = pos.leverage;
+        breakEvenLimit_ = pos.breakEvenLimit;
+        limitPrice_ = pos.limitPrice;
+        stopLossPrice_ = pos.stopLossPrice;
 
-        uint256 initialPrice = openPositions[_posId].initialPrice;
+        uint256 initialPrice = pos.initialPrice;
         uint256 currentPrice = PRICE_FEED.getPairLatestPrice(baseToken_, quoteToken_);
 
         int256 share = 10000 - int(currentPrice * 10000) / int(initialPrice);
@@ -597,9 +596,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
         currentPnL_ = isShort_ ? currentPnL_ : -currentPnL_;
 
-        currentPnL_ = currentPnL_ - int128(openPositions[_posId].liquidationReward);
+        currentPnL_ = currentPnL_ - int128(pos.liquidationReward);
 
-        collateralLeft_ = int128(openPositions[_posId].collateralSize) + currentPnL_;
+        collateralLeft_ = int128(pos.collateralSize) + currentPnL_;
     }
 
     function swapMaxTokenPossible(
@@ -609,6 +608,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         uint256 amountOut,
         uint256 amountInMaximum
     ) private returns (uint256, uint256) {
+        uint256 token0DecimalsPow = 10 ** IERC20Metadata(_token0).decimals();
         SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), amountInMaximum);
         uint256 swapCost = UNISWAP_V3_HELPER.swapExactOutputSingle(
             _token0,
@@ -617,12 +617,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             amountOut,
             amountInMaximum
         );
-        // if swap cannot be done with amountInMaximum
         if (swapCost == 0) {
-            SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), amountInMaximum);
-
             uint256 price = PRICE_FEED.getPairLatestPrice(_token0, _token1);
-            uint256 minOut = (amountInMaximum * price) / (10 ** IERC20Metadata(_token0).decimals());
+            uint256 minOut = (amountInMaximum * price) / token0DecimalsPow;
             minOut = (minOut * 9500) / 10000;
 
             uint256 out = UNISWAP_V3_HELPER.swapExactInputSingle(
@@ -640,7 +637,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
     function getTraderPositions(address _traderAdd) external view returns (uint256[] memory) {
         uint256 nbOfPositions = balanceOf(_traderAdd);
-        uint256[] memory traderPositions = new uint[](nbOfPositions);
+        uint256[] memory traderPositions = new uint256[](nbOfPositions);
         // start form the highest posId and stop when the all positions are found
         uint256 posId_;
         for (uint256 i = posId - 1; i > 0; ) {

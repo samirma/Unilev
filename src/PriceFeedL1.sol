@@ -104,12 +104,7 @@ contract PriceFeedL1 is Ownable {
     }
 
     function isPairSupported(address _token0, address _token1) public view returns (bool) {
-        if (address(tokenToPriceFeedUsd[_token0]) == address(0)) {
-            return false;
-        }
-        if (address(tokenToPriceFeedUsd[_token1]) == address(0)) {
-            return false;
-        }
-        return true;
+        return address(tokenToPriceFeedUsd[_token0]) != address(0) &&
+               address(tokenToPriceFeedUsd[_token1]) != address(0);
     }
 }

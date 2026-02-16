@@ -160,11 +160,9 @@ contract FeeManager is Ownable {
     function getFees(
         address _trader
     ) external view returns (uint128 treasureFee, uint128 liquidationReward) {
-        FeeParams memory params = customFees[_trader];
-        if (params.isCustom) {
-            return (params.treasureFee, params.liquidationReward);
-        } else {
-            return (defaultTreasureFee, defaultLiquidationReward);
+        if (customFees[_trader].isCustom) {
+            return (customFees[_trader].treasureFee, customFees[_trader].liquidationReward);
         }
+        return (defaultTreasureFee, defaultLiquidationReward);
     }
 }
