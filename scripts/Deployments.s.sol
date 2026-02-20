@@ -19,15 +19,6 @@ contract Deployments is Script, HelperConfig {
     Market public market;
     Positions public positions;
     FeeManager public feeManager;
-    LiquidityPool public lbPoolWBTC;
-    LiquidityPool public lbPoolWETH;
-    LiquidityPool public lbPoolUSDC;
-    LiquidityPool public lbPoolDAI;
-
-    address public alice;
-    address public bob;
-    address public carol;
-    address public deployer;
 
     HelperConfig.NetworkConfig public conf;
 
@@ -57,10 +48,6 @@ contract Deployments is Script, HelperConfig {
             msg.sender
         );
 
-        /// configurations
-        // add position address to the factory
-        liquidityPoolFactory.addPositionsAddress(address(positions));
-
         // transfer ownership
         positions.transferOwnership(address(market));
         liquidityPoolFactory.transferOwnership(address(market));
@@ -76,15 +63,7 @@ contract Deployments is Script, HelperConfig {
             priceFeeds[i] = conf.supportedTokens[i].priceFeed;
         }
 
-        address[] memory pools = market.initializeTokens(tokens, priceFeeds);
-
-        // We know from HelperConfig order: WBTC=0, WETH=1, USDC=2, DAI=3
-        lbPoolWBTC = LiquidityPool(pools[0]);
-        lbPoolWETH = LiquidityPool(pools[1]);
-        lbPoolUSDC = LiquidityPool(pools[2]);
-        lbPoolDAI = LiquidityPool(pools[3]);
-
-        wrapperAddress = conf.wrapper.token;
+        market.initializeTokens(tokens, priceFeeds);
 
         vm.stopBroadcast();
     }

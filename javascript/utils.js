@@ -78,6 +78,7 @@ function getEnvVars() {
         DAI: ethers.getAddress(envVars.DAI),
         USDC: ethers.getAddress(envVars.USDC),
         WBTC: ethers.getAddress(envVars.WBTC),
+        WRAPPER_ADDRESS: envVars.WRAPPER_ADDRESS ? ethers.getAddress(envVars.WRAPPER_ADDRESS) : null,
         PRICEFEEDL1_ADDRESS: ethers.getAddress(envVars.PRICEFEEDL1_ADDRESS),
         POSITIONS_ADDRESS: ethers.getAddress(envVars.POSITIONS_ADDRESS),
         UNISWAPV3HELPER_ADDRESS: ethers.getAddress(envVars.UNISWAPV3HELPER_ADDRESS),

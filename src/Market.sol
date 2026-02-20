@@ -125,7 +125,7 @@ contract Market is IMarket, Ownable, Pausable {
 
     // --------------- Admin Zone ---------------
     function createLiquidityPool(address _token) public onlyOwner whenNotPaused returns (address) {
-        address lpAdd = LIQUIDITY_POOL_FACTORY.createLiquidityPool(_token);
+        address lpAdd = LIQUIDITY_POOL_FACTORY.createLiquidityPool(_token, address(POSITIONS));
         emit LiquidityPoolCreated(_token, msg.sender);
         return lpAdd;
     }
