@@ -52,11 +52,7 @@ async function getTokenBalance(contract, address, priceFeedL1Contract) {
 
     const formattedBalance = ethers.formatUnits(balance, decimals);
 
-    // Fetch the USD value from the PriceFeedL1 contract
-    const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(await contract.getAddress(), balance);
-    const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2); // PriceFeedL1 returns USD with 18 decimals
-
-    console.log(`  ${symbol.padEnd(6)} : ${formattedBalance.padEnd(20)} (~$ ${usdValue} USD)`);
+    console.log(`  ${symbol.padEnd(6)} : ${formattedBalance.padEnd(20)}`);
 }
 
 /**
@@ -196,20 +192,6 @@ async function logPositionDetails(posId, marketContract, priceFeedL1Contract, pr
         const token1 = isShort ? quoteToken : baseToken;
         const symbol0 = isShort ? baseSymbol : quoteSymbol;
         const symbol1 = isShort ? quoteSymbol : baseSymbol;
-
-        // Calculate USD value
-        // Note: positionSize is essentially the collateral size + borrowed (if margin) or just amount?
-        // In openShortPosition, we logged 'amount'. Market.PositionOpened emits 'amount'.
-        // getPositionParams returns 'positionSize'. 
-        // For short: positionSize = amountBorrow (baseToken).
-        // Let's rely on what we have. The user liked the previous output.
-        // Previous output used `parsedLog.args.amount` which was the input/margin amount.
-        // `getPositionParams` gives the Total size of the position found in the market.
-        // This might be slightly different context but for "View All Positions", showing Position Size is appropriate.
-        // Let's stick to showing Position Size as per `checkLiquidablePositions.js` logic but enhanced.
-
-        // Wait, for `openShortPosition.js` we want to show the details of the *opened* position.
-        // If we use the generic `logPositionDetails` which pulls from `getPositionParams`, it will show valid data.
 
         // Calculate USD for the Position Size
         const usdAmountBigInt = await priceFeedL1Contract.getAmountInUsd(baseToken, positionSize);
