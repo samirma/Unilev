@@ -31,7 +31,7 @@ contract Deployments is Script, HelperConfig {
 
     HelperConfig.NetworkConfig public conf;
 
-    function run() public {
+    function run() public returns (address wrapperAddress) {
         conf = getActiveNetworkConfig();
 
         vm.startBroadcast();
@@ -67,23 +67,24 @@ contract Deployments is Script, HelperConfig {
         priceFeedL1.transferOwnership(address(market));
 
         // initialize tokens (create pools + add price feeds)
-        address[] memory tokens = new address[](4);
-        tokens[0] = conf.wbtc;
-        tokens[1] = conf.weth;
-        tokens[2] = conf.usdc;
-        tokens[3] = conf.dai;
+        uint256 numTokens = conf.supportedTokens.length;
+        address[] memory tokens = new address[](numTokens);
+        address[] memory priceFeeds = new address[](numTokens);
 
-        address[] memory priceFeeds = new address[](4);
-        priceFeeds[0] = conf.priceFeedWbtcUsd;
-        priceFeeds[1] = conf.priceFeedEthUsd;
-        priceFeeds[2] = conf.priceFeedUsdcUsd;
-        priceFeeds[3] = conf.priceFeedDaiUsd;
+        for (uint256 i = 0; i < numTokens; i++) {
+            tokens[i] = conf.supportedTokens[i].token;
+            priceFeeds[i] = conf.supportedTokens[i].priceFeed;
+        }
 
         address[] memory pools = market.initializeTokens(tokens, priceFeeds);
+
+        // We know from HelperConfig order: WBTC=0, WETH=1, USDC=2, DAI=3
         lbPoolWBTC = LiquidityPool(pools[0]);
         lbPoolWETH = LiquidityPool(pools[1]);
         lbPoolUSDC = LiquidityPool(pools[2]);
         lbPoolDAI = LiquidityPool(pools[3]);
+
+        wrapperAddress = conf.wrapper.token;
 
         vm.stopBroadcast();
     }

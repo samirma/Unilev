@@ -53,6 +53,19 @@ async function updateEnv() {
         }
       });
 
+      // Update WRAPPER_ADDRESS from script returns
+      if (runLatest.returns && runLatest.returns.wrapperAddress) {
+        const wrapperAddress = runLatest.returns.wrapperAddress.value;
+        const key = 'WRAPPER_ADDRESS';
+        const newLine = `${key}=${wrapperAddress}`;
+        if (envMap.has(key)) {
+          const { index } = envMap.get(key);
+          envLines[index] = newLine;
+        } else {
+          envLines.push(newLine);
+        }
+      }
+
       // Write the updated content back to the .env file
       fs.writeFile(envPath, envLines.join('\n'), 'utf8', (err) => {
         if (err) {

@@ -94,30 +94,30 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         priceFeedL1.transferOwnership(address(market));
 
         // create liquidity pools
-        lbPoolWbtc = LiquidityPool(market.createLiquidityPool(conf.wbtc));
-        lbPoolWeth = LiquidityPool(market.createLiquidityPool(conf.weth));
-        lbPoolUsdc = LiquidityPool(market.createLiquidityPool(conf.usdc));
-        lbPoolDai = LiquidityPool(market.createLiquidityPool(conf.dai));
+        lbPoolWbtc = LiquidityPool(market.createLiquidityPool(conf.supportedTokens[0].token));
+        lbPoolWeth = LiquidityPool(market.createLiquidityPool(conf.supportedTokens[1].token));
+        lbPoolUsdc = LiquidityPool(market.createLiquidityPool(conf.supportedTokens[2].token));
+        lbPoolDai = LiquidityPool(market.createLiquidityPool(conf.supportedTokens[3].token));
 
         // add price feeds
-        market.addPriceFeed(conf.wbtc, address(mockV3AggregatorWbtcUsd));
-        market.addPriceFeed(conf.usdc, address(mockV3AggregatorUsdcUsd));
-        market.addPriceFeed(conf.dai, address(mockV3AggregatorDaiUsd));
-        market.addPriceFeed(conf.weth, address(mockV3AggregatorEthUsd));
+        market.addPriceFeed(conf.supportedTokens[0].token, address(mockV3AggregatorWbtcUsd));
+        market.addPriceFeed(conf.supportedTokens[2].token, address(mockV3AggregatorUsdcUsd));
+        market.addPriceFeed(conf.supportedTokens[3].token, address(mockV3AggregatorDaiUsd));
+        market.addPriceFeed(conf.supportedTokens[1].token, address(mockV3AggregatorEthUsd));
 
         vm.stopPrank();
 
         // add liquidity to a pool to be able to open a short position
         vm.startPrank(bob);
-        writeTokenBalance(bob, conf.wbtc, 10e8);
-        writeTokenBalance(bob, conf.weth, 100e18);
-        writeTokenBalance(bob, conf.usdc, 10000000e6);
-        writeTokenBalance(bob, conf.dai, 10000000e6);
+        writeTokenBalance(bob, conf.supportedTokens[0].token, 10e8);
+        writeTokenBalance(bob, conf.supportedTokens[1].token, 100e18);
+        writeTokenBalance(bob, conf.supportedTokens[2].token, 10000000e6);
+        writeTokenBalance(bob, conf.supportedTokens[3].token, 10000000e6);
 
-        IERC20(conf.wbtc).approve(address(lbPoolWbtc), 10e8);
-        IERC20(conf.weth).approve(address(lbPoolWeth), 100e18);
-        IERC20(conf.usdc).approve(address(lbPoolUsdc), 10000000e6);
-        IERC20(conf.dai).approve(address(lbPoolDai), 10000000e6);
+        IERC20(conf.supportedTokens[0].token).approve(address(lbPoolWbtc), 10e8);
+        IERC20(conf.supportedTokens[1].token).approve(address(lbPoolWeth), 100e18);
+        IERC20(conf.supportedTokens[2].token).approve(address(lbPoolUsdc), 10000000e6);
+        IERC20(conf.supportedTokens[3].token).approve(address(lbPoolDai), 10000000e6);
 
         lbPoolWbtc.deposit(10e8, bob);
         lbPoolWeth.deposit(100e18, bob);

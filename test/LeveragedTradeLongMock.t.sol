@@ -13,7 +13,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint24 fee = 3000;
 
         // 1. Initial State
-        writeTokenBalance(alice, conf.weth, amount);
+        writeTokenBalance(alice, conf.supportedTokens[1].token, amount);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8); // ETH = $4,000
@@ -22,9 +22,9 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // 2. Open Position (Long WETH/WBTC 2x)
         vm.startPrank(alice);
-        IERC20(conf.weth).approve(address(positions), amount);
+        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
         // token0=WETH, token1=WBTC, isShort=false (Long), leverage=2
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 2, amount, 0, 0);
+        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
         vm.stopPrank();
 
         // Verify Position State (Approximate check based on table)
@@ -44,7 +44,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // 5. Final Assertions
         // Table Target: 1.1856 WETH
-        uint256 finalBalance = IERC20(conf.weth).balanceOf(alice);
+        uint256 finalBalance = IERC20(conf.supportedTokens[1].token).balanceOf(alice);
         console.log("Final Trader Balance (WETH):", finalBalance);
 
         // Using a relative error tolerance to account for minor fee calculation differences in mocks
@@ -52,7 +52,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         assertApproxEqAbs(finalBalance, 1.1856e18, 1e16);
 
         // Treasure check: ~0.009012 WETH
-        uint256 treasureBalance = IERC20(conf.weth).balanceOf(conf.treasure);
+        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
         console.log("Treasure Balance (WETH):", treasureBalance);
         assertApproxEqAbs(treasureBalance, 0.009012e18, 1e16);
     }
@@ -65,7 +65,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint24 fee = 3000;
 
         // 1. Initial State
-        writeTokenBalance(alice, conf.weth, amount);
+        writeTokenBalance(alice, conf.supportedTokens[1].token, amount);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -74,8 +74,8 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // 2. Open Position
         vm.startPrank(alice);
-        IERC20(conf.weth).approve(address(positions), amount);
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 2, amount, 0, 0);
+        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
+        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -92,12 +92,12 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // 5. Final Assertions
         // Table Target: 1.3469 WETH
-        uint256 finalBalance = IERC20(conf.weth).balanceOf(alice);
+        uint256 finalBalance = IERC20(conf.supportedTokens[1].token).balanceOf(alice);
         console.log("Final Trader Balance (WETH):", finalBalance);
         assertApproxEqAbs(finalBalance, 1.3469e18, 2e17);
 
         // Treasure check: ~0.00821 WETH
-        uint256 treasureBalance = IERC20(conf.weth).balanceOf(conf.treasure);
+        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
         console.log("Treasure Balance (WETH):", treasureBalance);
         assertApproxEqAbs(treasureBalance, 0.00821e18, 1e16);
     }
@@ -109,7 +109,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint128 amount = 1e18;
         uint24 fee = 3000;
 
-        writeTokenBalance(alice, conf.weth, amount);
+        writeTokenBalance(alice, conf.supportedTokens[1].token, amount);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -117,8 +117,8 @@ contract LeveragedTradeLongMock is TestSetupMock {
         vm.stopPrank();
 
         vm.startPrank(alice);
-        IERC20(conf.weth).approve(address(positions), amount);
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 2, amount, 0, 0);
+        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
+        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -135,12 +135,12 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // 5. Final Assertions
         // Table Target: 0.931 WETH
-        uint256 finalBalance = IERC20(conf.weth).balanceOf(alice);
+        uint256 finalBalance = IERC20(conf.supportedTokens[1].token).balanceOf(alice);
         console.log("Final Trader Balance (WETH):", finalBalance);
         assertApproxEqAbs(finalBalance, 0.931e18, 1e16);
 
         // Treasure check: ~0.010279 WETH
-        uint256 treasureBalance = IERC20(conf.weth).balanceOf(conf.treasure);
+        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
         assertApproxEqAbs(treasureBalance, 0.010279e18, 1e16);
     }
 
@@ -151,7 +151,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint128 amount = 1e18;
         uint24 fee = 3000;
 
-        writeTokenBalance(alice, conf.weth, amount);
+        writeTokenBalance(alice, conf.supportedTokens[1].token, amount);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -159,9 +159,9 @@ contract LeveragedTradeLongMock is TestSetupMock {
         vm.stopPrank();
 
         vm.startPrank(alice);
-        IERC20(conf.weth).approve(address(positions), amount);
+        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
         // Leverage = 1 (No Leverage)
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 1, amount, 0, 0);
+        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 1, amount, 0, 0);
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -178,12 +178,12 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // 5. Final Assertions
         // Table Target: 0.995 WETH (Just holding minus fees)
-        uint256 finalBalance = IERC20(conf.weth).balanceOf(alice);
+        uint256 finalBalance = IERC20(conf.supportedTokens[1].token).balanceOf(alice);
         console.log("Final Trader Balance (WETH):", finalBalance);
         assertApproxEqAbs(finalBalance, 0.995e18, 1e16); // Slightly higher tolerance due to fee model
 
         // Treasure check: ~0.009976 WETH
-        uint256 treasureBalance = IERC20(conf.weth).balanceOf(conf.treasure);
+        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
         assertApproxEqAbs(treasureBalance, 0.009976e18, 1e16);
     }
 
@@ -194,7 +194,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint128 amount = 1e18;
         uint24 fee = 3000;
 
-        writeTokenBalance(alice, conf.weth, amount);
+        writeTokenBalance(alice, conf.supportedTokens[1].token, amount);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -202,8 +202,8 @@ contract LeveragedTradeLongMock is TestSetupMock {
         vm.stopPrank();
 
         vm.startPrank(alice);
-        IERC20(conf.weth).approve(address(positions), amount);
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 1, amount, 0, 0);
+        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
+        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 1, amount, 0, 0);
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -220,12 +220,12 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // 5. Final Assertions
         // Table Target: 0.995 WETH
-        uint256 finalBalance = IERC20(conf.weth).balanceOf(alice);
+        uint256 finalBalance = IERC20(conf.supportedTokens[1].token).balanceOf(alice);
         console.log("Final Trader Balance (WETH):", finalBalance);
         assertApproxEqAbs(finalBalance, 0.995e18, 1e16);
 
         // Treasure check: ~0.009976 WETH
-        uint256 treasureBalance = IERC20(conf.weth).balanceOf(conf.treasure);
+        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
         assertApproxEqAbs(treasureBalance, 0.009976e18, 1e16);
     }
     // ----------------------------------------------------------------------
@@ -237,7 +237,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         address whitelistedUser = address(0x88);
 
         // 1. Initial State
-        writeTokenBalance(whitelistedUser, conf.weth, amount);
+        writeTokenBalance(whitelistedUser, conf.supportedTokens[1].token, amount);
 
         // 2. Add to Whitelist with reduced fees (0.01% treasure, 0% liquidation reward)
         vm.startPrank(deployer);
@@ -251,8 +251,8 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // 3. Open Position
         vm.startPrank(whitelistedUser);
-        IERC20(conf.weth).approve(address(positions), amount);
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 2, amount, 0, 0);
+        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
+        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
         vm.stopPrank();
 
         // 4. Verification of Treasure Fee
@@ -260,7 +260,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // Amount used for fee calc = 1e18
         // Treasure Fee = 1e18 * 1 / 10000 = 1e14
 
-        uint256 treasureBalance = IERC20(conf.weth).balanceOf(conf.treasure);
+        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
         console.log("Treasure Balance (Whitelisted):", treasureBalance);
         assertApproxEqAbs(treasureBalance, 1e14, 100); // Allow small rounding
     }
@@ -274,8 +274,8 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint24 fee = 3000;
 
         // 1. Initial State
-        writeTokenBalance(alice, conf.weth, amountAlice);
-        writeTokenBalance(bob, conf.weth, amountBob);
+        writeTokenBalance(alice, conf.supportedTokens[1].token, amountAlice);
+        writeTokenBalance(bob, conf.supportedTokens[1].token, amountBob);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8); // ETH = $4,000
@@ -284,13 +284,13 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // 2. Open Positions
         vm.startPrank(alice);
-        IERC20(conf.weth).approve(address(positions), amountAlice);
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 2, amountAlice, 0, 0);
+        IERC20(conf.supportedTokens[1].token).approve(address(positions), amountAlice);
+        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amountAlice, 0, 0);
         vm.stopPrank();
 
         vm.startPrank(bob);
-        IERC20(conf.weth).approve(address(positions), amountBob);
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 3, amountBob, 0, 0);
+        IERC20(conf.supportedTokens[1].token).approve(address(positions), amountBob);
+        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 3, amountBob, 0, 0);
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -321,7 +321,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         assertTrue(count >= 2, "Should have at least 2 liquidable positions");
 
         // 5. Liquidate via Market
-        uint256 liquidatorBalanceBefore = IERC20(conf.weth).balanceOf(deployer);
+        uint256 liquidatorBalanceBefore = IERC20(conf.supportedTokens[1].token).balanceOf(deployer);
 
         vm.startPrank(deployer);
         market.liquidatePositions(liquidablePos);
@@ -331,7 +331,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         assertEq(positions.getTraderPositions(alice).length, 0, "Alice position should be closed");
         assertEq(positions.getTraderPositions(bob).length, 0, "Bob position should be closed");
 
-        uint256 liquidatorBalanceAfter = IERC20(conf.weth).balanceOf(deployer);
+        uint256 liquidatorBalanceAfter = IERC20(conf.supportedTokens[1].token).balanceOf(deployer);
         assertTrue(
             liquidatorBalanceAfter > liquidatorBalanceBefore,
             "Liquidator should receive rewards"
