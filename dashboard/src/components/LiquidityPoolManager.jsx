@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useDeFi } from '../hooks/useDeFi';
 import { useAccount } from 'wagmi';
+import { polygon } from 'wagmi/chains';
 import clsx from 'clsx';
 import { ethers } from 'ethers';
+import { formatContractError } from '../utils/formatContractError';
 
 const TOKENS = [
     { key: 'WETH', name: 'WETH' },
@@ -13,8 +15,10 @@ const TOKENS = [
 ];
 
 export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
-    const { isConnected, address } = useAccount();
+    const { isConnected, address, chainId } = useAccount();
     const { getProtocolBalances, depositToPool, redeemFromPool, ADDRESSES } = useDeFi();
+
+    const isCorrectNetwork = chainId === polygon.id;
 
     // Tab state (Internal logic for tabs removed, using prop)
     const [action, setAction] = useState('deposit'); // 'deposit' | 'redeem'
@@ -47,7 +51,7 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
 
     const handleAction = async (e) => {
         e.preventDefault();
-        if (!amount || parseFloat(amount) <= 0) return;
+        if (!amount || parseFloat(amount) <= 0 || !isCorrectNetwork) return;
         setProcessing(true);
         setTxStatus('Initiating transaction...');
 
@@ -74,7 +78,8 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
 
         } catch (error) {
             console.error(error);
-            setTxStatus(`❌ Error: ${error.reason || error.message}`);
+            const friendlyError = formatContractError(error);
+            setTxStatus(`❌ Error: ${friendlyError}`);
         } finally {
             setProcessing(false);
         }
@@ -160,15 +165,17 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
 
                 <button
                     type="submit"
-                    disabled={processing || !isConnected}
+                    disabled={processing || !isConnected || !isCorrectNetwork}
                     className={clsx(
                         "w-full primary-button py-4 text-base font-bold tracking-wide mt-4",
-                        processing && "opacity-50 cursor-not-allowed"
+                        (processing || !isCorrectNetwork) && "opacity-50 cursor-not-allowed"
                     )}
                 >
-                    {processing
-                        ? 'Processing...'
-                        : (action === 'deposit' ? `DEPOSIT ${selectedTokenKey}` : 'REDEEM SHARES')
+                    {!isCorrectNetwork
+                        ? 'Wrong Network'
+                        : processing
+                            ? 'Processing...'
+                            : (action === 'deposit' ? `DEPOSIT ${selectedTokenKey}` : 'REDEEM SHARES')
                     }
                 </button>
 

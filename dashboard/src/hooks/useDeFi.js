@@ -83,16 +83,28 @@ export function useDeFi() {
         if (!readProvider || !userAddress) return null;
         try {
             const balance = await readProvider.getBalance(userAddress);
-            const priceFeed = new ethers.Contract(ADDRESSES.PRICEFEEDL1, PriceFeedL1ABI.abi, readProvider);
 
-            // Use WETH address for ETH price
-            const usdValueBigInt = await priceFeed.getAmountInUsd(ADDRESSES.WETH, balance);
-            const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2);
+            // On Polygon, the native token is POL (formerly MATIC)
+            // MATIC/USD Price Feed on Polygon Mainnet: 0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
+            const maticUsdAggregator = new ethers.Contract(
+                "0xAB594600376Ec9fD91F8e885dADF0CE036862dE0",
+                ["function latestRoundData() external view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)", "function decimals() external view returns (uint8)"],
+                readProvider
+            );
+
+            const [roundData, decimals] = await Promise.all([
+                maticUsdAggregator.latestRoundData(),
+                maticUsdAggregator.decimals()
+            ]);
+
+            const price = Number(roundData.answer) / (10 ** Number(decimals));
+            const formattedBalance = parseFloat(ethers.formatEther(balance));
+            const usdValue = (formattedBalance * price).toFixed(2);
 
             return {
-                symbol: 'ETH',
+                symbol: 'POL',
                 decimals: 18,
-                balance: ethers.formatEther(balance),
+                balance: formattedBalance.toString(),
                 usdValue,
                 rawBalance: balance
             };
@@ -224,6 +236,29 @@ export function useDeFi() {
         } catch (error) {
             console.error("Error fetching positions count:", error);
             return 0n;
+        }
+    }, [readProvider]);
+
+    const getPoolBorrowCapacity = useCallback(async (tokenAddress) => {
+        if (!readProvider || !tokenAddress) return null;
+        try {
+            const factory = new ethers.Contract(ADDRESSES.POOL_FACTORY, LiquidityPoolFactoryABI.abi, readProvider);
+            const poolAddress = await factory.getTokenToLiquidityPools(tokenAddress);
+            if (!poolAddress || poolAddress === ethers.ZeroAddress) return null;
+
+            const poolContract = new ethers.Contract(poolAddress, LiquidityPoolABI.abi, readProvider);
+            const capacityBigInt = await poolContract.borrowCapacityLeft();
+
+            const tokenContract = new ethers.Contract(tokenAddress, ERC20ABI.abi, readProvider);
+            const decimals = await tokenContract.decimals();
+
+            return {
+                rawCapacity: capacityBigInt,
+                capacityFormatted: ethers.formatUnits(capacityBigInt, decimals)
+            };
+        } catch (error) {
+            console.error("Error fetching borrow capacity:", error);
+            return null;
         }
     }, [readProvider]);
 
@@ -376,6 +411,7 @@ export function useDeFi() {
         closePosition,
         getPositionDetails,
         getPositionsCount,
+        getPoolBorrowCapacity,
         getProtocolBalances,
         depositToPool,
         redeemFromPool,

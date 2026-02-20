@@ -4,7 +4,7 @@ import { useDeFi } from '../hooks/useDeFi';
 import { useAccount } from 'wagmi';
 
 const TOKENS = [
-    { key: 'native', name: 'ETH' },
+    { key: 'native', name: 'POL' },
     { key: 'WETH', name: 'WETH' },
     { key: 'DAI', name: 'DAI' },
     { key: 'USDC', name: 'USDC' },
@@ -28,6 +28,7 @@ export function Balances() {
             let bal;
             if (t.key === 'native') {
                 bal = await getNativeBalance(address);
+                if (bal) bal.symbol = 'POL';
             } else {
                 const tokenAddr = ADDRESSES[t.key];
                 if (tokenAddr) {
