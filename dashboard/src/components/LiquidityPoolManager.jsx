@@ -7,13 +7,6 @@ import clsx from 'clsx';
 import { ethers } from 'ethers';
 import { formatContractError } from '../utils/formatContractError';
 
-const TOKENS = [
-    { key: 'WETH', name: 'WETH' },
-    { key: 'DAI', name: 'DAI' },
-    { key: 'USDC', name: 'USDC' },
-    { key: 'WBTC', name: 'WBTC' },
-];
-
 export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
     const { isConnected, address, chainId } = useAccount();
     const { getProtocolBalances, depositToPool, redeemFromPool, ADDRESSES } = useDeFi();

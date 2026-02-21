@@ -3,18 +3,12 @@ import { useState, useEffect } from 'react';
 import { useDeFi } from '../hooks/useDeFi';
 import { useAccount } from 'wagmi';
 
-const TOKENS = [
-    { key: 'native', name: 'POL' },
-    { key: 'WETH', name: 'WETH' },
-    { key: 'DAI', name: 'DAI' },
-    { key: 'USDC', name: 'USDC' },
-    { key: 'WBTC', name: 'WBTC' },
-];
-
 export function Balances() {
     const { isConnected, address } = useAccount();
-    const { getTokenBalance, getNativeBalance, ADDRESSES } = useDeFi();
+    const { getTokenBalance, getNativeBalance, ADDRESSES, SUPPORTED_TOKENS_LIST } = useDeFi();
     const [balances, setBalances] = useState({});
+
+    const displayTokens = [{ key: 'native', name: 'POL' }, ...SUPPORTED_TOKENS_LIST];
 
     // Initial state with zeroes/dashes to prevent layout shift
     const [loading, setLoading] = useState(false);
@@ -24,7 +18,7 @@ export function Balances() {
         setLoading(true);
         const newBalances = {};
 
-        for (const t of TOKENS) {
+        for (const t of displayTokens) {
             let bal;
             if (t.key === 'native') {
                 bal = await getNativeBalance(address);
@@ -60,7 +54,7 @@ export function Balances() {
                 </button>
             </div>
             <div className="space-y-3">
-                {TOKENS.map(t => (
+                {displayTokens.map(t => (
                     <div key={t.key} className="flex justify-between items-center bg-white/5 p-3 rounded-lg">
                         <span className="font-bold text-gray-300">{t.name}</span>
                         <div className="text-right">

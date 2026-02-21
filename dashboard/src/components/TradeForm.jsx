@@ -6,16 +6,9 @@ import { useAccount } from 'wagmi';
 import { polygon } from 'wagmi/chains';
 import { formatContractError } from '../utils/formatContractError';
 
-const TOKENS = [
-    { key: 'WETH', name: 'WETH' },
-    { key: 'DAI', name: 'DAI' },
-    { key: 'USDC', name: 'USDC' },
-    { key: 'WBTC', name: 'WBTC' },
-];
-
 export function TradeForm() {
     const { isConnected, chainId } = useAccount();
-    const { openPosition, calculateTokenAmountFromUsd, getPoolBorrowCapacity, ADDRESSES } = useDeFi();
+    const { openPosition, calculateTokenAmountFromUsd, getPoolBorrowCapacity, ADDRESSES, SUPPORTED_TOKENS_LIST } = useDeFi();
 
     const [marginToken, setMarginToken] = useState('USDC');
     const [tradingToken, setTradingToken] = useState('WBTC');
@@ -48,7 +41,17 @@ export function TradeForm() {
             setBorrowCapacity(capacityData);
         };
         fetchCapacity();
-    }, [isConnected, isCorrectNetwork, marginToken, tradingToken, isShort, ADDRESSES, getPoolBorrowCapacity]);
+
+        // Setup initial default selected tokens if not set properly (e.g if 'USDC/WBTC' don't exist in config)
+        if (SUPPORTED_TOKENS_LIST.length > 0) {
+            if (!SUPPORTED_TOKENS_LIST.find(t => t.key === marginToken)) {
+                setMarginToken(SUPPORTED_TOKENS_LIST[0].key);
+            }
+            if (!SUPPORTED_TOKENS_LIST.find(t => t.key === tradingToken)) {
+                setTradingToken(SUPPORTED_TOKENS_LIST[Math.min(1, SUPPORTED_TOKENS_LIST.length - 1)].key);
+            }
+        }
+    }, [isConnected, isCorrectNetwork, marginToken, tradingToken, isShort, ADDRESSES, getPoolBorrowCapacity, SUPPORTED_TOKENS_LIST]);
 
     // Calculate required borrow when amount/leverage changes
     useEffect(() => {
@@ -187,7 +190,7 @@ export function TradeForm() {
                             onChange={(e) => setMarginToken(e.target.value)}
                             className="input-field bg-black/40"
                         >
-                            {TOKENS.map(t => <option key={t.key} value={t.key}>{t.name}</option>)}
+                            {SUPPORTED_TOKENS_LIST.map(t => <option key={t.key} value={t.key}>{t.name}</option>)}
                         </select>
                     </div>
                     <div>
@@ -197,7 +200,7 @@ export function TradeForm() {
                             onChange={(e) => setTradingToken(e.target.value)}
                             className="input-field bg-black/40"
                         >
-                            {TOKENS.map(t => <option key={t.key} value={t.key}>{t.name}</option>)}
+                            {SUPPORTED_TOKENS_LIST.map(t => <option key={t.key} value={t.key}>{t.name}</option>)}
                         </select>
                     </div>
                 </div>

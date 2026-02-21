@@ -22,10 +22,7 @@ console.log("🔄 Syncing Environment Variables...");
 
 const envVars = [
     { key: 'RPC_URL', target: 'RPC_URL' },
-    { key: 'WETH', target: 'WETH' },
-    { key: 'DAI', target: 'DAI' },
-    { key: 'USDC', target: 'USDC' },
-    { key: 'WBTC', target: 'WBTC' },
+    { key: 'WRAPPER_ADDRESS', target: 'WRAPPER_ADDRESS' },
     { key: 'PRICEFEEDL1_ADDRESS', target: 'PRICEFEEDL1_ADDRESS' },
     { key: 'POSITIONS_ADDRESS', target: 'POSITIONS_ADDRESS' },
     { key: 'MARKET_ADDRESS', target: 'MARKET_ADDRESS' },
@@ -45,6 +42,11 @@ envVars.forEach(v => {
 
 fs.writeFileSync(targetEnvPath, envContent);
 console.log(`✅ Updated dashboard/.env`);
+
+// Copy supported_tokens.json
+const tokensSrc = path.join(projectRoot, 'supported_tokens.json');
+const tokensDest = path.join(projectRoot, 'dashboard/src/config/supported_tokens.json');
+copyFile(tokensSrc, tokensDest);
 
 // 2. Update ABIs
 console.log("\n🔄 Syncing ABIs...");

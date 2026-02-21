@@ -2,15 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useDeFi } from '../hooks/useDeFi';
 
-const TOKENS = [
-    { key: 'WETH', name: 'WETH' },
-    { key: 'DAI', name: 'DAI' },
-    { key: 'USDC', name: 'USDC' },
-    { key: 'WBTC', name: 'WBTC' },
-];
-
 export function ProtocolBalances({ onSelectToken, selectedToken }) {
-    const { getProtocolBalances } = useDeFi();
+    const { getProtocolBalances, SUPPORTED_TOKENS_LIST } = useDeFi();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
 
@@ -42,7 +35,7 @@ export function ProtocolBalances({ onSelectToken, selectedToken }) {
             </div>
 
             <div className="grid grid-cols-1 gap-3 flex-1 overflow-y-auto">
-                {TOKENS.map(t => {
+                {SUPPORTED_TOKENS_LIST.map(t => {
                     const posBal = data?.positionsBalances?.[t.key];
                     const pool = data?.poolBalances?.[t.key];
                     const isSelected = selectedToken === t.key;
@@ -52,8 +45,8 @@ export function ProtocolBalances({ onSelectToken, selectedToken }) {
                             key={t.key}
                             onClick={() => onSelectToken(t.key)}
                             className={`rounded-lg p-3 border cursor-pointer transition-all hover:bg-white/10 ${isSelected
-                                    ? 'bg-white/10 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]'
-                                    : 'bg-white/5 border-white/5'
+                                ? 'bg-white/10 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]'
+                                : 'bg-white/5 border-white/5'
                                 }`}
                         >
                             <div className="flex justify-between items-center border-b border-white/5 pb-1 mb-2">

@@ -11,13 +11,16 @@ import PriceFeedL1ABI from '../abis/PriceFeedL1.json';
 import LiquidityPoolFactoryABI from '../abis/LiquidityPoolFactory.json';
 import LiquidityPoolABI from '../abis/LiquidityPool.json';
 import FeeManagerABI from '../abis/FeeManager.json';
+import supportedTokens from '../config/supported_tokens.json';
+
+// Create a static array of supported tokens (excluding 'wrapper' and duplicates, though in a UI, it's simpler to just filter 'wrapper')
+export const SUPPORTED_TOKENS_LIST = Object.entries(supportedTokens)
+    .filter(([key]) => key !== 'wrapper')
+    .map(([key, address]) => ({ key, name: key, address }));
 
 // Constants
 const ADDRESSES = {
-    WETH: process.env.WETH,
-    DAI: process.env.DAI,
-    USDC: process.env.USDC,
-    WBTC: process.env.WBTC,
+    ...supportedTokens,
     PRICEFEEDL1: process.env.PRICEFEEDL1_ADDRESS,
     POSITIONS: process.env.POSITIONS_ADDRESS,
     MARKET: process.env.MARKET_ADDRESS,
@@ -271,17 +274,10 @@ export function useDeFi() {
             const priceFeed = new ethers.Contract(ADDRESSES.PRICEFEEDL1, PriceFeedL1ABI.abi, readProvider);
             const factory = new ethers.Contract(ADDRESSES.POOL_FACTORY, LiquidityPoolFactoryABI.abi, readProvider);
 
-            const tokens = [
-                { key: 'WETH', address: ADDRESSES.WETH },
-                { key: 'DAI', address: ADDRESSES.DAI },
-                { key: 'USDC', address: ADDRESSES.USDC },
-                { key: 'WBTC', address: ADDRESSES.WBTC }
-            ];
-
             const positionsBalances = {};
             const poolBalances = {};
 
-            for (const token of tokens) {
+            for (const token of SUPPORTED_TOKENS_LIST) {
                 if (!token.address) continue;
                 const tokenContract = new ethers.Contract(token.address, ERC20ABI.abi, readProvider);
 
@@ -417,6 +413,7 @@ export function useDeFi() {
         redeemFromPool,
         getFeeDefaults,
         updateFeeDefaults,
-        getNativeBalance
+        getNativeBalance,
+        SUPPORTED_TOKENS_LIST
     };
 }
