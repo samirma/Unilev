@@ -139,6 +139,10 @@ contract Market is IMarket, Ownable, Pausable {
         emit PriceFeedAdded(_token, _priceFeed);
     }
 
+    function setStalenessThreshold(uint256 _newThreshold) external onlyOwner {
+        PRICE_FEED.setStalenessThreshold(_newThreshold);
+    }
+
     function initializeTokens(
         address[] calldata _tokens,
         address[] calldata _priceFeeds

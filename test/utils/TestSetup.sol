@@ -77,13 +77,10 @@ contract TestSetup is Test, HelperConfig, Utils {
         );
 
         /// configurations
-        // add position addres to the factory
-        liquidityPoolFactory.addPositionsAddress(address(positions));
-
         // Set a longer staleness threshold for fork testing (7 days to account for mainnet fork age)
         // Must be done before transferring ownership
         priceFeedL1.setStalenessThreshold(7 days);
-        
+
         // transfer ownership
         positions.transferOwnership(address(market));
         liquidityPoolFactory.transferOwnership(address(market));
@@ -100,7 +97,7 @@ contract TestSetup is Test, HelperConfig, Utils {
         market.addPriceFeed(conf.supportedTokens[2].token, conf.supportedTokens[2].priceFeed);
         market.addPriceFeed(conf.supportedTokens[3].token, conf.supportedTokens[3].priceFeed);
         market.addPriceFeed(conf.supportedTokens[1].token, conf.supportedTokens[1].priceFeed);
-        
+
         vm.stopPrank();
 
         // add liquidity to a pool to be able to open a short position

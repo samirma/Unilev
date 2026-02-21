@@ -20,7 +20,8 @@ async function main() {
   const liquidityPoolAbi = getLiquidityPoolAbi();
   const uniswapV3HelperAbi = getUniswapV3HelperAbi();
 
-  const wethContract = new ethers.Contract(env.WETH, erc20Abi, wallet);
+  const wrapperAddress = env.WRAPPER_ADDRESS;
+  const wrapperContract = new ethers.Contract(wrapperAddress, erc20Abi, wallet);
   const daiContract = new ethers.Contract(env.DAI, erc20Abi, provider);
   const usdcContract = new ethers.Contract(env.USDC, erc20Abi, provider);
   const wbtcContract = new ethers.Contract(env.WBTC, erc20Abi, provider);
@@ -38,28 +39,28 @@ async function main() {
     console.log("\nCalculating ETH amount for $100...");
     const targetUsdValue = ethers.parseUnits("100", 18);
 
-    const ethPriceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(env.WETH);
-    console.log(`ETH Price: $${ethers.formatUnits(ethPriceInUsd, 18)}`);
+    const wrapperPriceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(wrapperAddress);
+    console.log(`Wrapper Token Price: $${ethers.formatUnits(wrapperPriceInUsd, 18)}`);
 
-    const ethAmountFor100USD = (targetUsdValue * BigInt(1e18)) / ethPriceInUsd;
-    console.log(`ETH Amount for $100: ${ethers.formatEther(ethAmountFor100USD)} ETH`);
+    const wrapperAmountFor100USD = (targetUsdValue * BigInt(1e18)) / wrapperPriceInUsd;
+    console.log(`Wrapper Amount for $100: ${ethers.formatEther(wrapperAmountFor100USD)}`);
 
     console.log("\nperforming Swaps...");
 
     const swapFee = 3000;
     let nonce = await provider.getTransactionCount(wallet.address);
 
-    const totalEthNeeded = ethAmountFor100USD * 4n;
-    console.log(`Total ETH to wrap: ${ethers.formatEther(totalEthNeeded)} ETH`);
+    const totalWrapperNeeded = wrapperAmountFor100USD * 4n;
+    console.log(`Total wrapper to wrap: ${ethers.formatEther(totalWrapperNeeded)}`);
 
-    console.log("Wrapping ETH...");
-    const txWrap = await wethContract.deposit({ value: totalEthNeeded, nonce: nonce++ });
+    console.log("Wrapping native token...");
+    const txWrap = await wrapperContract.deposit({ value: totalWrapperNeeded, nonce: nonce++ });
     await txWrap.wait();
-    console.log("- Wrapped ETH to WETH");
+    console.log("- Wrapped native token");
 
-    const amountToApprove = ethAmountFor100USD * 3n;
-    console.log(`Approving Helper to spend ${ethers.formatEther(amountToApprove)} WETH...`);
-    const txApprove = await wethContract.approve(env.UNISWAPV3HELPER_ADDRESS, amountToApprove, { nonce: nonce++ });
+    const amountToApprove = wrapperAmountFor100USD * 3n;
+    console.log(`Approving Helper to spend ${ethers.formatEther(amountToApprove)} wrapper token...`);
+    const txApprove = await wrapperContract.approve(env.UNISWAPV3HELPER_ADDRESS, amountToApprove, { nonce: nonce++ });
     await txApprove.wait();
     console.log("- Approved Helper");
 
@@ -72,10 +73,11 @@ async function main() {
     for (const p of swapParams) {
       console.log(`Swapping WETH for ${p.name}...`);
       const tx = await uniswapV3Helper.swapExactInputSingle(
-        env.WETH,
+        wrapperAddress,
         p.token,
         swapFee,
-        ethAmountFor100USD,
+        wrapperAmountFor100USD,
+        0n,
         { nonce: nonce++ }
       );
       await tx.wait();

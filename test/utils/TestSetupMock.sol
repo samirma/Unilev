@@ -81,9 +81,6 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         );
 
         /// configurations
-        // add position addres to the factory
-        liquidityPoolFactory.addPositionsAddress(address(positions));
-
         // Set a longer staleness threshold for mock testing (365 days for time limit tests)
         // Must be done BEFORE transferring ownership
         priceFeedL1.setStalenessThreshold(365 days);

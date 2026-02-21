@@ -66,5 +66,7 @@ contract Deployments is Script, HelperConfig {
         market.initializeTokens(tokens, priceFeeds);
 
         vm.stopBroadcast();
+
+        wrapperAddress = conf.wrapper.token;
     }
 }

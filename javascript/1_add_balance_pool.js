@@ -93,6 +93,7 @@ async function main() {
           token.address,
           swapFee,
           nativeAmountFor1000USD,
+          0n,
           { nonce: nonce++ }
         );
         await txSwap.wait();
