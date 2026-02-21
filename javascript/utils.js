@@ -69,12 +69,16 @@ async function getTokenBalance(contract, address, priceFeedL1Contract) {
         contract.name(),
         contract.symbol(),
         contract.decimals(),
-        contract.balanceOf(address),
-    ])
+        contract.balanceOf(address)
+    ]);
 
-    const formattedBalance = ethers.formatUnits(balance, decimals)
+    const formattedBalance = ethers.formatUnits(balance, decimals);
 
-    console.log(`  ${symbol.padEnd(6)} : ${formattedBalance.padEnd(20)}`)
+    // Fetch the USD value from the PriceFeedL1 contract
+    const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(await contract.getAddress(), balance);
+    const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2); // PriceFeedL1 returns USD with 18 decimals
+
+    console.log(`  ${symbol.padEnd(6)} : ${formattedBalance.padEnd(20)} (~$ ${usdValue} USD)`);
 }
 
 /**
@@ -85,10 +89,6 @@ function getEnvVars() {
     const requiredVars = [
         "RPC_URL",
         "PRIVATE_KEY",
-        "WETH",
-        "DAI",
-        "USDC",
-        "WBTC",
         "PRICEFEEDL1_ADDRESS",
         "POSITIONS_ADDRESS",
         "UNISWAPV3HELPER_ADDRESS",
@@ -104,10 +104,6 @@ function getEnvVars() {
     return {
         RPC_URL: envVars.RPC_URL,
         PRIVATE_KEY: envVars.PRIVATE_KEY,
-        WETH: ethers.getAddress(envVars.WETH),
-        DAI: ethers.getAddress(envVars.DAI),
-        USDC: ethers.getAddress(envVars.USDC),
-        WBTC: ethers.getAddress(envVars.WBTC),
         WRAPPER_ADDRESS: envVars.WRAPPER_ADDRESS
             ? ethers.getAddress(envVars.WRAPPER_ADDRESS)
             : null,
