@@ -10,11 +10,7 @@ function getSupportedTokens() {
         const tokens = JSON.parse(data)
         const result = {}
         for (const [key, value] of Object.entries(tokens)) {
-            if (key === "wrapper") {
-                result["wrapper"] = ethers.getAddress(value.address)
-            } else {
-                result[key] = ethers.getAddress(value)
-            }
+            result[key] = ethers.getAddress(value)
         }
         return result
     } catch (error) {

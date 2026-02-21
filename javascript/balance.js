@@ -51,10 +51,10 @@ async function logWalletBalances(env, provider, wallet) {
 
     const ethBalance = await provider.getBalance(wallet.address)
     const formattedEthBalance = ethers.formatEther(ethBalance)
-    const wethAddress = supportedTokens.WETH
+    const wethAddress = supportedTokens.wrapper
     const ethUsdValueBigInt = await priceFeedL1Contract.getAmountInUsd(wethAddress, ethBalance)
     const ethUsdValue = parseFloat(ethers.formatUnits(ethUsdValueBigInt, 18)).toFixed(2)
-    console.log(`  ETH    : ${formattedEthBalance.padEnd(20)} (~$ ${ethUsdValue} USD)`)
+    console.log(`  Native : ${formattedEthBalance.padEnd(20)} (~$ ${ethUsdValue} USD)`)
 
     const tokenContracts = getTokenContracts(supportedTokens, erc20Abi, provider)
     for (const [symbol, contract] of Object.entries(tokenContracts)) {
@@ -176,7 +176,7 @@ async function logTreasureBalances(env, provider) {
 
     const ethBalance = await provider.getBalance(treasureAddress)
     const formattedEthBalance = ethers.formatEther(ethBalance)
-    const wethAddress = supportedTokens.WETH
+    const wethAddress = supportedTokens.wrapper
     const ethUsdValueBigInt = await priceFeedL1Contract.getAmountInUsd(wethAddress, ethBalance)
     const ethUsdValue = parseFloat(ethers.formatUnits(ethUsdValueBigInt, 18)).toFixed(2)
     console.log(`  ETH    : ${formattedEthBalance.padEnd(20)} (~$ ${ethUsdValue} USD)`)

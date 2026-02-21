@@ -127,7 +127,7 @@ async function updateEnv() {
     if (wrapperAddress) {
         const wrapperSymbol = await getTokenSymbol(provider, wrapperAddress)
         if (wrapperSymbol) {
-            supportedTokens["wrapper"] = { symbol: wrapperSymbol, address: wrapperAddress }
+            supportedTokens["wrapper"] = wrapperAddress
             console.log(`  wrapper (${wrapperSymbol}): ${wrapperAddress}`)
         }
     }

@@ -106,7 +106,7 @@ contract HelperConfig {
         // WPOL
         tokens[4] = TokenInfo({
             token: 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270,
-            priceFeed: 0xAB594600C4C4dD860FDE8FD4E0bB5e808B6b2DE0
+            priceFeed: 0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
         });
 
         mainnetNetworkConfig = NetworkConfig({
