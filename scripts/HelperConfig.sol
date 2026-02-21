@@ -44,26 +44,26 @@ contract HelperConfig {
             priceFeed: 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c
         });
 
-        // WETH
-        tokens[1] = TokenInfo({
-            token: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
-            priceFeed: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
-        });
-
         // USDC
-        tokens[2] = TokenInfo({
+        tokens[1] = TokenInfo({
             token: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
             priceFeed: 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6
         });
 
         // DAI
-        tokens[3] = TokenInfo({
+        tokens[2] = TokenInfo({
             token: 0x6B175474E89094C44Da98b954EedeAC495271d0F,
             priceFeed: 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9
         });
 
+        // WETH
+        tokens[3] = TokenInfo({
+            token: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
+            priceFeed: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
+        });
+
         mainnetNetworkConfig = NetworkConfig({
-            wrapper: tokens[1], // WETH
+            wrapper: tokens[3],
             supportedTokens: tokens,
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
@@ -77,7 +77,7 @@ contract HelperConfig {
         pure
         returns (NetworkConfig memory mainnetNetworkConfig)
     {
-        TokenInfo[] memory tokens = new TokenInfo[](4);
+        TokenInfo[] memory tokens = new TokenInfo[](5);
 
         // WBTC
         tokens[0] = TokenInfo({
@@ -103,11 +103,14 @@ contract HelperConfig {
             priceFeed: 0x4746DeC9e833A82EC7C2C1356372CcF2cfcD2F3D
         });
 
+        // WPOL
+        tokens[4] = TokenInfo({
+            token: 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270,
+            priceFeed: 0xAB594600C4C4dD860FDE8FD4E0bB5e808B6b2DE0
+        });
+
         mainnetNetworkConfig = NetworkConfig({
-            wrapper: TokenInfo({
-                token: 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270, // WPOL token address
-                priceFeed: 0xAB594600C4C4dD860FDE8FD4E0bB5e808B6b2DE0 // POL/USD price feed
-            }),
+            wrapper: tokens[4],
             supportedTokens: tokens,
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             swapRouter: 0xE592427A0AEce92De3Edee1F18E0157C05861564,

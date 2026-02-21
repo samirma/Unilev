@@ -1,7 +1,27 @@
-const { ethers } = require("ethers");
-const fs = require("fs");
-const path = require("path");
-require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
+const { ethers } = require("ethers")
+const fs = require("fs")
+const path = require("path")
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") })
+
+function getSupportedTokens() {
+    const supportedTokensPath = path.resolve(__dirname, "../supported_tokens.json")
+    try {
+        const data = fs.readFileSync(supportedTokensPath, "utf8")
+        const tokens = JSON.parse(data)
+        const result = {}
+        for (const [key, value] of Object.entries(tokens)) {
+            if (key === "wrapper") {
+                result["wrapper"] = ethers.getAddress(value.address)
+            } else {
+                result[key] = ethers.getAddress(value)
+            }
+        }
+        return result
+    } catch (error) {
+        console.error(`Error loading supported_tokens.json:`, error.message)
+        return null
+    }
+}
 
 /**
  * Loads the contract ABI from the JSON file.
@@ -10,13 +30,15 @@ require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
  */
 function getAbi(contractName) {
     try {
-        const abiPath = path.resolve(__dirname, `../out/${contractName}.sol/${contractName}.json`);
-        const abiFile = fs.readFileSync(abiPath, "utf8");
-        return JSON.parse(abiFile).abi;
+        const abiPath = path.resolve(__dirname, `../out/${contractName}.sol/${contractName}.json`)
+        const abiFile = fs.readFileSync(abiPath, "utf8")
+        return JSON.parse(abiFile).abi
     } catch (error) {
-        console.error(`Error loading contract ABI for ${contractName}:`, error.message);
-        console.error("Please ensure the contract has been compiled and the ABI file is in the correct path.");
-        process.exit(1);
+        console.error(`Error loading contract ABI for ${contractName}:`, error.message)
+        console.error(
+            "Please ensure the contract has been compiled and the ABI file is in the correct path."
+        )
+        process.exit(1)
     }
 }
 
@@ -32,8 +54,8 @@ function getErc20Abi() {
         "function balanceOf(address) view returns (uint256)",
         "function approve(address spender, uint256 amount) public returns (bool)",
         "function allowance(address owner, address spender) view returns (uint256)",
-        "function deposit() public payable"
-    ];
+        "function deposit() public payable",
+    ]
 }
 
 /**
@@ -47,27 +69,35 @@ async function getTokenBalance(contract, address, priceFeedL1Contract) {
         contract.name(),
         contract.symbol(),
         contract.decimals(),
-        contract.balanceOf(address)
-    ]);
+        contract.balanceOf(address),
+    ])
 
-    const formattedBalance = ethers.formatUnits(balance, decimals);
+    const formattedBalance = ethers.formatUnits(balance, decimals)
 
-    console.log(`  ${symbol.padEnd(6)} : ${formattedBalance.padEnd(20)}`);
+    console.log(`  ${symbol.padEnd(6)} : ${formattedBalance.padEnd(20)}`)
 }
 
 /**
  * loads all environment variables and returns them as an object.
  */
 function getEnvVars() {
-    const envVars = process.env;
+    const envVars = process.env
     const requiredVars = [
-        "RPC_URL", "PRIVATE_KEY", "WETH", "DAI", "USDC", "WBTC", "PRICEFEEDL1_ADDRESS", "POSITIONS_ADDRESS", "UNISWAPV3HELPER_ADDRESS"
-    ];
+        "RPC_URL",
+        "PRIVATE_KEY",
+        "WETH",
+        "DAI",
+        "USDC",
+        "WBTC",
+        "PRICEFEEDL1_ADDRESS",
+        "POSITIONS_ADDRESS",
+        "UNISWAPV3HELPER_ADDRESS",
+    ]
 
     for (const v of requiredVars) {
         if (!envVars[v]) {
-            console.error(`Error: Ensure ${v} is set in ../.env`);
-            process.exit(1);
+            console.error(`Error: Ensure ${v} is set in ../.env`)
+            process.exit(1)
         }
     }
 
@@ -78,23 +108,25 @@ function getEnvVars() {
         DAI: ethers.getAddress(envVars.DAI),
         USDC: ethers.getAddress(envVars.USDC),
         WBTC: ethers.getAddress(envVars.WBTC),
-        WRAPPER_ADDRESS: envVars.WRAPPER_ADDRESS ? ethers.getAddress(envVars.WRAPPER_ADDRESS) : null,
+        WRAPPER_ADDRESS: envVars.WRAPPER_ADDRESS
+            ? ethers.getAddress(envVars.WRAPPER_ADDRESS)
+            : null,
         PRICEFEEDL1_ADDRESS: ethers.getAddress(envVars.PRICEFEEDL1_ADDRESS),
         POSITIONS_ADDRESS: ethers.getAddress(envVars.POSITIONS_ADDRESS),
         UNISWAPV3HELPER_ADDRESS: ethers.getAddress(envVars.UNISWAPV3HELPER_ADDRESS),
         MARKET_ADDRESS: ethers.getAddress(envVars.MARKET_ADDRESS),
         LIQUIDITYPOOLFACTORY_ADDRESS: ethers.getAddress(envVars.LIQUIDITYPOOLFACTORY_ADDRESS),
-        FEEMANAGER_ADDRESS: ethers.getAddress(envVars.FEEMANAGER_ADDRESS)
-    };
+        FEEMANAGER_ADDRESS: ethers.getAddress(envVars.FEEMANAGER_ADDRESS),
+    }
 }
 
 /**
  * Sets up provider and wallet.
  */
 function setupProviderAndWallet(rpcUrl, privateKey) {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const wallet = new ethers.Wallet(privateKey, provider);
-    return { provider, wallet };
+    const provider = new ethers.JsonRpcProvider(rpcUrl)
+    const wallet = new ethers.Wallet(privateKey, provider)
+    return { provider, wallet }
 }
 
 /**
@@ -102,7 +134,7 @@ function setupProviderAndWallet(rpcUrl, privateKey) {
  * @returns {object} The Market ABI.
  */
 function getMarketAbi() {
-    return getAbi("Market");
+    return getAbi("Market")
 }
 
 /**
@@ -110,7 +142,7 @@ function getMarketAbi() {
  * @returns {object} The Positions ABI.
  */
 function getPositionsAbi() {
-    return getAbi("Positions");
+    return getAbi("Positions")
 }
 
 /**
@@ -118,7 +150,7 @@ function getPositionsAbi() {
  * @returns {object} The PriceFeedL1 ABI.
  */
 function getPriceFeedL1Abi() {
-    return getAbi("PriceFeedL1");
+    return getAbi("PriceFeedL1")
 }
 
 /**
@@ -126,7 +158,7 @@ function getPriceFeedL1Abi() {
  * @returns {object} The LiquidityPoolFactory ABI.
  */
 function getLiquidityPoolFactoryAbi() {
-    return getAbi("LiquidityPoolFactory");
+    return getAbi("LiquidityPoolFactory")
 }
 
 /**
@@ -134,7 +166,7 @@ function getLiquidityPoolFactoryAbi() {
  * @returns {object} The LiquidityPool ABI.
  */
 function getLiquidityPoolAbi() {
-    return getAbi("LiquidityPool");
+    return getAbi("LiquidityPool")
 }
 
 /**
@@ -142,10 +174,8 @@ function getLiquidityPoolAbi() {
  * @returns {object} The UniswapV3Helper ABI.
  */
 function getUniswapV3HelperAbi() {
-    return getAbi("UniswapV3Helper");
+    return getAbi("UniswapV3Helper")
 }
-
-
 
 /**
  * Calculates the amount of tokens for a given USD value.
@@ -155,11 +185,11 @@ function getUniswapV3HelperAbi() {
  * @returns {Promise<bigint>} The calculated token amount.
  */
 async function calculateTokenAmountFromUsd(tokenContract, priceFeedL1Contract, usdAmount) {
-    const decimals = await tokenContract.decimals();
-    const tokenAddress = await tokenContract.getAddress();
-    const priceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(tokenAddress);
-    const targetUsdValue = ethers.parseUnits(usdAmount, 18);
-    return (targetUsdValue * BigInt(10n ** decimals)) / priceInUsd;
+    const decimals = await tokenContract.decimals()
+    const tokenAddress = await tokenContract.getAddress()
+    const priceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(tokenAddress)
+    const targetUsdValue = ethers.parseUnits(usdAmount, 18)
+    return (targetUsdValue * BigInt(10n ** decimals)) / priceInUsd
 }
 
 /**
@@ -171,59 +201,78 @@ async function calculateTokenAmountFromUsd(tokenContract, priceFeedL1Contract, u
  */
 async function logPositionDetails(posId, marketContract, priceFeedL1Contract, provider) {
     try {
-        const params = await marketContract.getPositionParams(posId);
+        const params = await marketContract.getPositionParams(posId)
         // params: baseToken, quoteToken, positionSize, timestamp, isShort, leverage, ...
 
         const [
-            baseToken, quoteToken, positionSize, , isShort, leverage, , , , currentPnL, collateralLeft
-        ] = params;
+            baseToken,
+            quoteToken,
+            positionSize,
+            ,
+            isShort,
+            leverage,
+            ,
+            ,
+            ,
+            currentPnL,
+            collateralLeft,
+        ] = params
 
         // Fetch symbols
-        const erc20Abi = getErc20Abi();
-        const baseTokenContract = new ethers.Contract(baseToken, erc20Abi, provider);
-        const quoteTokenContract = new ethers.Contract(quoteToken, erc20Abi, provider);
+        const erc20Abi = getErc20Abi()
+        const baseTokenContract = new ethers.Contract(baseToken, erc20Abi, provider)
+        const quoteTokenContract = new ethers.Contract(quoteToken, erc20Abi, provider)
 
         const [baseSymbol, baseDecimals, quoteSymbol] = await Promise.all([
             baseTokenContract.symbol(),
             baseTokenContract.decimals(),
-            quoteTokenContract.symbol()
-        ]);
+            quoteTokenContract.symbol(),
+        ])
 
-        const token0 = isShort ? baseToken : quoteToken;
-        const token1 = isShort ? quoteToken : baseToken;
-        const symbol0 = isShort ? baseSymbol : quoteSymbol;
-        const symbol1 = isShort ? quoteSymbol : baseSymbol;
+        const token0 = isShort ? baseToken : quoteToken
+        const token1 = isShort ? quoteToken : baseToken
+        const symbol0 = isShort ? baseSymbol : quoteSymbol
+        const symbol1 = isShort ? quoteSymbol : baseSymbol
 
         // Calculate USD for the Position Size
-        const usdAmountBigInt = await priceFeedL1Contract.getAmountInUsd(baseToken, positionSize);
-        const usdAmount = parseFloat(ethers.formatUnits(usdAmountBigInt, 18)).toFixed(2);
+        const usdAmountBigInt = await priceFeedL1Contract.getAmountInUsd(baseToken, positionSize)
+        const usdAmount = parseFloat(ethers.formatUnits(usdAmountBigInt, 18)).toFixed(2)
 
         // Fetch Position State
         // Enum: 0=NONE, 1=TAKE_PROFIT, 2=ACTIVE, 3=STOP_LOSS, 4=LIQUIDATABLE, 5=BAD_DEBT, 6=EXPIRED
         // We need to call Positions contract for this
-        const env = getEnvVars();
-        const positionsAbi = getAbi("Positions");
-        const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider);
+        const env = getEnvVars()
+        const positionsAbi = getAbi("Positions")
+        const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider)
 
-        const stateInt = await positionsContract.getPositionState(posId);
-        const states = ["NONE", "TAKE_PROFIT", "ACTIVE", "STOP_LOSS", "LIQUIDATABLE", "BAD_DEBT", "EXPIRED"];
-        const stateStr = states[Number(stateInt)] || "UNKNOWN";
-        const isLiquidable = stateStr === "LIQUIDATABLE" || stateStr === "BAD_DEBT";
+        const stateInt = await positionsContract.getPositionState(posId)
+        const states = [
+            "NONE",
+            "TAKE_PROFIT",
+            "ACTIVE",
+            "STOP_LOSS",
+            "LIQUIDATABLE",
+            "BAD_DEBT",
+            "EXPIRED",
+        ]
+        const stateStr = states[Number(stateInt)] || "UNKNOWN"
+        const isLiquidable = stateStr === "LIQUIDATABLE" || stateStr === "BAD_DEBT"
 
-        console.log("\n--- Position Details ---");
-        console.log(`Position ID: ${posId}`);
-        console.log(`State: ${stateStr}`);
-        console.log(`Liquidable: ${isLiquidable ? "Yes" : "No"}`);
-        console.log(`Type: ${isShort ? "SHORT" : "LONG"} ${leverage}x`);
-        console.log(`Token0 (Collateral): ${token0} (${symbol0})`);
-        console.log(`Token1 (Target): ${token1} (${symbol1})`);
-        console.log(`Size: ${ethers.formatUnits(positionSize, baseDecimals)} ${baseSymbol} (~$${usdAmount})`);
-        console.log(`PnL: ${currentPnL}`);
-        console.log(`Collateral Left: ${collateralLeft}`);
-        console.log("------------------------\n");
-
+        console.log("\n--- Position Details ---")
+        console.log(`Position ID: ${posId}`)
+        console.log(`State: ${stateStr}`)
+        console.log(`Liquidable: ${isLiquidable ? "Yes" : "No"}`)
+        console.log(`Type: ${isShort ? "SHORT" : "LONG"} ${leverage}x`)
+        console.log(`Token0 (Collateral): ${token0} (${symbol0})`)
+        console.log(`Token1 (Target): ${token1} (${symbol1})`)
+        console.log(
+            `Size: ${ethers.formatUnits(positionSize, baseDecimals)} ${baseSymbol} (~$${usdAmount})`
+        )
+        console.log(`PnL: ${currentPnL}`)
+        console.log(`Collateral Left: ${collateralLeft}`)
+        console.log("------------------------\n")
     } catch (error) {
-        console.error(`Failed to fetch details for Position ${posId}:`, error.message);
+        console.error(`Failed to fetch details for Position ${posId}:`, error.message)
     }
 }
 
@@ -239,5 +288,6 @@ module.exports = {
     getEnvVars,
     setupProviderAndWallet,
     calculateTokenAmountFromUsd,
-    logPositionDetails
-};
+    logPositionDetails,
+    getSupportedTokens,
+}
