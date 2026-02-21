@@ -1,5 +1,5 @@
 const { ethers } = require("ethers");
-const { getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails, getMarketAbi, getPriceFeedL1Abi } = require("./utils");
+const { getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails, getMarketAbi, getPriceFeedL1Abi, getSupportedTokens } = require("./utils");
 
 async function main() {
     // --- Environment Setup ---
@@ -13,11 +13,13 @@ async function main() {
     const marketAbi = getMarketAbi();
     const priceFeedL1Abi = getPriceFeedL1Abi();
 
+    const supportedTokens = getSupportedTokens();
+
     // We are using USDC as collateral to long WBTC
     // token0 = USDC (Collateral)
     // token1 = WBTC (Long Target)
-    const token0Address = env.USDC; // Collateral
-    const token1Address = env.WBTC; // Target
+    const token0Address = supportedTokens.USDC; // Collateral
+    const token1Address = supportedTokens.WBTC; // Target
 
     const token0Contract = new ethers.Contract(token0Address, erc20Abi, wallet);
     const marketContract = new ethers.Contract(env.MARKET_ADDRESS, marketAbi, wallet);

@@ -1,5 +1,5 @@
 const { ethers } = require("ethers");
-const { getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails, getMarketAbi, getPriceFeedL1Abi } = require("./utils");
+const { getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails, getMarketAbi, getPriceFeedL1Abi, getSupportedTokens } = require("./utils");
 
 
 async function main() {
@@ -14,20 +14,22 @@ async function main() {
     const marketAbi = getMarketAbi();
     const priceFeedL1Abi = getPriceFeedL1Abi();
 
+    const supportedTokens = getSupportedTokens();
+
     // We are using WBTC as collateral to short WETH
     // token0 = WBTC (Collateral)
     // token1 = WETH (Short Target)
-    const token0Address = env.WBTC; // Collateral
-    const token1Address = env.WETH; // Shield/Target
+    const token0Address = supportedTokens.WBTC; // Collateral
+    const token1Address = supportedTokens.WETH; // Shield/Target
 
     const token0Contract = new ethers.Contract(token0Address, erc20Abi, wallet);
     const marketContract = new ethers.Contract(env.MARKET_ADDRESS, marketAbi, wallet);
     const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
 
     try {
-        // --- 1. Calculate Amount of WBTC for $10 ---
-        console.log("Calculating WBTC amount for $10...");
-        const positionAmount = await calculateTokenAmountFromUsd(token0Contract, priceFeedL1Contract, "10");
+        // --- 1. Calculate Amount of WBTC for $8 ---
+        console.log("Calculating WBTC amount for $8...");
+        const positionAmount = await calculateTokenAmountFromUsd(token0Contract, priceFeedL1Contract, "8");
         const decimals = await token0Contract.decimals();
 
         console.log(`Amount: ${ethers.formatUnits(positionAmount, decimals)} WBTC`);

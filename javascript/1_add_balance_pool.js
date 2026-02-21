@@ -62,16 +62,16 @@ async function main() {
 
     try {
         // --- 1. Calculate Required Native Token for Swaps ---
-        console.log("Calculating token amounts needed for $1000 each...")
-        const targetUsdValue = ethers.parseUnits("1000", 18)
+        console.log("Calculating token amounts needed for $100 each...")
+        const targetUsdValue = ethers.parseUnits("100", 18)
 
         // Get Native Token Price in USD
         const nativePriceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(wrapperAddress)
         console.log(`Native Token Price: $${ethers.formatUnits(nativePriceInUsd, 18)}`)
 
         // Amount of Native Token needed = TargetUSD / NativePrice
-        const nativeAmountFor1000USD = (targetUsdValue * BigInt(1e18)) / nativePriceInUsd
-        console.log(`Native Amount for $1000: ${ethers.formatEther(nativeAmountFor1000USD)}`)
+        const nativeAmountFor100USD = (targetUsdValue * BigInt(1e18)) / nativePriceInUsd
+        console.log(`Native Amount for $100: ${ethers.formatEther(nativeAmountFor100USD)}`)
 
         let nonce = await provider.getTransactionCount(wallet.address)
 
@@ -90,7 +90,7 @@ async function main() {
 
         // Calculate total Native Token needed to wrap (1x for each token)
         const tokenCount = BigInt(tokens.length)
-        const totalNativeToWrap = nativeAmountFor1000USD * tokenCount + ethers.parseEther("0.1") // Add 0.1 buffer
+        const totalNativeToWrap = nativeAmountFor100USD * tokenCount + ethers.parseEther("0.1") // Add 0.1 buffer
 
         console.log(`\nRequirements:`)
         console.log(`- Wrap ${ethers.formatEther(totalNativeToWrap)} Native to Wrapper Token`)
@@ -103,7 +103,7 @@ async function main() {
 
         // --- 3. Approve Uniswap Helper ---
         const tokensNeedingSwap = BigInt(tokens.filter((t) => t.needsSwap).length)
-        const totalSwapAmount = nativeAmountFor1000USD * tokensNeedingSwap
+        const totalSwapAmount = nativeAmountFor100USD * tokensNeedingSwap
         console.log(
             `Approving Uniswap Helper to spend ${ethers.formatEther(
                 totalSwapAmount
@@ -132,7 +132,7 @@ async function main() {
                     wrapperAddress,
                     token.address,
                     swapFee,
-                    nativeAmountFor1000USD,
+                    nativeAmountFor100USD,
                     0n,
                     { nonce: nonce++ }
                 )
@@ -144,7 +144,7 @@ async function main() {
                 tokenAmountToDeposit = (targetUsdValue * BigInt(10n ** tokenDecimals)) / priceInUsd
 
                 console.log(
-                    `- Calculated Deposit Amount ($1000): ${ethers.formatUnits(
+                    `- Calculated Deposit Amount ($100): ${ethers.formatUnits(
                         tokenAmountToDeposit,
                         tokenDecimals
                     )} ${token.name}`
@@ -161,9 +161,9 @@ async function main() {
                     tokenAmountToDeposit = currentBalance
                 }
             } else {
-                tokenAmountToDeposit = nativeAmountFor1000USD
+                tokenAmountToDeposit = nativeAmountFor100USD
                 console.log(
-                    `- Deposit Amount ($1000): ${ethers.formatUnits(tokenAmountToDeposit, 18)} ${token.name
+                    `- Deposit Amount ($100): ${ethers.formatUnits(tokenAmountToDeposit, 18)} ${token.name
                     }`
                 )
             }
