@@ -50,6 +50,7 @@ struct PositionParams {
     bool isShort;              // True if short, false if long
     bool isBaseToken0;         // True if the baseToken is the token0 (in the uniswapV3Pool) 
     uint8 leverage;            // Leverage of position => 0 if no leverage
+    IERC20 initialToken;       // Token provided by the user as collateral
 }
 
 // Errors

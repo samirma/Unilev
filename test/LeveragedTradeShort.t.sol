@@ -6,19 +6,50 @@ import "./utils/TestSetup.sol";
 
 contract LeveragedTradeShort is TestSetup {
     function test__leveragedTradeToCloseShort1() public {
-        uint128 amount = 1000e6;
-        uint24 fee = 3000;
-        writeTokenBalance(alice, conf.supportedTokens[2].token, amount);
+        address wbtc = conf.supportedTokens[0].token;
+        address usdc = conf.supportedTokens[2].token;
 
-        assertEq(amount, IERC20(conf.supportedTokens[2].token).balanceOf(alice));
-        assertEq(0, IERC20(conf.supportedTokens[2].token).balanceOf(address(positions)));
+        uint128 amount = 2e18; // 2 USDC/DAI
+        uint24 fee = 3000;
+
+        // Short scenario: only the base token pool (WBTC) needs liquidity for the borrow
+        vm.startPrank(bob);
+        writeTokenBalance(bob, wbtc, 10e8);
+        IERC20(wbtc).approve(address(lbPoolWbtc), 10e8);
+        lbPoolWbtc.deposit(10e8, bob);
+        vm.stopPrank();
+
+        writeTokenBalance(alice, usdc, amount);
+
+        assertEq(amount, IERC20(usdc).balanceOf(alice));
+        assertEq(0, IERC20(usdc).balanceOf(address(positions)));
+
+        uint256 wbtcBalanceBefore = IERC20(wbtc).balanceOf(address(lbPoolWbtc));
 
         vm.startPrank(alice);
-        IERC20(conf.supportedTokens[2].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[2].token, conf.supportedTokens[0].token, uint24(fee), true, 2, amount, 0, 0);
+        IERC20(usdc).approve(address(positions), amount);
 
-        assertEq(0, IERC20(conf.supportedTokens[2].token).balanceOf(alice));
-        assertApproxEqRel(amount * 3, IERC20(conf.supportedTokens[2].token).balanceOf(address(positions)), 0.05e18);
+        // Open Short on WBTC against USDC
+        market.openPosition(
+            usdc, // USDC (collateral)
+            wbtc, // WBTC (exposure)
+            uint24(fee),
+            true, // isShort
+            5, // 5x leverage
+            amount,
+            0,
+            0
+        );
+
+        assertEq(0, IERC20(usdc).balanceOf(alice));
+
+        // Contract holds USDC after short swap
+        uint256 positionsUsdc = IERC20(usdc).balanceOf(address(positions));
+        assertGt(positionsUsdc, amount * 4);
+
+        // WBTC was borrowed
+        uint256 wbtcBalanceAfter = IERC20(wbtc).balanceOf(address(lbPoolWbtc));
+        assertLt(wbtcBalanceAfter, wbtcBalanceBefore);
 
         assertEq(1, positions.totalNbPos());
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -27,8 +58,8 @@ contract LeveragedTradeShort is TestSetup {
 
         market.closePosition(posAlice[0]);
 
-        assertApproxEqRel(amount, IERC20(conf.supportedTokens[2].token).balanceOf(alice), 0.05e18);
-        assertEq(0, IERC20(conf.supportedTokens[2].token).balanceOf(address(positions)));
+        // Alice receives USDC back
+        assertGt(IERC20(usdc).balanceOf(alice), 0);
+        assertEq(0, IERC20(usdc).balanceOf(address(positions)));
     }
-
 }

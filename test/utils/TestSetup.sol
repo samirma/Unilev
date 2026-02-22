@@ -112,11 +112,6 @@ contract TestSetup is Test, HelperConfig, Utils {
         IERC20(conf.supportedTokens[2].token).approve(address(lbPoolUsdc), 10000000e6);
         IERC20(conf.supportedTokens[3].token).approve(address(lbPoolDai), 10000000e6);
 
-        lbPoolWbtc.deposit(10e8, bob);
-        lbPoolWeth.deposit(100e18, bob);
-        lbPoolUsdc.deposit(10000000e6, bob);
-        lbPoolDai.deposit(10000000e6, bob);
-
         vm.stopPrank();
     }
 }

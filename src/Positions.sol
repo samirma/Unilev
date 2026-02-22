@@ -42,7 +42,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
     // Variables
     uint256 public constant LIQUIDATION_THRESHOLD = 1000; // 10% of margin
     uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 1e18;
-    uint256 public constant MAX_LEVERAGE = 3;
+    uint256 public constant MAX_LEVERAGE = 5;
     uint256 public constant USD_DECIMALS = 18; // The standard for USD values in this contract
 
     LiquidityPoolFactory public immutable LIQUIDITY_POOL_FACTORY;
@@ -151,7 +151,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
     ) external onlyOwner nonReentrant whenNotPaused returns (uint256) {
         // Cache storage variable to avoid multiple SLOADs
         uint256 currentPosId = posId;
-        
+
         // Check params
         PositionLogic.ValidationResult memory validationResult = PositionLogic.validateOpenPosition(
             PositionLogic.ValidationParams({
@@ -202,16 +202,51 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         IERC20(_token0).safeTransfer(treasure, treasureAmount);
         _amount = _amount - uint128(treasureAmount);
 
+        uint128 baseCollateralAmount;
+        if (!_isShort && _token0 != baseToken) {
+            SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), _amount);
+
+            uint256 priceQuoteToBase = PRICE_FEED.getPairLatestPrice(_token0, baseToken);
+            uint256 minOut = (_amount * priceQuoteToBase) / quoteDecimalsPow;
+            minOut = (minOut * 9500) / 10000;
+
+            baseCollateralAmount = uint128(
+                UNISWAP_V3_HELPER.swapExactInputSingle(
+                    _token0,
+                    baseToken,
+                    IUniswapV3Pool(v3Pool).fee(),
+                    _amount,
+                    minOut
+                )
+            );
+        } else if (_isShort && _token0 != quoteToken) {
+            SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), _amount);
+
+            uint256 priceBaseToQuote = PRICE_FEED.getPairLatestPrice(_token0, quoteToken);
+            uint256 minOut = (_amount * priceBaseToQuote) / baseDecimalsPow;
+            minOut = (minOut * 9500) / 10000;
+
+            baseCollateralAmount = uint128(
+                UNISWAP_V3_HELPER.swapExactInputSingle(
+                    _token0,
+                    quoteToken,
+                    IUniswapV3Pool(v3Pool).fee(),
+                    _amount,
+                    minOut
+                )
+            );
+        } else {
+            baseCollateralAmount = _amount;
+        }
+
         if (isMargin) {
             if (_isShort) {
                 breakEvenLimit = price + (price * 10000) / (uint256(_leverage) * 10000);
-                totalBorrow =
-                    (_amount * baseDecimalsPow * _leverage) /
-                    price;
+                totalBorrow = (uint256(baseCollateralAmount) * baseDecimalsPow * _leverage) / price;
             } else {
                 breakEvenLimit = price - (price * 10000) / (uint256(_leverage) * 10000);
                 totalBorrow =
-                    (_amount * (_leverage - 1) * price) /
+                    (uint256(baseCollateralAmount) * (_leverage - 1) * price) /
                     baseDecimalsPow;
             }
 
@@ -247,7 +282,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                     uint256 minOut = (totalBorrow * priceQuoteToBase) / quoteDecimalsPow;
                     minOut = (minOut * 9500) / 10000;
 
-                amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
+                    amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
                         quoteToken,
                         baseToken,
                         IUniswapV3Pool(v3Pool).fee(),
@@ -268,9 +303,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         if (_isShort) {
             positionSize = uint128(amountBorrow);
         } else if (_leverage != 1) {
-            positionSize = uint128(_amount + amountBorrow);
+            positionSize = uint128(baseCollateralAmount + amountBorrow);
         } else {
-            positionSize = _amount;
+            positionSize = baseCollateralAmount;
         }
 
         openPositions[currentPosId] = PositionParams({
@@ -282,21 +317,22 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             limitPrice: _limitPrice,
             baseToken: IERC20(baseToken),
             quoteToken: IERC20(quoteToken),
-            collateralSize: _amount,
+            collateralSize: baseCollateralAmount,
             positionSize: positionSize,
             liquidationReward: liquidationReward,
             timestamp: uint64(block.timestamp),
             blockNumber: uint64(block.number),
             isShort: _isShort,
             isBaseToken0: isBaseToken0,
-            leverage: _leverage
+            leverage: _leverage,
+            initialToken: IERC20(_token0)
         });
-        
+
         unchecked {
             ++totalNbPos;
             ++posId;
         }
-        
+
         _mint(_trader, currentPosId);
         return currentPosId;
     }
@@ -373,9 +409,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                 ? address(posParms.quoteToken)
                 : address(posParms.baseToken);
 
-        addTokenInitiallySupplied = posParms.isShort
-            ? address(posParms.quoteToken)
-            : address(posParms.baseToken);
+        addTokenInitiallySupplied = address(posParms.initialToken);
         // will be used if margin position
         addTokenBorrowed = posParms.isShort
             ? address(posParms.baseToken)
@@ -436,10 +470,33 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                     uint256 treasureAmount = ((amountTokenReceived - inAmount) * treasureFee) /
                         10000;
                     IERC20(addTokenReceived).safeTransfer(treasure, treasureAmount);
-                    IERC20(addTokenReceived).safeTransfer(
-                        trader,
-                        amountTokenReceived - inAmount - treasureAmount
-                    );
+
+                    uint256 netReceived = amountTokenReceived - inAmount - treasureAmount;
+                    if (address(posParms.initialToken) != addTokenReceived) {
+                        SafeERC20.forceApprove(
+                            IERC20(addTokenReceived),
+                            address(UNISWAP_V3_HELPER),
+                            netReceived
+                        );
+                        uint256 priceBaseToQuote = PRICE_FEED.getPairLatestPrice(
+                            addTokenReceived,
+                            address(posParms.initialToken)
+                        );
+                        uint256 minOut = (netReceived * priceBaseToQuote) /
+                            (10 ** IERC20Metadata(addTokenReceived).decimals());
+                        minOut = (minOut * 9500) / 10000;
+
+                        uint256 finalOut = UNISWAP_V3_HELPER.swapExactInputSingle(
+                            addTokenReceived,
+                            address(posParms.initialToken),
+                            IUniswapV3Pool(posParms.v3Pool).fee(),
+                            netReceived,
+                            minOut
+                        );
+                        IERC20(posParms.initialToken).safeTransfer(trader, finalOut);
+                    } else {
+                        IERC20(addTokenReceived).safeTransfer(trader, netReceived);
+                    }
                 }
             } else if (state == PositionState.ACTIVE) {
                 uint256 treasureAmount = (amountTokenReceived * treasureFee) / 10000;
@@ -467,11 +524,39 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                 );
                 uint256 treasureAmount = (outAmount * treasureFee) / 10000;
                 IERC20(tokenToTrader).safeTransfer(treasure, treasureAmount);
-                IERC20(tokenToTrader).safeTransfer(trader, outAmount - treasureAmount);
+                uint256 netReceived = outAmount - treasureAmount;
+
+                if (address(posParms.initialToken) != tokenToTrader) {
+                    SafeERC20.forceApprove(
+                        IERC20(tokenToTrader),
+                        address(UNISWAP_V3_HELPER),
+                        netReceived
+                    );
+                    uint256 priceQuoteToBase = PRICE_FEED.getPairLatestPrice(
+                        tokenToTrader,
+                        address(posParms.initialToken)
+                    );
+                    uint256 minOut2 = (netReceived * priceQuoteToBase) /
+                        (10 ** IERC20Metadata(tokenToTrader).decimals());
+                    minOut2 = (minOut2 * 9500) / 10000;
+
+                    uint256 finalOut = UNISWAP_V3_HELPER.swapExactInputSingle(
+                        tokenToTrader,
+                        address(posParms.initialToken),
+                        IUniswapV3Pool(posParms.v3Pool).fee(),
+                        netReceived,
+                        minOut2
+                    );
+                    IERC20(posParms.initialToken).safeTransfer(trader, finalOut);
+                } else {
+                    IERC20(tokenToTrader).safeTransfer(trader, netReceived);
+                }
             }
         }
 
-        unchecked { --totalNbPos; }
+        unchecked {
+            --totalNbPos;
+        }
         delete openPositions[_posId];
         safeBurn(_posId);
         IERC20(addTokenInitiallySupplied).safeTransfer(_liquidator, posParms.liquidationReward);
@@ -650,7 +735,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                     --i;
                 }
             } else {
-                unchecked { --i; }
+                unchecked {
+                    --i;
+                }
             }
         }
         return traderPositions;
@@ -671,7 +758,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                     --i;
                 }
             } else {
-                unchecked { --i; }
+                unchecked {
+                    --i;
+                }
             }
         }
         return liquidablePositions;

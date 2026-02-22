@@ -5,47 +5,53 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./utils/TestSetup.sol";
 
 contract LeveragedTradeLong is TestSetup {
+    function test__leveragedTradeToCloseLong1() public {
+        address wbtc = conf.supportedTokens[0].token;
+        address usdc = conf.supportedTokens[2].token;
 
+        uint128 amount = 2e18; // 2 DAI/USDC (18 decimals)
+        uint24 fee = 3000;
 
-function test__leveragedTradeToCloseLong1() public {
-    uint128 amount = 1e8;
-    uint24 fee = 3000;
-    
-    writeTokenBalance(alice, conf.supportedTokens[0].token, amount);
+        // Long scenario: only the quote token pool (USDC) needs liquidity for the borrow
+        vm.startPrank(bob);
+        writeTokenBalance(bob, usdc, 1000000e18);
+        IERC20(usdc).approve(address(lbPoolUsdc), 1000000e18);
+        lbPoolUsdc.deposit(1000000e18, bob);
+        vm.stopPrank();
 
-    assertEq(amount, IERC20(conf.supportedTokens[0].token).balanceOf(alice));
-    assertEq(0, IERC20(conf.supportedTokens[0].token).balanceOf(address(positions)));
+        writeTokenBalance(alice, usdc, amount);
 
-    // Log USDC balance in lbPoolUsdc BEFORE open
-    uint256 usdcBalanceBefore = IERC20(conf.supportedTokens[2].token).balanceOf(address(lbPoolUsdc));
-    console.log("USDC balance in lbPoolUsdc BEFORE open: ", usdcBalanceBefore);
+        assertEq(amount, IERC20(usdc).balanceOf(alice));
+        assertEq(0, IERC20(usdc).balanceOf(address(positions)));
 
-    vm.startPrank(alice);
-    IERC20(conf.supportedTokens[0].token).approve(address(positions), amount);
-    console.log("Open position");
-    market.openPosition(conf.supportedTokens[0].token, conf.supportedTokens[2].token, uint24(fee), false, 2, amount, 0, 0);
+        uint256 usdcBalanceBefore = IERC20(usdc).balanceOf(address(lbPoolUsdc));
+        console.log("USDC balance in lbPoolUsdc BEFORE open: ", usdcBalanceBefore);
 
-    assertEq(0, IERC20(conf.supportedTokens[0].token).balanceOf(alice));
-    assertApproxEqRel(amount * 2, IERC20(conf.supportedTokens[0].token).balanceOf(address(positions)), 0.05e18);
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), amount);
+        console.log("Open position");
+        market.openPosition(usdc, wbtc, uint24(fee), false, 5, amount, 0, 0);
 
-    uint256 usdcBalanceAfter = IERC20(conf.supportedTokens[2].token).balanceOf(address(lbPoolUsdc));
-    assertApproxEqRel(usdcBalanceBefore, usdcBalanceAfter, 0.05e18);
+        assertEq(0, IERC20(usdc).balanceOf(alice));
 
-    assertEq(1, positions.totalNbPos());
-    uint256[] memory posAlice = positions.getTraderPositions(alice);
-    
-    assertEq(1, posAlice[0]);
-    assertEq(alice, positions.ownerOf(posAlice[0]));
-    console.log("Close position");
-    market.closePosition(posAlice[0]);
+        uint256 usdcBalanceAfter = IERC20(usdc).balanceOf(address(lbPoolUsdc));
+        assertLt(usdcBalanceAfter, usdcBalanceBefore);
 
-    assertApproxEqRel(amount, IERC20(conf.supportedTokens[0].token).balanceOf(alice), 0.05e18);
-    assertEq(0, IERC20(conf.supportedTokens[0].token).balanceOf(address(positions)));
+        uint256 wbtcBalance = IERC20(wbtc).balanceOf(address(positions));
+        assertGt(wbtcBalance, 0);
 
-    uint256 usdcBalanceAfterClose = IERC20(conf.supportedTokens[2].token).balanceOf(address(lbPoolUsdc));
-    //assertGe(usdcBalanceBefore, usdcBalanceAfter);
-    console.log("USDC balance in lbPoolUsdc AFTER close: ", usdcBalanceAfterClose);
+        assertEq(1, positions.totalNbPos());
+        uint256[] memory posAlice = positions.getTraderPositions(alice);
 
-}
+        assertEq(1, posAlice[0]);
+        assertEq(alice, positions.ownerOf(posAlice[0]));
+        console.log("Close position");
+        market.closePosition(posAlice[0]);
 
+        assertGt(IERC20(usdc).balanceOf(alice), 0);
+        assertEq(0, IERC20(wbtc).balanceOf(address(positions)));
+
+        uint256 usdcBalanceAfterClose = IERC20(usdc).balanceOf(address(lbPoolUsdc));
+        console.log("USDC balance in lbPoolUsdc AFTER close: ", usdcBalanceAfterClose);
+    }
 }

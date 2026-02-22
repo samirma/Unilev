@@ -69,10 +69,15 @@ library PositionLogic {
         }
 
         /**
-         * @dev The user need to open a long position by sending
-         * the base token and open a short position by depositing the quote token.
+         * @dev We use the USD price to determine which token is the stablecoin (quoteToken).
+         * Stablecoins generally have a price near 1e18 ($1.00).
          */
-        if (params.isShort) {
+        uint256 token0UsdPrice = PriceFeedL1(params.priceFeed).getTokenLatestPriceInUsd(
+            params.token0
+        );
+        bool isToken0Stable = (token0UsdPrice >= 0.9e18 && token0UsdPrice <= 1.1e18);
+
+        if (isToken0Stable) {
             result.quoteToken = params.token0;
             result.baseToken = (params.token0 == poolToken0) ? poolToken1 : poolToken0;
         } else {
