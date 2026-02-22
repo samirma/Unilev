@@ -21,7 +21,15 @@ contract PositionsTimeLimitTest is TestSetupMock {
         // 2. Open Position
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
+        market.openLongPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -77,12 +85,28 @@ contract PositionsTimeLimitTest is TestSetupMock {
         // 2. Open Positions (Alice and Bob)
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
+        market.openLongPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         vm.startPrank(bob);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
+        market.openLongPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         uint256 posIdAlice = positions.getTraderPositions(alice)[0];

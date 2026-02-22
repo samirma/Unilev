@@ -30,7 +30,7 @@ contract LeveragedTradeLong is TestSetup {
         vm.startPrank(alice);
         IERC20(usdc).approve(address(positions), amount);
         console.log("Open position");
-        market.openPosition(usdc, wbtc, uint24(fee), false, 5, amount, 0, 0);
+        market.openLongPosition(usdc, wbtc, uint24(fee), 5, amount, 0, 0);
 
         assertEq(0, IERC20(usdc).balanceOf(alice));
 

@@ -131,45 +131,41 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
      * @param _token0 token sent
      * @param _token1 token traded
      * @param _fee Uniswap V3 pool fee
-     * @param _isShort true if short else long
      * @param _leverage leverage value 1 -> 5
      * @param _amount trade amount in token0
      * @param _limitPrice limit price in token1
      * @param _stopLossPrice stop loss price in token1
      * @return posId position Id
      */
-    function openPosition(
+    function openLongPosition(
         address _trader,
         address _token0,
         address _token1,
         uint24 _fee,
-        bool _isShort,
         uint8 _leverage,
         uint128 _amount,
         uint160 _limitPrice,
         uint256 _stopLossPrice
     ) external onlyOwner nonReentrant whenNotPaused returns (uint256) {
-        // Cache storage variable to avoid multiple SLOADs
         uint256 currentPosId = posId;
 
-        // Check params
-        PositionLogic.ValidationResult memory validationResult = PositionLogic.validateOpenPosition(
-            PositionLogic.ValidationParams({
-                token0: _token0,
-                token1: _token1,
-                fee: _fee,
-                isShort: _isShort,
-                leverage: _leverage,
-                amount: _amount,
-                limitPrice: _limitPrice,
-                stopLossPrice: _stopLossPrice,
-                liquidityPoolFactoryUniswapV3: LIQUIDITY_POOL_FACTORY_UNISWAP_V3,
-                liquidityPoolFactory: address(LIQUIDITY_POOL_FACTORY),
-                priceFeed: address(PRICE_FEED),
-                maxLeverage: MAX_LEVERAGE,
-                minPositionAmountInUsd: MIN_POSITION_AMOUNT_IN_USD
-            })
-        );
+        PositionLogic.ValidationResult memory validationResult = PositionLogic
+            .validateOpenLongPosition(
+                PositionLogic.ValidationParams({
+                    token0: _token0,
+                    token1: _token1,
+                    fee: _fee,
+                    leverage: _leverage,
+                    amount: _amount,
+                    limitPrice: _limitPrice,
+                    stopLossPrice: _stopLossPrice,
+                    liquidityPoolFactoryUniswapV3: LIQUIDITY_POOL_FACTORY_UNISWAP_V3,
+                    liquidityPoolFactory: address(LIQUIDITY_POOL_FACTORY),
+                    priceFeed: address(PRICE_FEED),
+                    maxLeverage: MAX_LEVERAGE,
+                    minPositionAmountInUsd: MIN_POSITION_AMOUNT_IN_USD
+                })
+            );
 
         address baseToken = validationResult.baseToken;
         address quoteToken = validationResult.quoteToken;
@@ -177,24 +173,15 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         address v3Pool = validationResult.v3Pool;
         bool isBaseToken0 = validationResult.isBaseToken0;
 
-        bool isMargin = _leverage != 1 || _isShort;
-
-        uint8 baseDecimals = IERC20Metadata(baseToken).decimals();
         uint8 quoteDecimals = IERC20Metadata(quoteToken).decimals();
-        uint256 baseDecimalsPow = 10 ** baseDecimals;
         uint256 quoteDecimalsPow = 10 ** quoteDecimals;
+        uint8 baseDecimals = IERC20Metadata(baseToken).decimals();
+        uint256 baseDecimalsPow = 10 ** baseDecimals;
 
-        // transfer funds to the contract (trader need to approve first)
         IERC20(_token0).safeTransferFrom(_trader, address(this), _amount);
-
-        // Compute parameters
-        uint256 breakEvenLimit;
-        uint256 totalBorrow;
-        uint256 amountBorrow;
 
         (uint128 treasureFee, uint128 liquidationRewardRate) = feeManager.getFees(_trader);
 
-        // take opening fees
         uint128 liquidationReward = uint128((_amount * liquidationRewardRate) / 10000);
         _amount = _amount - liquidationReward;
 
@@ -203,7 +190,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         _amount = _amount - uint128(treasureAmount);
 
         uint128 baseCollateralAmount;
-        if (!_isShort && _token0 != baseToken) {
+        if (_token0 != baseToken) {
             SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), _amount);
 
             uint256 priceQuoteToBase = PRICE_FEED.getPairLatestPrice(_token0, baseToken);
@@ -219,7 +206,116 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                     minOut
                 )
             );
-        } else if (_isShort && _token0 != quoteToken) {
+        } else {
+            baseCollateralAmount = _amount;
+        }
+
+        uint256 breakEvenLimit = price - (price * 10000) / (uint256(_leverage) * 10000);
+        uint256 totalBorrow = (uint256(baseCollateralAmount) * (_leverage - 1) * price) /
+            baseDecimalsPow;
+
+        address cacheLiquidityPoolToUse = LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY)
+            .getTokenToLiquidityPools(quoteToken);
+
+        LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
+
+        SafeERC20.forceApprove(IERC20(quoteToken), address(UNISWAP_V3_HELPER), totalBorrow);
+
+        uint256 priceQuoteToBaseBorrow = PRICE_FEED.getPairLatestPrice(quoteToken, baseToken);
+        uint256 minOutBorrow = (totalBorrow * priceQuoteToBaseBorrow) / quoteDecimalsPow;
+        minOutBorrow = (minOutBorrow * 9500) / 10000;
+
+        uint256 amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
+            quoteToken,
+            baseToken,
+            IUniswapV3Pool(v3Pool).fee(),
+            totalBorrow,
+            minOutBorrow
+        );
+
+        uint128 positionSize = uint128(baseCollateralAmount + amountBorrow);
+
+        openPositions[currentPosId] = PositionParams({
+            initialPrice: price,
+            totalBorrow: totalBorrow,
+            breakEvenLimit: breakEvenLimit,
+            stopLossPrice: _stopLossPrice,
+            v3Pool: v3Pool,
+            limitPrice: _limitPrice,
+            baseToken: IERC20(baseToken),
+            quoteToken: IERC20(quoteToken),
+            collateralSize: baseCollateralAmount,
+            positionSize: positionSize,
+            liquidationReward: liquidationReward,
+            timestamp: uint64(block.timestamp),
+            blockNumber: uint64(block.number),
+            isShort: false,
+            isBaseToken0: isBaseToken0,
+            leverage: _leverage,
+            initialToken: IERC20(_token0)
+        });
+
+        unchecked {
+            ++totalNbPos;
+            ++posId;
+        }
+
+        _mint(_trader, currentPosId);
+        return currentPosId;
+    }
+
+    function openShortPosition(
+        address _trader,
+        address _token0,
+        address _token1,
+        uint24 _fee,
+        uint8 _leverage,
+        uint128 _amount,
+        uint160 _limitPrice,
+        uint256 _stopLossPrice
+    ) external onlyOwner nonReentrant whenNotPaused returns (uint256) {
+        uint256 currentPosId = posId;
+
+        PositionLogic.ValidationResult memory validationResult = PositionLogic
+            .validateOpenShortPosition(
+                PositionLogic.ValidationParams({
+                    token0: _token0,
+                    token1: _token1,
+                    fee: _fee,
+                    leverage: _leverage,
+                    amount: _amount,
+                    limitPrice: _limitPrice,
+                    stopLossPrice: _stopLossPrice,
+                    liquidityPoolFactoryUniswapV3: LIQUIDITY_POOL_FACTORY_UNISWAP_V3,
+                    liquidityPoolFactory: address(LIQUIDITY_POOL_FACTORY),
+                    priceFeed: address(PRICE_FEED),
+                    maxLeverage: MAX_LEVERAGE,
+                    minPositionAmountInUsd: MIN_POSITION_AMOUNT_IN_USD
+                })
+            );
+
+        address baseToken = validationResult.baseToken;
+        address quoteToken = validationResult.quoteToken;
+        uint256 price = validationResult.price;
+        address v3Pool = validationResult.v3Pool;
+        bool isBaseToken0 = validationResult.isBaseToken0;
+
+        uint8 baseDecimals = IERC20Metadata(baseToken).decimals();
+        uint256 baseDecimalsPow = 10 ** baseDecimals;
+
+        IERC20(_token0).safeTransferFrom(_trader, address(this), _amount);
+
+        (uint128 treasureFee, uint128 liquidationRewardRate) = feeManager.getFees(_trader);
+
+        uint128 liquidationReward = uint128((_amount * liquidationRewardRate) / 10000);
+        _amount = _amount - liquidationReward;
+
+        uint256 treasureAmount = (_amount * treasureFee) / 10000;
+        IERC20(_token0).safeTransfer(treasure, treasureAmount);
+        _amount = _amount - uint128(treasureAmount);
+
+        uint128 baseCollateralAmount;
+        if (_token0 != quoteToken) {
             SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), _amount);
 
             uint256 priceBaseToQuote = PRICE_FEED.getPairLatestPrice(_token0, quoteToken);
@@ -239,74 +335,29 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             baseCollateralAmount = _amount;
         }
 
-        if (isMargin) {
-            if (_isShort) {
-                breakEvenLimit = price + (price * 10000) / (uint256(_leverage) * 10000);
-                totalBorrow = (uint256(baseCollateralAmount) * baseDecimalsPow * _leverage) / price;
-            } else {
-                breakEvenLimit = price - (price * 10000) / (uint256(_leverage) * 10000);
-                totalBorrow =
-                    (uint256(baseCollateralAmount) * (_leverage - 1) * price) /
-                    baseDecimalsPow;
-            }
+        uint256 breakEvenLimit = price + (price * 10000) / (uint256(_leverage) * 10000);
+        uint256 totalBorrow = (uint256(baseCollateralAmount) * baseDecimalsPow * _leverage) / price;
 
-            address cacheLiquidityPoolToUse = LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY)
-                .getTokenToLiquidityPools(_isShort ? baseToken : quoteToken);
+        address cacheLiquidityPoolToUse = LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY)
+            .getTokenToLiquidityPools(baseToken);
 
-            // Borrow funds from the pool
-            LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
+        LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
 
-            if (_isShort) {
-                SafeERC20.forceApprove(IERC20(baseToken), address(UNISWAP_V3_HELPER), totalBorrow);
+        SafeERC20.forceApprove(IERC20(baseToken), address(UNISWAP_V3_HELPER), totalBorrow);
 
-                uint256 priceBaseToQuote = PRICE_FEED.getPairLatestPrice(baseToken, quoteToken);
-                uint256 minOut = (totalBorrow * priceBaseToQuote) / baseDecimalsPow;
-                minOut = (minOut * 9500) / 10000;
+        uint256 priceBaseToQuoteBorrow = PRICE_FEED.getPairLatestPrice(baseToken, quoteToken);
+        uint256 minOutBorrow = (totalBorrow * priceBaseToQuoteBorrow) / baseDecimalsPow;
+        minOutBorrow = (minOutBorrow * 9500) / 10000;
 
-                amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
-                    baseToken,
-                    quoteToken,
-                    IUniswapV3Pool(v3Pool).fee(),
-                    totalBorrow,
-                    minOut
-                );
-            } else {
-                if (_leverage != 1) {
-                    SafeERC20.forceApprove(
-                        IERC20(quoteToken),
-                        address(UNISWAP_V3_HELPER),
-                        totalBorrow
-                    );
+        uint256 amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
+            baseToken,
+            quoteToken,
+            IUniswapV3Pool(v3Pool).fee(),
+            totalBorrow,
+            minOutBorrow
+        );
 
-                    uint256 priceQuoteToBase = PRICE_FEED.getPairLatestPrice(quoteToken, baseToken);
-                    uint256 minOut = (totalBorrow * priceQuoteToBase) / quoteDecimalsPow;
-                    minOut = (minOut * 9500) / 10000;
-
-                    amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
-                        quoteToken,
-                        baseToken,
-                        IUniswapV3Pool(v3Pool).fee(),
-                        totalBorrow,
-                        minOut
-                    );
-                }
-            }
-        } else {
-            // if not margin
-            if (_limitPrice != 0) {
-                revert("Limit orders for non-margin trades are temporarily disabled");
-            }
-        }
-
-        // position size calculation
-        uint128 positionSize;
-        if (_isShort) {
-            positionSize = uint128(amountBorrow);
-        } else if (_leverage != 1) {
-            positionSize = uint128(baseCollateralAmount + amountBorrow);
-        } else {
-            positionSize = baseCollateralAmount;
-        }
+        uint128 positionSize = uint128(amountBorrow);
 
         openPositions[currentPosId] = PositionParams({
             initialPrice: price,
@@ -322,7 +373,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             liquidationReward: liquidationReward,
             timestamp: uint64(block.timestamp),
             blockNumber: uint64(block.number),
-            isShort: _isShort,
+            isShort: true,
             isBaseToken0: isBaseToken0,
             leverage: _leverage,
             initialToken: IERC20(_token0)

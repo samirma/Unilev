@@ -30,11 +30,10 @@ contract Market is IMarket, Ownable, Pausable {
     }
 
     // --------------- Trader Zone ---------------
-    function openPosition(
+    function openLongPosition(
         address _token0,
         address _token1,
         uint24 _fee,
-        bool _isShort,
         uint8 _leverage,
         uint128 _amount,
         uint160 _limitPrice,
@@ -42,12 +41,11 @@ contract Market is IMarket, Ownable, Pausable {
     ) external whenNotPaused {
         SafeERC20.forceApprove(IERC20(_token0), address(POSITIONS), _amount);
 
-        uint256 posId = POSITIONS.openPosition(
+        uint256 posId = POSITIONS.openLongPosition(
             msg.sender,
             _token0,
             _token1,
             _fee,
-            _isShort,
             _leverage,
             _amount,
             _limitPrice,
@@ -59,7 +57,41 @@ contract Market is IMarket, Ownable, Pausable {
             _token0,
             _token1,
             _amount,
-            _isShort,
+            false,
+            _leverage,
+            _limitPrice,
+            _stopLossPrice
+        );
+    }
+
+    function openShortPosition(
+        address _token0,
+        address _token1,
+        uint24 _fee,
+        uint8 _leverage,
+        uint128 _amount,
+        uint160 _limitPrice,
+        uint256 _stopLossPrice
+    ) external whenNotPaused {
+        SafeERC20.forceApprove(IERC20(_token0), address(POSITIONS), _amount);
+
+        uint256 posId = POSITIONS.openShortPosition(
+            msg.sender,
+            _token0,
+            _token1,
+            _fee,
+            _leverage,
+            _amount,
+            _limitPrice,
+            _stopLossPrice
+        );
+        emit PositionOpened(
+            posId,
+            msg.sender,
+            _token0,
+            _token1,
+            _amount,
+            true,
             _leverage,
             _limitPrice,
             _stopLossPrice

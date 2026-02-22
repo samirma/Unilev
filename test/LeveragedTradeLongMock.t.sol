@@ -24,7 +24,15 @@ contract LeveragedTradeLongMock is TestSetupMock {
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
         // token0=WETH, token1=WBTC, isShort=false (Long), leverage=2
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
+        market.openLongPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         // Verify Position State (Approximate check based on table)
@@ -75,7 +83,15 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // 2. Open Position
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
+        market.openLongPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -118,7 +134,15 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
+        market.openLongPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -145,90 +169,6 @@ contract LeveragedTradeLongMock is TestSetupMock {
     }
 
     // ----------------------------------------------------------------------
-    // Scenario: Long - Profit No Leverage
-    // ----------------------------------------------------------------------
-    function test_Long_NoLeverage_Profit() public {
-        uint128 amount = 1e18;
-        uint24 fee = 3000;
-
-        writeTokenBalance(alice, conf.supportedTokens[1].token, amount);
-
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
-        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
-        vm.stopPrank();
-
-        vm.startPrank(alice);
-        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        // Leverage = 1 (No Leverage)
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 1, amount, 0, 0);
-        vm.stopPrank();
-
-        uint256[] memory posAlice = positions.getTraderPositions(alice);
-
-        // 3. Mock Price Change (ETH -> $5,000)
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(5000 * 1e8);
-        vm.stopPrank();
-
-        // 4. Close Position
-        vm.startPrank(alice);
-        market.closePosition(posAlice[0]);
-        vm.stopPrank();
-
-        // 5. Final Assertions
-        // Table Target: 0.995 WETH (Just holding minus fees)
-        uint256 finalBalance = IERC20(conf.supportedTokens[1].token).balanceOf(alice);
-        console.log("Final Trader Balance (WETH):", finalBalance);
-        assertApproxEqAbs(finalBalance, 0.995e18, 1e16); // Slightly higher tolerance due to fee model
-
-        // Treasure check: ~0.009976 WETH
-        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
-        assertApproxEqAbs(treasureBalance, 0.009976e18, 1e16);
-    }
-
-    // ----------------------------------------------------------------------
-    // Scenario: Long - Loss No Leverage
-    // ----------------------------------------------------------------------
-    function test_Long_NoLeverage_Loss() public {
-        uint128 amount = 1e18;
-        uint24 fee = 3000;
-
-        writeTokenBalance(alice, conf.supportedTokens[1].token, amount);
-
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
-        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
-        vm.stopPrank();
-
-        vm.startPrank(alice);
-        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 1, amount, 0, 0);
-        vm.stopPrank();
-
-        uint256[] memory posAlice = positions.getTraderPositions(alice);
-
-        // 3. Mock Price Change (ETH -> $3,800)
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(3800 * 1e8);
-        vm.stopPrank();
-
-        // 4. Close Position
-        vm.startPrank(alice);
-        market.closePosition(posAlice[0]);
-        vm.stopPrank();
-
-        // 5. Final Assertions
-        // Table Target: 0.995 WETH
-        uint256 finalBalance = IERC20(conf.supportedTokens[1].token).balanceOf(alice);
-        console.log("Final Trader Balance (WETH):", finalBalance);
-        assertApproxEqAbs(finalBalance, 0.995e18, 1e16);
-
-        // Treasure check: ~0.009976 WETH
-        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
-        assertApproxEqAbs(treasureBalance, 0.009976e18, 1e16);
-    }
-    // ----------------------------------------------------------------------
     // Scenario: Whitelist Fees Test
     // ----------------------------------------------------------------------
     function test_WhitelistFees() public {
@@ -252,7 +192,15 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // 3. Open Position
         vm.startPrank(whitelistedUser);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amount, 0, 0);
+        market.openLongPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         // 4. Verification of Treasure Fee
@@ -285,12 +233,28 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // 2. Open Positions
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amountAlice);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 2, amountAlice, 0, 0);
+        market.openLongPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amountAlice,
+            0,
+            0
+        );
         vm.stopPrank();
 
         vm.startPrank(bob);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amountBob);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, false, 3, amountBob, 0, 0);
+        market.openLongPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            3,
+            amountBob,
+            0,
+            0
+        );
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);

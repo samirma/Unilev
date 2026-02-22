@@ -24,7 +24,15 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // isShort=true. token0 (Quote/Collateral)=WETH. token1 (Base)=WBTC.
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, true, 2, amount, 0, 0);
+        market.openShortPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -68,7 +76,15 @@ contract LeveragedTradeShortMock is TestSetupMock {
 
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, true, 2, amount, 0, 0);
+        market.openShortPosition(
+            conf.supportedTokens[1].token,
+            conf.supportedTokens[0].token,
+            fee,
+            2,
+            amount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -96,93 +112,6 @@ contract LeveragedTradeShortMock is TestSetupMock {
     }
 
     // ----------------------------------------------------------------------
-    // Scenario: Short - Profit No Leverage
-    // (Note: In this protocol, isShort implies Margin/Borrowing even if leverage is 1)
-    // ----------------------------------------------------------------------
-    function test_Short_Profit_NoLeverage() public {
-        uint128 amount = 1e18;
-        uint24 fee = 3000;
-
-        writeTokenBalance(alice, conf.supportedTokens[1].token, amount);
-
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
-        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
-        vm.stopPrank();
-
-        vm.startPrank(alice);
-        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        // Leverage = 1
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, true, 1, amount, 0, 0);
-        vm.stopPrank();
-
-        uint256[] memory posAlice = positions.getTraderPositions(alice);
-
-        // 3. Mock Price Change (ETH -> $5,000)
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(5000 * 1e8);
-        vm.stopPrank();
-
-        // 4. Close Position
-        vm.startPrank(alice);
-        market.closePosition(posAlice[0]);
-        vm.stopPrank();
-
-        // 5. Final Assertions
-        // Table Target: 1.1856 WETH
-        uint256 finalBalance = IERC20(conf.supportedTokens[1].token).balanceOf(alice);
-        console.log("Final Trader Balance (WETH):", finalBalance);
-        assertApproxEqAbs(finalBalance, 1.1856e18, 0.009e18);
-
-        // Treasure check: ~0.009012 WETH
-        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
-        assertApproxEqAbs(treasureBalance, 0.009012e18, 2e16);
-    }
-
-    // ----------------------------------------------------------------------
-    // Scenario: Short - Loss No Leverage
-    // ----------------------------------------------------------------------
-    function test_Short_Loss_NoLeverage() public {
-        uint128 amount = 1e18;
-        uint24 fee = 3000;
-
-        writeTokenBalance(alice, conf.supportedTokens[1].token, amount);
-
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
-        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
-        vm.stopPrank();
-
-        vm.startPrank(alice);
-        IERC20(conf.supportedTokens[1].token).approve(address(positions), amount);
-        // Leverage = 1
-        market.openPosition(conf.supportedTokens[1].token, conf.supportedTokens[0].token, fee, true, 1, amount, 0, 0);
-        vm.stopPrank();
-
-        uint256[] memory posAlice = positions.getTraderPositions(alice);
-
-        // 3. Mock Price Change (ETH -> $3,800)
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(3800 * 1e8);
-        vm.stopPrank();
-
-        // 4. Close Position
-        vm.startPrank(alice);
-        market.closePosition(posAlice[0]);
-        vm.stopPrank();
-
-        // 5. Final Assertions
-        // Table Target: 0.931 WETH
-        uint256 finalBalance = IERC20(conf.supportedTokens[1].token).balanceOf(alice);
-        console.log("Final Trader Balance (WETH):", finalBalance);
-        assertApproxEqAbs(finalBalance, 0.931e18, 1e16);
-
-        // Treasure check: ~0.010279 WETH
-        uint256 treasureBalance = IERC20(conf.supportedTokens[1].token).balanceOf(conf.treasure);
-        assertApproxEqAbs(treasureBalance, 0.010279e18, 2e16);
-    }
-
-    // ----------------------------------------------------------------------
     // Scenario: Short - USDC Collateral to Buy WETH (2x Leverage) - LOSS
     // Short position profits when WETH price DROPS
     // ----------------------------------------------------------------------
@@ -202,7 +131,15 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // isShort=true, token0=USDC (collateral), token1=WETH (base/borrowed)
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[2].token).approve(address(positions), usdcAmount);
-        market.openPosition(conf.supportedTokens[2].token, conf.supportedTokens[1].token, fee, true, 2, usdcAmount, 0, 0);
+        market.openShortPosition(
+            conf.supportedTokens[2].token,
+            conf.supportedTokens[1].token,
+            fee,
+            2,
+            usdcAmount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -247,7 +184,15 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // 2. Open Position (Short - using USDC to buy WETH with 2x leverage)
         vm.startPrank(alice);
         IERC20(conf.supportedTokens[2].token).approve(address(positions), usdcAmount);
-        market.openPosition(conf.supportedTokens[2].token, conf.supportedTokens[1].token, fee, true, 2, usdcAmount, 0, 0);
+        market.openShortPosition(
+            conf.supportedTokens[2].token,
+            conf.supportedTokens[1].token,
+            fee,
+            2,
+            usdcAmount,
+            0,
+            0
+        );
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);

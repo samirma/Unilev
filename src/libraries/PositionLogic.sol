@@ -21,7 +21,6 @@ library PositionLogic {
         address token0;
         address token1;
         uint24 fee;
-        bool isShort;
         uint8 leverage;
         uint256 amount;
         uint256 limitPrice;
@@ -41,9 +40,9 @@ library PositionLogic {
         address v3Pool;
     }
 
-    function validateOpenPosition(
+    function _getBaseValidationResult(
         ValidationParams memory params
-    ) external view returns (ValidationResult memory result) {
+    ) private view returns (ValidationResult memory result) {
         result.v3Pool = address(
             IUniswapV3Factory(params.liquidityPoolFactoryUniswapV3).getPool(
                 params.token0,
@@ -68,10 +67,6 @@ library PositionLogic {
             revert Positions__TOKEN_NOT_SUPPORTED(params.token0);
         }
 
-        /**
-         * @dev We use the USD price to determine which token is the stablecoin (quoteToken).
-         * Stablecoins generally have a price near 1e18 ($1.00).
-         */
         uint256 token0UsdPrice = PriceFeedL1(params.priceFeed).getTokenLatestPriceInUsd(
             params.token0
         );
@@ -97,29 +92,8 @@ library PositionLogic {
         );
 
         // check leverage
-        if (params.leverage < 1 || params.leverage > params.maxLeverage) {
+        if (params.leverage <= 1 || params.leverage > params.maxLeverage) {
             revert Positions__LEVERAGE_NOT_IN_RANGE(params.leverage);
-        }
-        // when margin position check if token is supported by a LiquidityPool
-        if (params.leverage != 1) {
-            if (
-                params.isShort &&
-                LiquidityPoolFactory(params.liquidityPoolFactory).getTokenToLiquidityPools(
-                    result.baseToken
-                ) ==
-                address(0)
-            ) {
-                revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(result.baseToken);
-            }
-            if (
-                !params.isShort &&
-                LiquidityPoolFactory(params.liquidityPoolFactory).getTokenToLiquidityPools(
-                    result.quoteToken
-                ) ==
-                address(0)
-            ) {
-                revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(result.quoteToken);
-            }
         }
 
         // check amount
@@ -134,21 +108,47 @@ library PositionLogic {
                 params.amount
             );
         }
+    }
 
-        if (params.isShort) {
-            if (params.limitPrice > result.price && params.limitPrice != 0) {
-                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(params.limitPrice);
-            }
-            if (params.stopLossPrice < result.price && params.stopLossPrice != 0) {
-                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(params.stopLossPrice);
-            }
-        } else {
-            if (params.limitPrice < result.price && params.limitPrice != 0) {
-                revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(params.limitPrice);
-            }
-            if (params.stopLossPrice > result.price && params.stopLossPrice != 0) {
-                revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(params.stopLossPrice);
-            }
+    function validateOpenLongPosition(
+        ValidationParams memory params
+    ) external view returns (ValidationResult memory result) {
+        result = _getBaseValidationResult(params);
+
+        if (
+            LiquidityPoolFactory(params.liquidityPoolFactory).getTokenToLiquidityPools(
+                result.quoteToken
+            ) == address(0)
+        ) {
+            revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(result.quoteToken);
+        }
+
+        if (params.limitPrice < result.price && params.limitPrice != 0) {
+            revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(params.limitPrice);
+        }
+        if (params.stopLossPrice > result.price && params.stopLossPrice != 0) {
+            revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(params.stopLossPrice);
+        }
+    }
+
+    function validateOpenShortPosition(
+        ValidationParams memory params
+    ) external view returns (ValidationResult memory result) {
+        result = _getBaseValidationResult(params);
+
+        if (
+            LiquidityPoolFactory(params.liquidityPoolFactory).getTokenToLiquidityPools(
+                result.baseToken
+            ) == address(0)
+        ) {
+            revert Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN(result.baseToken);
+        }
+
+        if (params.limitPrice > result.price && params.limitPrice != 0) {
+            revert Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT(params.limitPrice);
+        }
+        if (params.stopLossPrice < result.price && params.stopLossPrice != 0) {
+            revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(params.stopLossPrice);
         }
     }
 }

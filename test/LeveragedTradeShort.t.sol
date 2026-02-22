@@ -30,11 +30,10 @@ contract LeveragedTradeShort is TestSetup {
         IERC20(usdc).approve(address(positions), amount);
 
         // Open Short on WBTC against USDC
-        market.openPosition(
+        market.openShortPosition(
             usdc, // USDC (collateral)
             wbtc, // WBTC (exposure)
             uint24(fee),
-            true, // isShort
             5, // 5x leverage
             amount,
             0,
