@@ -9,10 +9,10 @@ contract LeveragedTradeLong is TestSetup {
         address wbtc = getWbtcAddress();
         address usdc = getUsdcAddress();
 
-        uint128 amount = 2e18;
+        uint128 amount = 2e6;
         uint24 fee = 3000;
 
-        depositLiquidity(usdc, 100000e18);
+        depositLiquidity(usdc, 100_000e6);
 
         writeTokenBalance(alice, usdc, amount);
 
@@ -22,12 +22,12 @@ contract LeveragedTradeLong is TestSetup {
         uint256 usdcBalanceBefore = IERC20(usdc).balanceOf(
             address(liquidityPoolFactory.getTokenToLiquidityPools(usdc))
         );
-        console.log("USDC balance in lbPoolUsdc BEFORE open: ", usdcBalanceBefore);
+        console.log("USDC balance in lbPool BEFORE open: ", usdcBalanceBefore);
 
         vm.startPrank(alice);
         IERC20(usdc).approve(address(positions), amount);
         console.log("Open position");
-        market.openLongPosition(usdc, wbtc, uint24(fee), 2, amount, 0, 0);
+        market.openLongPosition(usdc, wbtc, uint24(fee), 5, amount, 0, 0);
 
         assertEq(0, IERC20(usdc).balanceOf(alice));
 
@@ -44,6 +44,13 @@ contract LeveragedTradeLong is TestSetup {
 
         assertEq(1, posAlice[0]);
         assertEq(alice, positions.ownerOf(posAlice[0]));
+
+        (, , , , bool isShort_, uint8 leverage_, , , , , ) = positions.getPositionParams(
+            posAlice[0]
+        );
+        assertEq(isShort_, false);
+        assertEq(leverage_, 5);
+
         console.log("Close position");
         market.closePosition(posAlice[0]);
 
@@ -53,6 +60,6 @@ contract LeveragedTradeLong is TestSetup {
         uint256 usdcBalanceAfterClose = IERC20(usdc).balanceOf(
             address(liquidityPoolFactory.getTokenToLiquidityPools(usdc))
         );
-        console.log("USDC balance in lbPoolUsdc AFTER close: ", usdcBalanceAfterClose);
+        console.log("USDC balance in lbPool AFTER close: ", usdcBalanceAfterClose);
     }
 }
