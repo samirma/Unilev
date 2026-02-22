@@ -17,7 +17,10 @@ contract LiquidityPoolTest is TestSetup {
         );
         asset = IERC20(conf.supportedTokens[0].token);
 
-        // Ensure alice has some funds and approves the pool
+        // Ensure bob deposits 10e8 for initial pool liquidity
+        depositLiquidity(address(asset), 10e8);
+
+        // Ensure alice has some funds and approves the pool for her tests
         vm.startPrank(alice);
         writeTokenBalance(alice, address(asset), 100e8);
         asset.approve(address(pool), 100e8);
