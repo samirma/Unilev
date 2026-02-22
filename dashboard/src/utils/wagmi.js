@@ -1,15 +1,13 @@
-
-import { http, createConfig } from 'wagmi'
-import { polygon } from 'wagmi/chains'
-import { injected } from 'wagmi/connectors'
+import { createConfig } from "wagmi"
+import { polygon } from "wagmi/chains"
+import { injected } from "wagmi/connectors"
 
 export const config = createConfig({
     chains: [polygon],
-    connectors: [
-        injected(),
-    ],
+    connectors: [injected()],
     transports: {
-        [polygon.id]: http(process.env.RPC_URL),
+        // No explicit transport - wagmi will use the injected provider (MetaMask)
+        [polygon.id]: undefined,
     },
     ssr: true,
 })

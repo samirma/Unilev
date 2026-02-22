@@ -21,7 +21,6 @@ function copyFile(src, dest) {
 console.log("🔄 Syncing Environment Variables...");
 
 const envVars = [
-    { key: 'RPC_URL', target: 'RPC_URL' },
     { key: 'WRAPPER_ADDRESS', target: 'WRAPPER_ADDRESS' },
     { key: 'PRICEFEEDL1_ADDRESS', target: 'PRICEFEEDL1_ADDRESS' },
     { key: 'POSITIONS_ADDRESS', target: 'POSITIONS_ADDRESS' },
