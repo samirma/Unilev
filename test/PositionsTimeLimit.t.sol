@@ -13,7 +13,6 @@ contract PositionsTimeLimitTest is TestSetupMock {
         uint24 fee = 3000;
 
         depositLiquidity(usdc, 1000_000e6);
-        depositLiquidity(wbtc, 10e8);
 
         // 1. Initial State
         writeTokenBalance(alice, usdc, amount);
@@ -69,7 +68,6 @@ contract PositionsTimeLimitTest is TestSetupMock {
         uint24 fee = 3000;
 
         depositLiquidity(usdc, 1000_000e6);
-        depositLiquidity(wbtc, 10e8);
 
         // 1. Setup
         writeTokenBalance(alice, usdc, amount);

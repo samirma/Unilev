@@ -96,10 +96,7 @@ contract TestSetupMock is Test, HelperConfig, Utils {
 
         for (uint256 i = 0; i < numTokens; i++) {
             tokens[i] = conf.supportedTokens[i].token;
-            if (i == 0) priceFeeds[i] = address(mockV3AggregatorWbtcUsd);
-            else if (i == 1) priceFeeds[i] = address(mockV3AggregatorEthUsd);
-            else if (i == 2) priceFeeds[i] = address(mockV3AggregatorUsdcUsd);
-            else if (i == 3) priceFeeds[i] = address(mockV3AggregatorDaiUsd);
+            priceFeeds[i] = conf.supportedTokens[i].priceFeed;
 
             // Populate mapping
             string memory symbol = IERC20Metadata(tokens[i]).symbol();
