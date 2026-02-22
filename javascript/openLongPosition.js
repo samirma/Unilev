@@ -1,5 +1,16 @@
 const { ethers } = require("ethers");
-const { getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails, getMarketAbi, getPriceFeedL1Abi, getSupportedTokens } = require("./utils");
+const {
+    getErc20Abi,
+    getEnvVars,
+    setupProviderAndWallet,
+    calculateTokenAmountFromUsd,
+    logPositionDetails,
+    getMarketAbi,
+    getPriceFeedL1Abi,
+    getSupportedTokens,
+    getLiquidityPoolAbi,
+    checkAndLogPreflightTable
+} = require("./utils");
 
 async function main() {
     // --- Environment Setup ---
@@ -44,30 +55,42 @@ async function main() {
         }
 
         // --- 2. Approve Positions Contract ---
-        console.log("Approving Positions contract...");
-        // Note: Market.sol calls SafeERC20.forceApprove, but we must approve POSITIONS directly as it pulls funds from msg.sender (Trader)
-        const txApprove = await token0Contract.approve(env.POSITIONS_ADDRESS, positionAmount);
-        await txApprove.wait();
-        console.log("- Approved Positions.");
+        console.log("Checking allowance for Positions contract...");
+        const currentAllowance = await token0Contract.allowance(wallet.address, env.POSITIONS_ADDRESS);
 
-        // --- 3. Open Long Position ---
-        console.log("Opening Long Position...");
+        if (currentAllowance < positionAmount) {
+            console.log("Allowance too low. Approving Positions contract...");
+            const txApprove = await token0Contract.approve(env.POSITIONS_ADDRESS, ethers.MaxUint256);
+            await txApprove.wait();
+            console.log("- Approved Positions.");
+        } else {
+            console.log("- Sufficient allowance exists. Skipping approval.");
+        }
 
-        // Params:
-        // address _token0 (Collateral - USDC)
-        // address _token1 (Target - WBTC)
-        // uint24 _fee (3000 -> 0.3%)
-        // bool _isShort (false)
-        // uint8 _leverage (2)
-        // uint128 _amount (positionAmount)
-        // uint160 _limitPrice (0)
-        // uint256 _stopLossPrice (0)
-
+        // --- 3. Pre-flight Table ---
         const fee = 3000;
         const isShort = false;
-        const leverage = 2;
+        const leverage = 1;
         const limitPrice = 0;
         const stopLossPrice = 0;
+
+        const willPass = await checkAndLogPreflightTable(
+            provider,
+            marketContract,
+            priceFeedL1Contract,
+            token0Address,
+            token1Address,
+            positionAmount,
+            leverage,
+            isShort
+        );
+
+        if (!willPass) {
+            console.warn("⚠️ Warning: Transaction might fail due to lack of borrow capacity.");
+        }
+
+        // --- 4. Open Long Position ---
+        console.log("Opening Long Position...");
 
         try {
             console.log("Simulating transaction...");
@@ -89,7 +112,7 @@ async function main() {
             positionAmount,
             limitPrice,
             stopLossPrice,
-            { gasLimit: 5000000, nonce: txApprove.nonce + 1 }
+            { gasLimit: 5000000 }
         );
 
         console.log(`Transaction sent: ${txOpen.hash}`);

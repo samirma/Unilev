@@ -268,6 +268,75 @@ async function logPositionDetails(posId, marketContract, priceFeedL1Contract, pr
     }
 }
 
+/**
+ * Generates and logs a pre-flight table and checks capacity.
+ * @param {ethers.Provider} provider 
+ * @param {ethers.Contract} marketContract 
+ * @param {ethers.Contract} priceFeedL1Contract 
+ * @param {string} token0Address Collateral token address
+ * @param {string} token1Address Target token address
+ * @param {bigint} positionAmount 
+ * @param {number} leverage 
+ * @param {boolean} isShort 
+ * @returns {Promise<boolean>} True if capacity left >= borrow amount, false otherwise.
+ */
+async function checkAndLogPreflightTable(
+    provider,
+    marketContract,
+    priceFeedL1Contract,
+    token0Address,
+    token1Address,
+    positionAmount,
+    leverage,
+    isShort
+) {
+    const erc20Abi = getErc20Abi();
+    const lpAbi = getLiquidityPoolAbi();
+
+    const token0Contract = new ethers.Contract(token0Address, erc20Abi, provider);
+    const token1Contract = new ethers.Contract(token1Address, erc20Abi, provider);
+
+    const [decimals, symbol0, symbol1] = await Promise.all([
+        token0Contract.decimals(),
+        token0Contract.symbol(),
+        token1Contract.symbol()
+    ]);
+
+    const poolSymbol = isShort ? symbol0 : symbol1;
+    const poolTokenAddress = isShort ? token0Address : token1Address;
+    const poolAddress = await marketContract.getTokenToLiquidityPools(poolTokenAddress);
+
+    const poolTokenContract = new ethers.Contract(poolTokenAddress, erc20Abi, provider);
+    const poolDecimals = await poolTokenContract.decimals();
+    const poolBalanceRaw = await poolTokenContract.balanceOf(poolAddress);
+
+    const liquidityPoolContract = new ethers.Contract(poolAddress, lpAbi, provider);
+    const capacityLeftRaw = await liquidityPoolContract.borrowCapacityLeft();
+
+    let expectedBorrowAmountRaw;
+    if (isShort) {
+        expectedBorrowAmountRaw = positionAmount * BigInt(leverage);
+    } else {
+        const priceRaw = await priceFeedL1Contract.getPairLatestPrice(token0Address, token1Address);
+        expectedBorrowAmountRaw = (positionAmount * BigInt(leverage - 1) * priceRaw) / (10n ** BigInt(decimals));
+    }
+
+    const willPass = capacityLeftRaw >= expectedBorrowAmountRaw;
+
+    console.log("\n====== Pre-flight Check ======");
+    console.log(`Operation:       ${isShort ? "Short" : "Long"}`);
+    console.log(`Collateral:      ${symbol0}`);
+    console.log(`Target:          ${symbol1}`);
+    console.log(`Borrow Amount:   ${ethers.formatUnits(expectedBorrowAmountRaw, poolDecimals)} ${poolSymbol}`);
+    console.log(`Borrow Pool:     ${poolAddress}`);
+    console.log(`Pool Balance:    ${ethers.formatUnits(poolBalanceRaw, poolDecimals)} ${poolSymbol}`);
+    console.log(`Capacity Left:   ${ethers.formatUnits(capacityLeftRaw, poolDecimals)} ${poolSymbol}`);
+    console.log(`Would Pass:      ${willPass ? "✅ Yes" : "❌ No"}`);
+    console.log("==============================\n");
+
+    return willPass;
+}
+
 module.exports = {
     getMarketAbi,
     getPositionsAbi,
@@ -282,4 +351,5 @@ module.exports = {
     calculateTokenAmountFromUsd,
     logPositionDetails,
     getSupportedTokens,
+    checkAndLogPreflightTable,
 }
