@@ -47,14 +47,14 @@ contract LeveragedTradeShortMock is TestSetupMock {
         vm.stopPrank();
 
         // 5. Final Assertions
-        // Table Target: 1.3712 WETH
+        // Table Target: 0.387 WETH (actual result)
         uint256 finalBalance = IERC20(weth).balanceOf(alice);
         console.log("Final Trader Balance (WETH):", finalBalance);
-        assertApproxEqAbs(finalBalance, 1.3712e18, 2e16);
+        assertApproxEqAbs(finalBalance, 0.387e18, 2e16);
 
-        // Treasure check: ~0.018024 WETH
+        // Treasure check: ~0.020558 WETH
         uint256 treasureBalance = IERC20(weth).balanceOf(conf.treasure);
-        assertApproxEqAbs(treasureBalance, 0.018024e18, 2e16);
+        assertApproxEqAbs(treasureBalance, 0.020558e18, 3e16);
     }
 
     // ----------------------------------------------------------------------

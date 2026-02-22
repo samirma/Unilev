@@ -27,10 +27,10 @@ contract TestSetupMock is Test, HelperConfig, Utils {
     Market public market;
     Positions public positions;
     FeeManager public feeManager;
+
     MockV3Aggregator public mockV3AggregatorWbtcUsd;
-    MockV3Aggregator public mockV3AggregatorUsdcUsd;
-    MockV3Aggregator public mockV3AggregatorDaiUsd;
     MockV3Aggregator public mockV3AggregatorEthUsd;
+    MockV3Aggregator public mockV3AggregatorUsdcUsd;
 
     ERC20Mock public mockWbtc;
     ERC20Mock public mockWeth;
@@ -58,18 +58,6 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         carol = address(0x31);
 
         vm.startPrank(deployer);
-
-        /// deployments
-        // mocks - Chainlink USD feeds usually have 8 decimals
-        mockV3AggregatorWbtcUsd = new MockV3Aggregator(8, 60000 * 1e8); // 1 WBTC = $60,000
-        mockV3AggregatorUsdcUsd = new MockV3Aggregator(8, 1 * 1e8); // 1 USDC = $1
-        mockV3AggregatorDaiUsd = new MockV3Aggregator(8, 1 * 1e8); // 1 DAI = $1
-        mockV3AggregatorEthUsd = new MockV3Aggregator(8, 3000 * 1e8); // 1 ETH = $3000
-
-        mockV3AggregatorBySymbol["WBTC"] = address(mockV3AggregatorWbtcUsd);
-        mockV3AggregatorBySymbol["USDC"] = address(mockV3AggregatorUsdcUsd);
-        mockV3AggregatorBySymbol["DAI"] = address(mockV3AggregatorDaiUsd);
-        mockV3AggregatorBySymbol["ETH"] = address(mockV3AggregatorEthUsd);
 
         priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
@@ -112,13 +100,18 @@ contract TestSetupMock is Test, HelperConfig, Utils {
             tokens[i] = conf.supportedTokens[i].token;
             string memory symbol = IERC20Metadata(tokens[i]).symbol();
 
-            priceFeeds[i] = mockV3AggregatorBySymbol[symbol];
+            priceFeeds[i] = address(new MockV3Aggregator(8, 1 * 1e8));
 
             // Populate mapping
             tokenBySymbol[symbol] = tokens[i];
+            mockV3AggregatorBySymbol[symbol] = priceFeeds[i];
         }
 
         market.initializeTokens(tokens, priceFeeds);
+
+        mockV3AggregatorEthUsd = MockV3Aggregator(mockV3AggregatorBySymbol["WETH"]);
+        mockV3AggregatorWbtcUsd= MockV3Aggregator(mockV3AggregatorBySymbol["WBTC"]);
+        mockV3AggregatorUsdcUsd = MockV3Aggregator(mockV3AggregatorBySymbol["USDC"]);
 
         vm.stopPrank();
     }
