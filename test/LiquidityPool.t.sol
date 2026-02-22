@@ -12,7 +12,9 @@ contract LiquidityPoolTest is TestSetup {
 
     function setUp() public override {
         super.setUp();
-        pool = lbPoolWbtc;
+        pool = LiquidityPool(
+            liquidityPoolFactory.getTokenToLiquidityPools(conf.supportedTokens[0].token)
+        );
         asset = IERC20(conf.supportedTokens[0].token);
 
         // Ensure alice has some funds and approves the pool

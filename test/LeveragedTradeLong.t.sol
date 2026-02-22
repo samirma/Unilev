@@ -12,19 +12,16 @@ contract LeveragedTradeLong is TestSetup {
         uint128 amount = 2e18; // 2 DAI/USDC (18 decimals)
         uint24 fee = 3000;
 
-        // Long scenario: only the quote token pool (USDC) needs liquidity for the borrow
-        vm.startPrank(bob);
-        writeTokenBalance(bob, usdc, 1000000e18);
-        IERC20(usdc).approve(address(lbPoolUsdc), 1000000e18);
-        lbPoolUsdc.deposit(1000000e18, bob);
-        vm.stopPrank();
+        depositLiquidity(usdc, 100000e18);
 
         writeTokenBalance(alice, usdc, amount);
 
         assertEq(amount, IERC20(usdc).balanceOf(alice));
         assertEq(0, IERC20(usdc).balanceOf(address(positions)));
 
-        uint256 usdcBalanceBefore = IERC20(usdc).balanceOf(address(lbPoolUsdc));
+        uint256 usdcBalanceBefore = IERC20(usdc).balanceOf(
+            address(liquidityPoolFactory.getTokenToLiquidityPools(usdc))
+        );
         console.log("USDC balance in lbPoolUsdc BEFORE open: ", usdcBalanceBefore);
 
         vm.startPrank(alice);
@@ -34,7 +31,9 @@ contract LeveragedTradeLong is TestSetup {
 
         assertEq(0, IERC20(usdc).balanceOf(alice));
 
-        uint256 usdcBalanceAfter = IERC20(usdc).balanceOf(address(lbPoolUsdc));
+        uint256 usdcBalanceAfter = IERC20(usdc).balanceOf(
+            address(liquidityPoolFactory.getTokenToLiquidityPools(usdc))
+        );
         assertLt(usdcBalanceAfter, usdcBalanceBefore);
 
         uint256 wbtcBalance = IERC20(wbtc).balanceOf(address(positions));
@@ -51,7 +50,9 @@ contract LeveragedTradeLong is TestSetup {
         assertGt(IERC20(usdc).balanceOf(alice), 0);
         assertEq(0, IERC20(wbtc).balanceOf(address(positions)));
 
-        uint256 usdcBalanceAfterClose = IERC20(usdc).balanceOf(address(lbPoolUsdc));
+        uint256 usdcBalanceAfterClose = IERC20(usdc).balanceOf(
+            address(liquidityPoolFactory.getTokenToLiquidityPools(usdc))
+        );
         console.log("USDC balance in lbPoolUsdc AFTER close: ", usdcBalanceAfterClose);
     }
 }

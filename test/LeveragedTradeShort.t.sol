@@ -13,18 +13,17 @@ contract LeveragedTradeShort is TestSetup {
         uint24 fee = 3000;
 
         // Short scenario: only the base token pool (WBTC) needs liquidity for the borrow
-        vm.startPrank(bob);
-        writeTokenBalance(bob, wbtc, 10e8);
-        IERC20(wbtc).approve(address(lbPoolWbtc), 10e8);
-        lbPoolWbtc.deposit(10e8, bob);
-        vm.stopPrank();
+        depositLiquidity(wbtc, 1000e8); // 1000 WBTC
+        depositLiquidity(usdc, 1000000e18); // 1,000,000 USDC
 
         writeTokenBalance(alice, usdc, amount);
 
         assertEq(amount, IERC20(usdc).balanceOf(alice));
         assertEq(0, IERC20(usdc).balanceOf(address(positions)));
 
-        uint256 wbtcBalanceBefore = IERC20(wbtc).balanceOf(address(lbPoolWbtc));
+        uint256 wbtcBalanceBefore = IERC20(wbtc).balanceOf(
+            address(liquidityPoolFactory.getTokenToLiquidityPools(wbtc))
+        );
 
         vm.startPrank(alice);
         IERC20(usdc).approve(address(positions), amount);
@@ -47,7 +46,9 @@ contract LeveragedTradeShort is TestSetup {
         assertGt(positionsUsdc, amount * 4);
 
         // WBTC was borrowed
-        uint256 wbtcBalanceAfter = IERC20(wbtc).balanceOf(address(lbPoolWbtc));
+        uint256 wbtcBalanceAfter = IERC20(wbtc).balanceOf(
+            address(liquidityPoolFactory.getTokenToLiquidityPools(wbtc))
+        );
         assertLt(wbtcBalanceAfter, wbtcBalanceBefore);
 
         assertEq(1, positions.totalNbPos());
