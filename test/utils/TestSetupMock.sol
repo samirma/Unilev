@@ -14,6 +14,8 @@ import {FeeManager} from "../../src/FeeManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import {ERC20Mock} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/mocks/ERC20Mock.sol";
+
 import "forge-std/Test.sol";
 import {HelperConfig} from "../../scripts/HelperConfig.sol";
 import {Utils} from "./Utils.sol";
@@ -30,6 +32,11 @@ contract TestSetupMock is Test, HelperConfig, Utils {
     MockV3Aggregator public mockV3AggregatorDaiUsd;
     MockV3Aggregator public mockV3AggregatorEthUsd;
 
+    ERC20Mock public mockWbtc;
+    ERC20Mock public mockWeth;
+    ERC20Mock public mockUsdc;
+    ERC20Mock public mockDai;
+
     address public alice;
     address public bob;
     address public carol;
@@ -38,6 +45,8 @@ contract TestSetupMock is Test, HelperConfig, Utils {
     HelperConfig.NetworkConfig public conf;
 
     mapping(string => address) public tokenBySymbol;
+
+    mapping(string => address) public mockV3AggregatorBySymbol;
 
     function setUp() public {
         conf = getActiveNetworkConfig();
@@ -56,6 +65,11 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         mockV3AggregatorUsdcUsd = new MockV3Aggregator(8, 1 * 1e8); // 1 USDC = $1
         mockV3AggregatorDaiUsd = new MockV3Aggregator(8, 1 * 1e8); // 1 DAI = $1
         mockV3AggregatorEthUsd = new MockV3Aggregator(8, 3000 * 1e8); // 1 ETH = $3000
+
+        mockV3AggregatorBySymbol["WBTC"] = address(mockV3AggregatorWbtcUsd);
+        mockV3AggregatorBySymbol["USDC"] = address(mockV3AggregatorUsdcUsd);
+        mockV3AggregatorBySymbol["DAI"] = address(mockV3AggregatorDaiUsd);
+        mockV3AggregatorBySymbol["ETH"] = address(mockV3AggregatorEthUsd);
 
         priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
@@ -96,10 +110,11 @@ contract TestSetupMock is Test, HelperConfig, Utils {
 
         for (uint256 i = 0; i < numTokens; i++) {
             tokens[i] = conf.supportedTokens[i].token;
-            priceFeeds[i] = conf.supportedTokens[i].priceFeed;
+            string memory symbol = IERC20Metadata(tokens[i]).symbol();
+
+            priceFeeds[i] = mockV3AggregatorBySymbol[symbol];
 
             // Populate mapping
-            string memory symbol = IERC20Metadata(tokens[i]).symbol();
             tokenBySymbol[symbol] = tokens[i];
         }
 
@@ -125,5 +140,9 @@ contract TestSetupMock is Test, HelperConfig, Utils {
 
     function getWbtcAddress() internal view returns (address) {
         return tokenBySymbol["WBTC"];
+    }
+
+    function getWethAddress() internal view returns (address) {
+        return tokenBySymbol["WETH"];
     }
 }
