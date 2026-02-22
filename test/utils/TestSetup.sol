@@ -101,6 +101,7 @@ contract TestSetup is Test, HelperConfig, Utils {
         writeTokenBalance(bob, token, amount);
         IERC20(token).approve(address(liquidityPool), amount);
         liquidityPool.deposit(amount, bob);
+        console.log("One liquidity deposit made for token: ", IERC20Metadata(token).symbol(), " amount: ", amount);            
         vm.stopPrank();
     }
 

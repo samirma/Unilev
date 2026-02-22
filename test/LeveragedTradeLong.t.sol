@@ -6,10 +6,10 @@ import "./utils/TestSetup.sol";
 
 contract LeveragedTradeLong is TestSetup {
     function test__leveragedTradeToCloseLong1() public {
-        address wbtc = conf.supportedTokens[0].token;
-        address usdc = conf.supportedTokens[2].token;
+        address wbtc = getWbtcAddress();
+        address usdc = getUsdcAddress();
 
-        uint128 amount = 2e18; // 2 DAI/USDC (18 decimals)
+        uint128 amount = 2e18;
         uint24 fee = 3000;
 
         depositLiquidity(usdc, 100000e18);
@@ -27,7 +27,7 @@ contract LeveragedTradeLong is TestSetup {
         vm.startPrank(alice);
         IERC20(usdc).approve(address(positions), amount);
         console.log("Open position");
-        market.openLongPosition(usdc, wbtc, uint24(fee), 5, amount, 0, 0);
+        market.openLongPosition(usdc, wbtc, uint24(fee), 2, amount, 0, 0);
 
         assertEq(0, IERC20(usdc).balanceOf(alice));
 
