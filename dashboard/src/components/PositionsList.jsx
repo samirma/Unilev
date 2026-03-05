@@ -153,7 +153,11 @@ function PositionCard({ position, isOwner, onClose }) {
         setClosing(true);
         try {
             const tx = await onClose();
-            await tx.wait();
+            if (tx && tx.wait) {
+                await tx.wait();
+                alert("Position closed successfully!");
+                fetchPositions();
+            }
         } catch (e) {
             console.error(e);
             alert("Failed to close position");

@@ -33,17 +33,34 @@ export function useDeFi() {
 
     // Providers
     const [readProvider, setReadProvider] = useState(null)
+    const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(false)
 
     useEffect(() => {
-        // Use MetaMask's provider when available
-        if (typeof window !== "undefined" && window.ethereum) {
-            const provider = new ethers.BrowserProvider(window.ethereum)
-            setReadProvider(provider)
+        const initProvider = async () => {
+            const hasMetaMask = typeof window !== "undefined" && !!window.ethereum
+            setIsMetaMaskInstalled(hasMetaMask)
+
+            // Priority: Local RPC_URL if configured
+            if (process.env.RPC_URL) {
+                const provider = new ethers.JsonRpcProvider(process.env.RPC_URL)
+                setReadProvider(provider)
+            } 
+            // Fallback: window.ethereum (MetaMask)
+            else if (hasMetaMask) {
+                const provider = new ethers.BrowserProvider(window.ethereum)
+                setReadProvider(provider)
+            }
+            // Ultimate Fallback: Polygon Public RPC
+            else {
+                const provider = new ethers.JsonRpcProvider("https://polygon-rpc.com")
+                setReadProvider(provider)
+            }
         }
+        initProvider()
     }, [])
 
     const getSigner = useCallback(async () => {
-        if (!walletClient) return null
+        if (!walletClient || typeof window === "undefined" || !window.ethereum) return null
         const provider = new ethers.BrowserProvider(window.ethereum)
         return await provider.getSigner()
     }, [walletClient])
@@ -154,34 +171,65 @@ export function useDeFi() {
         [readProvider]
     )
 
+    const getAmountInUsd = useCallback(
+        async (tokenAddress, amount) => {
+            if (!readProvider) return 0n
+            try {
+                const priceFeed = new ethers.Contract(
+                    ADDRESSES.PRICEFEEDL1,
+                    PriceFeedL1ABI.abi,
+                    readProvider
+                )
+                return await priceFeed.getAmountInUsd(tokenAddress, amount)
+            } catch (error) {
+                console.error("Error calculating USD amount:", error)
+                return 0n
+            }
+        },
+        [readProvider]
+    )
+
     const openPosition = useCallback(
         async (token0, token1, isShort, amount, leverage) => {
             const signer = await getSigner()
             if (!signer) throw new Error("Wallet not connected")
 
-            const market = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, signer)
+            // Re-create instances with the correct signer
+            const marketContract = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, signer)
             const tokenContract = new ethers.Contract(token0, ERC20ABI.abi, signer)
 
             // Approve
             const allowance = await tokenContract.allowance(address, ADDRESSES.POSITIONS)
             if (allowance < amount) {
-                const txApprove = await tokenContract.approve(ADDRESSES.POSITIONS, amount)
+                const txApprove = await tokenContract.approve(ADDRESSES.POSITIONS, ethers.MaxUint256)
                 await txApprove.wait()
             }
 
             // Open Position
-            // Params: token0, token1, fee(3000), isShort, leverage, amount, limit(0), stop(0)
-            const tx = await market.openPosition(
-                token0,
-                token1,
-                3000,
-                isShort,
-                leverage,
-                amount,
-                0,
-                0,
-                { gasLimit: 5000000 }
-            )
+            let tx;
+            if (isShort) {
+                tx = await marketContract.openShortPosition(
+                    token0,
+                    token1,
+                    3000, // fee
+                    leverage,
+                    amount,
+                    0, // limitPrice
+                    0, // stopLossPrice
+                    { gasLimit: 5000000 }
+                )
+            } else {
+                tx = await marketContract.openLongPosition(
+                    token0,
+                    token1,
+                    3000, // fee
+                    leverage,
+                    amount,
+                    0, // limitPrice
+                    0, // stopLossPrice
+                    { gasLimit: 5000000 }
+                )
+            }
             return tx
         },
         [address, getSigner]
@@ -192,8 +240,8 @@ export function useDeFi() {
             const signer = await getSigner()
             if (!signer) throw new Error("Wallet not connected")
 
-            const market = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, signer)
-            const tx = await market.closePosition(posId, { gasLimit: 2000000 })
+            const marketContract = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, signer)
+            const tx = await marketContract.closePosition(posId, { gasLimit: 2000000 })
             return tx
         },
         [getSigner]
@@ -201,8 +249,12 @@ export function useDeFi() {
 
     const getPositionDetails = useCallback(
         async (posId) => {
-            if (!readProvider) return null
+            if (!readProvider || !ADDRESSES.POSITIONS || ADDRESSES.POSITIONS === ethers.ZeroAddress) return null
             try {
+                // Verify code exists at address to avoid BAD_DATA errors on wrong networks
+                const code = await readProvider.getCode(ADDRESSES.POSITIONS)
+                if (code === "0x") return null
+
                 const market = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, readProvider)
                 const priceFeed = new ethers.Contract(
                     ADDRESSES.PRICEFEEDL1,
@@ -275,8 +327,15 @@ export function useDeFi() {
     )
 
     const getPositionsCount = useCallback(async () => {
-        if (!readProvider) return 0n
+        if (!readProvider || !ADDRESSES.POSITIONS || ADDRESSES.POSITIONS === ethers.ZeroAddress) return 0n
         try {
+            // Verify code exists at address to avoid BAD_DATA errors on wrong networks
+            const code = await readProvider.getCode(ADDRESSES.POSITIONS)
+            if (code === "0x") {
+                console.warn("Positions contract not found on this network")
+                return 0n
+            }
+
             const positions = new ethers.Contract(
                 ADDRESSES.POSITIONS,
                 PositionsABI.abi,
@@ -293,12 +352,8 @@ export function useDeFi() {
         async (tokenAddress) => {
             if (!readProvider || !tokenAddress) return null
             try {
-                const factory = new ethers.Contract(
-                    ADDRESSES.POOL_FACTORY,
-                    LiquidityPoolFactoryABI.abi,
-                    readProvider
-                )
-                const poolAddress = await factory.getTokenToLiquidityPools(tokenAddress)
+                const market = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, readProvider)
+                const poolAddress = await market.getTokenToLiquidityPools(tokenAddress)
                 if (!poolAddress || poolAddress === ethers.ZeroAddress) return null
 
                 const poolContract = new ethers.Contract(
@@ -333,9 +388,9 @@ export function useDeFi() {
                 PriceFeedL1ABI.abi,
                 readProvider
             )
-            const factory = new ethers.Contract(
-                ADDRESSES.POOL_FACTORY,
-                LiquidityPoolFactoryABI.abi,
+            const market = new ethers.Contract(
+                ADDRESSES.MARKET,
+                MarketABI.abi,
                 readProvider
             )
 
@@ -357,7 +412,7 @@ export function useDeFi() {
                 }
 
                 // 2. Liquidity Pool Info
-                const poolAddress = await factory.getTokenToLiquidityPools(token.address)
+                const poolAddress = await market.getTokenToLiquidityPools(token.address)
                 if (poolAddress && poolAddress !== ethers.ZeroAddress) {
                     const poolContract = new ethers.Contract(
                         poolAddress,
@@ -408,12 +463,12 @@ export function useDeFi() {
             if (!tokenAddress) throw new Error("Invalid Token")
 
             // Get Pool Address
-            const factory = new ethers.Contract(
-                ADDRESSES.POOL_FACTORY,
-                LiquidityPoolFactoryABI.abi,
+            const market = new ethers.Contract(
+                ADDRESSES.MARKET,
+                MarketABI.abi,
                 readProvider
             )
-            const poolAddress = await factory.getTokenToLiquidityPools(tokenAddress)
+            const poolAddress = await market.getTokenToLiquidityPools(tokenAddress)
 
             if (!poolAddress || poolAddress === ethers.ZeroAddress)
                 throw new Error("Pool not found")
@@ -424,7 +479,7 @@ export function useDeFi() {
             // Approve
             const allowance = await tokenContract.allowance(address, poolAddress)
             if (allowance < amount) {
-                const txApprove = await tokenContract.approve(poolAddress, amount)
+                const txApprove = await tokenContract.approve(poolAddress, ethers.MaxUint256)
                 await txApprove.wait()
             }
 
@@ -441,12 +496,12 @@ export function useDeFi() {
             if (!signer) throw new Error("Wallet not connected")
 
             const tokenAddress = ADDRESSES[tokenKey]
-            const factory = new ethers.Contract(
-                ADDRESSES.POOL_FACTORY,
-                LiquidityPoolFactoryABI.abi,
+            const market = new ethers.Contract(
+                ADDRESSES.MARKET,
+                MarketABI.abi,
                 readProvider
             )
-            const poolAddress = await factory.getTokenToLiquidityPools(tokenAddress)
+            const poolAddress = await market.getTokenToLiquidityPools(tokenAddress)
 
             const poolContract = new ethers.Contract(poolAddress, LiquidityPoolABI.abi, signer)
 
@@ -501,6 +556,7 @@ export function useDeFi() {
         ADDRESSES,
         readProvider,
         getTokenBalance,
+        getAmountInUsd,
         calculateTokenAmountFromUsd,
         openPosition,
         closePosition,
@@ -514,5 +570,6 @@ export function useDeFi() {
         updateFeeDefaults,
         getNativeBalance,
         SUPPORTED_TOKENS_LIST,
+        isMetaMaskInstalled,
     }
 }

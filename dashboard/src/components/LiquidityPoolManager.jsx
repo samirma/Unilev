@@ -5,11 +5,11 @@ import { useAccount } from 'wagmi';
 import { polygon } from 'wagmi/chains';
 import clsx from 'clsx';
 import { ethers } from 'ethers';
-import { formatContractError } from '../utils/formatContractError';
+import { formatContractError, isUserCancellation } from '../utils/formatContractError';
 
 export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
     const { isConnected, address, chainId } = useAccount();
-    const { getProtocolBalances, depositToPool, redeemFromPool, ADDRESSES } = useDeFi();
+    const { getProtocolBalances, depositToPool, redeemFromPool, ADDRESSES, isMetaMaskInstalled, getTokenBalance } = useDeFi();
 
     const isCorrectNetwork = chainId === polygon.id;
 
@@ -18,10 +18,11 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
 
     // Data state
     const [poolData, setPoolData] = useState(null);
+    const [walletBalance, setWalletBalance] = useState('0.0');
     const [loadingData, setLoadingData] = useState(false);
 
     // Form state
-    const [amount, setAmount] = useState('');
+    const [amount, setAmount] = useState('0');
     const [txStatus, setTxStatus] = useState('');
     const [processing, setProcessing] = useState(false);
 
@@ -30,6 +31,17 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
         const res = await getProtocolBalances();
         if (res && res.poolBalances) {
             setPoolData(res.poolBalances);
+        }
+
+        // Also fetch wallet balance for selectedTokenKey
+        if (address) {
+            const tokenAddr = ADDRESSES[selectedTokenKey];
+            if (tokenAddr) {
+                const balData = await getTokenBalance(tokenAddr, address);
+                if (balData) {
+                    setWalletBalance(balData.balance);
+                }
+            }
         }
         setLoadingData(false);
     };
@@ -66,13 +78,17 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
             setTxStatus(`Tx Sent: ${tx.hash}`);
             await tx.wait();
             setTxStatus('✅ Success!');
-            setAmount('');
+            setAmount('0');
             fetchPoolData();
 
         } catch (error) {
             console.error(error);
-            const friendlyError = formatContractError(error);
-            setTxStatus(`❌ Error: ${friendlyError}`);
+            if (isUserCancellation(error)) {
+                setTxStatus(''); // Clear status if cancelled
+            } else {
+                const friendlyError = formatContractError(error);
+                setTxStatus(`❌ Error: ${friendlyError}`);
+            }
         } finally {
             setProcessing(false);
         }
@@ -131,12 +147,19 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
                         <label className="text-xs text-gray-400 uppercase tracking-wide">
                             {action === 'deposit' ? 'Amount to Deposit' : 'Shares to Redeem'}
                         </label>
-                        {action === 'redeem' && (
+                        {action === 'redeem' ? (
                             <span
                                 onClick={() => setAmount(userShares)}
                                 className="text-xs text-blue-400 cursor-pointer hover:text-blue-300"
                             >
-                                Max: {userShares}
+                                Max: {parseFloat(userShares).toFixed(4)}
+                            </span>
+                        ) : (
+                            <span
+                                onClick={() => setAmount(walletBalance)}
+                                className="text-xs text-blue-400 cursor-pointer hover:text-blue-300"
+                            >
+                                Max: {parseFloat(walletBalance).toFixed(4)}
                             </span>
                         )}
                     </div>
@@ -158,17 +181,19 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
 
                 <button
                     type="submit"
-                    disabled={processing || !isConnected || !isCorrectNetwork}
+                    disabled={processing || !isConnected || !isCorrectNetwork || !isMetaMaskInstalled}
                     className={clsx(
                         "w-full primary-button py-4 text-base font-bold tracking-wide mt-4",
-                        (processing || !isCorrectNetwork) && "opacity-50 cursor-not-allowed"
+                        (processing || !isCorrectNetwork || !isMetaMaskInstalled) && "opacity-50 cursor-not-allowed"
                     )}
                 >
-                    {!isCorrectNetwork
-                        ? 'Wrong Network'
-                        : processing
-                            ? 'Processing...'
-                            : (action === 'deposit' ? `DEPOSIT ${selectedTokenKey}` : 'REDEEM SHARES')
+                    {!isMetaMaskInstalled
+                        ? 'Install MetaMask'
+                        : !isCorrectNetwork
+                            ? 'Wrong Network'
+                            : processing
+                                ? 'Processing...'
+                                : (action === 'deposit' ? `DEPOSIT ${selectedTokenKey}` : 'REDEEM SHARES')
                     }
                 </button>
 

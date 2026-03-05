@@ -35,8 +35,8 @@ async function main() {
     console.log(`Attaching to UniswapV3Helper at ${env.UNISWAPV3HELPER_ADDRESS}...`);
     const uniswapV3Helper = new ethers.Contract(env.UNISWAPV3HELPER_ADDRESS, uniswapV3HelperAbi, wallet);
 
-    console.log("\nCalculating ETH amount for $10...");
-    const targetUsdValue = ethers.parseUnits("10", 18);
+    console.log("\nCalculating ETH amount for $5...");
+    const targetUsdValue = ethers.parseUnits("5", 18);
 
     const wrapperPriceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(wrapperAddress);
     console.log(`Wrapper Token Price: $${ethers.formatUnits(wrapperPriceInUsd, 18)}`);

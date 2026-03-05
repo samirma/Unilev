@@ -4,19 +4,33 @@ import { useDeFi } from '../hooks/useDeFi';
 import clsx from 'clsx';
 import { useAccount } from 'wagmi';
 import { polygon } from 'wagmi/chains';
-import { formatContractError } from '../utils/formatContractError';
+import { ethers } from 'ethers';
+import { formatContractError, isUserCancellation } from '../utils/formatContractError';
 
 export function TradeForm() {
-    const { isConnected, chainId } = useAccount();
-    const { openPosition, calculateTokenAmountFromUsd, getPoolBorrowCapacity, ADDRESSES, SUPPORTED_TOKENS_LIST } = useDeFi();
+    const { isConnected, chainId, address } = useAccount();
+    const { 
+        openPosition, 
+        calculateTokenAmountFromUsd, 
+        getPoolBorrowCapacity, 
+        ADDRESSES, 
+        SUPPORTED_TOKENS_LIST,
+        isMetaMaskInstalled,
+        getTokenBalance,
+        getAmountInUsd
+    } = useDeFi();
 
     const [marginToken, setMarginToken] = useState('USDC');
     const [tradingToken, setTradingToken] = useState('WBTC');
-    const [usdAmount, setUsdAmount] = useState('10');
+    const [amount, setAmount] = useState('0');
     const [leverage, setLeverage] = useState('1');
     const [isShort, setIsShort] = useState(false);
     const [status, setStatus] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Balance & Value State
+    const [balanceData, setBalanceData] = useState(null);
+    const [usdValue, setUsdValue] = useState('0.00');
 
     // Liquidity State
     const [borrowCapacity, setBorrowCapacity] = useState(null);
@@ -24,6 +38,38 @@ export function TradeForm() {
     const [isLiquiditySufficient, setIsLiquiditySufficient] = useState(true);
 
     const isCorrectNetwork = chainId === polygon.id;
+
+    // Fetch USD Value of the entered amount
+    useEffect(() => {
+        const fetchUsdValue = async () => {
+            if (!amount || isNaN(amount) || !balanceData) {
+                setUsdValue('0.00');
+                return;
+            }
+            try {
+                const marginAddr = ADDRESSES[marginToken];
+                const amountBig = ethers.parseUnits(amount.toString(), balanceData.decimals);
+                const usdBig = await getAmountInUsd(marginAddr, amountBig);
+                setUsdValue(parseFloat(ethers.formatUnits(usdBig, 18)).toFixed(2));
+            } catch (err) {
+                console.error("Error fetching USD value:", err);
+            }
+        };
+        fetchUsdValue();
+    }, [amount, marginToken, balanceData, ADDRESSES, getAmountInUsd]);
+
+    // Fetch user balance for the selected margin token
+    useEffect(() => {
+        const fetchBalance = async () => {
+            if (!isConnected || !address || !isCorrectNetwork) return;
+            const marginAddr = ADDRESSES[marginToken];
+            if (!marginAddr) return;
+
+            const data = await getTokenBalance(marginAddr, address);
+            setBalanceData(data);
+        };
+        fetchBalance();
+    }, [isConnected, address, isCorrectNetwork, marginToken, ADDRESSES, getTokenBalance]);
 
     // Fetch pool capacity when collateral token changes
     useEffect(() => {
@@ -56,17 +102,17 @@ export function TradeForm() {
     // Calculate required borrow when amount/leverage changes
     useEffect(() => {
         const calculateRequired = async () => {
-            if (!isConnected || !isCorrectNetwork || !borrowCapacity) return;
-            const marginAddr = ADDRESSES[marginToken];
-            if (!marginAddr || !usdAmount || isNaN(usdAmount) || !leverage || isNaN(leverage)) {
+            if (!isConnected || !isCorrectNetwork || !borrowCapacity || !balanceData) return;
+            
+            if (!amount || isNaN(amount) || !leverage || isNaN(leverage)) {
                 setRequiredBorrow(null);
                 setIsLiquiditySufficient(true);
                 return;
             }
 
             try {
-                // margin amount matching the USD value
-                const marginAmount = await calculateTokenAmountFromUsd(marginAddr, usdAmount);
+                // Parse amount directly
+                const marginAmount = ethers.parseUnits(amount.toString(), balanceData.decimals);
                 if (marginAmount === 0n) return;
 
                 // required distance (leverage - 1) * margin
@@ -88,13 +134,13 @@ export function TradeForm() {
         // Add a slight debounce to avoid slamming RPC on every keystroke
         const timeout = setTimeout(calculateRequired, 300);
         return () => clearTimeout(timeout);
-    }, [isConnected, isCorrectNetwork, borrowCapacity, usdAmount, leverage, marginToken, ADDRESSES, calculateTokenAmountFromUsd]);
+    }, [isConnected, isCorrectNetwork, borrowCapacity, amount, leverage, marginToken, ADDRESSES, balanceData]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!isConnected || !isCorrectNetwork) return;
+        if (!isConnected || !isCorrectNetwork || !balanceData) return;
         setLoading(true);
-        setStatus('Calculating amount...');
+        setStatus('Preparing transaction...');
 
         try {
             // "token0" is what trader SENDS as margin
@@ -107,10 +153,22 @@ export function TradeForm() {
                 throw new Error("Margin token and Trade token cannot be the same.");
             }
 
-            const amount = await calculateTokenAmountFromUsd(marginAddr, usdAmount);
+            const amountBig = ethers.parseUnits(amount.toString(), balanceData.decimals);
 
-            if (amount === 0n) {
-                throw new Error("Failed to calculate amount");
+            if (amountBig === 0n) {
+                throw new Error("Amount cannot be zero");
+            }
+
+            // Validation 1: Leverage limit
+            const levInt = parseInt(leverage);
+            if (levInt > 5) {
+                throw new Error("Maximum allowed leverage is 5x.");
+            }
+
+            // Validation 2: Minimum USD amount ($1)
+            const usdBig = await getAmountInUsd(marginAddr, amountBig);
+            if (usdBig < 1000000000000000000n) { // 1e18
+                throw new Error("Minimum position size is $1 USD.");
             }
 
             setStatus('Approving & Opening Position...');
@@ -119,7 +177,7 @@ export function TradeForm() {
                 marginAddr,
                 tradingAddr,
                 isShort,
-                amount,
+                amountBig,
                 parseInt(leverage)
             );
 
@@ -129,8 +187,12 @@ export function TradeForm() {
 
         } catch (error) {
             console.error(error);
-            const friendlyError = formatContractError(error);
-            setStatus(`❌ Error: ${friendlyError}`);
+            if (isUserCancellation(error)) {
+                setStatus(''); // Just clear it if they cancel
+            } else {
+                const friendlyError = formatContractError(error);
+                setStatus(`❌ Error: ${friendlyError}`);
+            }
         } finally {
             setLoading(false);
         }
@@ -209,27 +271,42 @@ export function TradeForm() {
                 <div className="grid grid-cols-2 gap-4">
                     {/* Amount */}
                     <div>
-                        <label className="text-xs text-gray-400 mb-1 block">Amount (USD)</label>
+                        <div className="flex justify-between mb-1">
+                            <label className="text-xs text-gray-400 block">Amount ({marginToken})</label>
+                            {balanceData && (
+                                <span 
+                                    onClick={() => setAmount(balanceData.balance)}
+                                    className="text-xs text-blue-400 cursor-pointer hover:text-blue-300"
+                                >
+                                    Max: {parseFloat(balanceData.balance).toFixed(4)}
+                                </span>
+                            )}
+                        </div>
                         <input
                             type="number"
-                            value={usdAmount}
-                            onChange={(e) => setUsdAmount(e.target.value)}
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
                             className="input-field"
-                            placeholder="10"
+                            placeholder="0.00"
                         />
                     </div>
 
                     {/* Leverage */}
                     <div>
-                        <label className="text-xs text-gray-400 mb-1 block">Leverage</label>
+                        <label className="text-xs text-gray-400 mb-1 block">Leverage (Max 5x)</label>
                         <input
                             type="number"
                             value={leverage}
                             onChange={(e) => setLeverage(e.target.value)}
                             className="input-field"
-                            min="1" max="10"
+                            min="1" max="5"
                         />
                     </div>
+                </div>
+
+                {/* Amount USD Display */}
+                <div className="text-[10px] text-gray-500 text-right px-1">
+                    Value: ≈ ${usdValue} USD
                 </div>
 
                 {/* Liquidity Information */}
@@ -260,19 +337,21 @@ export function TradeForm() {
 
                 <button
                     type="submit"
-                    disabled={loading || !isConnected || !isCorrectNetwork || !isLiquiditySufficient}
+                    disabled={loading || !isConnected || !isCorrectNetwork || !isLiquiditySufficient || !isMetaMaskInstalled}
                     className={clsx(
                         "w-full primary-button mt-4",
-                        (loading || !isCorrectNetwork || !isLiquiditySufficient) && "opacity-50 cursor-not-allowed"
+                        (loading || !isCorrectNetwork || !isLiquiditySufficient || !isMetaMaskInstalled) && "opacity-50 cursor-not-allowed"
                     )}
                 >
-                    {!isCorrectNetwork
-                        ? 'Wrong Network'
-                        : !isLiquiditySufficient
-                            ? 'Insufficient Liquidity'
-                            : loading
-                                ? 'Processing...'
-                                : 'Open Position'}
+                    {!isMetaMaskInstalled
+                        ? 'Install MetaMask'
+                        : !isCorrectNetwork
+                            ? 'Wrong Network'
+                            : !isLiquiditySufficient
+                                ? 'Insufficient Liquidity'
+                                : loading
+                                    ? 'Processing...'
+                                    : 'Open Position'}
                 </button>
 
                 {status && (

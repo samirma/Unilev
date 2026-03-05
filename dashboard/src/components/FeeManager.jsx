@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useDeFi } from '../hooks/useDeFi';
 import { useAccount } from 'wagmi';
+import { formatContractError, isUserCancellation } from '../utils/formatContractError';
 
 export function FeeManager() {
     const { getFeeDefaults, updateFeeDefaults } = useDeFi();
@@ -40,7 +41,12 @@ export function FeeManager() {
             fetchFees();
         } catch (error) {
             console.error(error);
-            setStatus(`❌ Error: ${error.reason || error.message}`);
+            if (isUserCancellation(error)) {
+                setStatus(''); // Clear if cancelled
+            } else {
+                const friendlyError = formatContractError(error);
+                setStatus(`❌ Error: ${friendlyError}`);
+            }
         } finally {
             setUpdating(false);
         }

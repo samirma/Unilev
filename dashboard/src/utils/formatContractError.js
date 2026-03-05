@@ -1,5 +1,21 @@
+export function isUserCancellation(error) {
+    if (!error) return false;
+    const errorMsg = (error.message || error.reason || error.toString()).toLowerCase();
+    return (
+        error.code === 'ACTION_REJECTED' || 
+        error.code === 4001 || 
+        errorMsg.includes("user rejected action") || 
+        errorMsg.includes("user denied transaction signature") ||
+        errorMsg.includes("rejected by user")
+    );
+}
+
 export function formatContractError(error) {
     if (!error) return "Unknown Error";
+
+    if (isUserCancellation(error)) {
+        return "Transaction cancelled by user.";
+    }
 
     const errorMsg = error.message || error.reason || error.toString();
 

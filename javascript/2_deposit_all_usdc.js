@@ -3,7 +3,7 @@
 // Configuration is loaded from a .env file.
 
 const { ethers } = require("ethers");
-const { getErc20Abi, getEnvVars, setupProviderAndWallet, getPositionsAbi, getLiquidityPoolFactoryAbi, getLiquidityPoolAbi } = require("./utils");
+const { getErc20Abi, getEnvVars, setupProviderAndWallet, getPositionsAbi, getLiquidityPoolFactoryAbi, getLiquidityPoolAbi, getSupportedTokens } = require("./utils");
 const { logPoolBalances } = require("./balance");
 
 async function main() {
@@ -20,7 +20,10 @@ async function main() {
     const liquidityPoolFactoryAbi = getLiquidityPoolFactoryAbi();
     const liquidityPoolAbi = getLiquidityPoolAbi();
 
-    const usdcContract = new ethers.Contract(env.USDC, erc20Abi, wallet);
+    const supportedTokens = getSupportedTokens();
+    const usdcAddress = supportedTokens.USDC;
+
+    const usdcContract = new ethers.Contract(usdcAddress, erc20Abi, wallet);
     const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider);
 
     const liquidityPoolFactoryAddress = await positionsContract.LIQUIDITY_POOL_FACTORY();
@@ -40,7 +43,7 @@ async function main() {
         }
 
         // --- 2. Get Liquidity Pool Address ---
-        const poolAddress = await liquidityPoolFactoryContract.getTokenToLiquidityPools(env.USDC);
+        const poolAddress = await liquidityPoolFactoryContract.getTokenToLiquidityPools(usdcAddress);
         if (poolAddress === ethers.ZeroAddress) {
             console.error(`No Liquidity Pool found for USDC`);
             process.exit(1);

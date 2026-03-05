@@ -3,12 +3,10 @@ const {
     getErc20Abi,
     getEnvVars,
     setupProviderAndWallet,
-    calculateTokenAmountFromUsd,
     logPositionDetails,
     getMarketAbi,
     getPriceFeedL1Abi,
     getSupportedTokens,
-    getLiquidityPoolAbi,
     checkAndLogPreflightTable,
 } = require("./utils")
 
@@ -42,9 +40,9 @@ async function main() {
 
     try {
         // --- 1. Calculate Amount of USDC ---
-        console.log("Using 1 USDC as collateral with leverage = 2...")
+        console.log("Using 0.4 USDC as collateral with leverage = 2...")
         const decimals = await token0Contract.decimals()
-        const positionAmount = ethers.parseUnits("1", decimals)
+        const positionAmount = ethers.parseUnits("0.4", decimals)
 
         console.log(`Amount: ${ethers.formatUnits(positionAmount, decimals)} USDC`)
 
@@ -74,10 +72,10 @@ async function main() {
 
         // --- 3. Pre-flight Table ---
         const fee = 3000
-        const isShort = false
         const leverage = 2
         const limitPrice = 0
         const stopLossPrice = 0
+        const isShort = false
 
         const willPass = await checkAndLogPreflightTable(
             provider,
@@ -99,27 +97,54 @@ async function main() {
 
         try {
             console.log("Simulating transaction...")
-            await marketContract.openPosition.staticCall(
+            // params: _token0, _token1, _fee, _leverage, _amount, _limitPrice, _stopLossPrice
+            await marketContract.openLongPosition.staticCall(
                 token0Address,
                 token1Address,
                 fee,
-                isShort,
                 leverage,
                 positionAmount,
                 limitPrice,
                 stopLossPrice,
                 { from: wallet.address }
             )
+            console.log("✅ Simulation successful.")
         } catch (simError) {
-            console.error("Simulation failed:", simError)
+            console.error("❌ Simulation failed.")
+            if (simError.revert) {
+                console.error("Revert reason:", simError.revert.name, simError.revert.args)
+            } else if (simError.data) {
+                // Try to decode custom error
+                try {
+                    const decodedError = marketContract.interface.parseError(simError.data)
+                    console.error("Decoded Error:", decodedError.name, decodedError.args)
+                } catch (e) {
+                    try {
+                        const positionsAbi = getAbi("Positions")
+                        const posInterface = new ethers.Interface(positionsAbi)
+                        const decodedError = posInterface.parseError(simError.data)
+                        console.error("Decoded Positions Error:", decodedError.name, decodedError.args)
+                    } catch (e2) {
+                        try {
+                            const pfAbi = getAbi("PriceFeedL1")
+                            const pfInterface = new ethers.Interface(pfAbi)
+                            const decodedError = pfInterface.parseError(simError.data)
+                            console.error("Decoded PriceFeed Error:", decodedError.name, decodedError.args)
+                        } catch (e3) {
+                            console.error("Raw Error Data:", simError.data)
+                        }
+                    }
+                }
+            } else {
+                console.error("Error Message:", simError.message)
+            }
             process.exit(1)
         }
 
-        const txOpen = await marketContract.openPosition(
+        const txOpen = await marketContract.openLongPosition(
             token0Address,
             token1Address,
             fee,
-            isShort,
             leverage,
             positionAmount,
             limitPrice,
@@ -131,7 +156,7 @@ async function main() {
         const receipt = await txOpen.wait()
         console.log("Position opened successfully!")
 
-        // --- 4. Parse Event Logs ---
+        // --- 5. Parse Event Logs ---
         for (const log of receipt.logs) {
             try {
                 const parsedLog = marketContract.interface.parseLog(log)

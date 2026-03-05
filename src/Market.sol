@@ -39,8 +39,6 @@ contract Market is IMarket, Ownable, Pausable {
         uint160 _limitPrice,
         uint256 _stopLossPrice
     ) external whenNotPaused {
-        SafeERC20.forceApprove(IERC20(_token0), address(POSITIONS), _amount);
-
         uint256 posId = POSITIONS.openLongPosition(
             msg.sender,
             _token0,
@@ -73,8 +71,6 @@ contract Market is IMarket, Ownable, Pausable {
         uint160 _limitPrice,
         uint256 _stopLossPrice
     ) external whenNotPaused {
-        SafeERC20.forceApprove(IERC20(_token0), address(POSITIONS), _amount);
-
         uint256 posId = POSITIONS.openShortPosition(
             msg.sender,
             _token0,

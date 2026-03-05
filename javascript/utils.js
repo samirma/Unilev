@@ -302,9 +302,31 @@ async function checkAndLogPreflightTable(
         token1Contract.symbol()
     ]);
 
-    const poolSymbol = isShort ? symbol0 : symbol1;
-    const poolTokenAddress = isShort ? token0Address : token1Address;
+    // Determine which token is base and which is quote (logic similar to PositionLogic.sol)
+    const token0UsdPrice = await priceFeedL1Contract.getTokenLatestPriceInUsd(token0Address);
+    const isToken0Stable = (token0UsdPrice >= 0.9e18 && token0UsdPrice <= 1.1e18);
+    
+    let baseTokenAddress, quoteTokenAddress, baseSymbol, quoteSymbol;
+    if (isToken0Stable) {
+        quoteTokenAddress = token0Address;
+        quoteSymbol = symbol0;
+        baseTokenAddress = token1Address;
+        baseSymbol = symbol1;
+    } else {
+        baseTokenAddress = token0Address;
+        baseSymbol = symbol0;
+        quoteTokenAddress = token1Address;
+        quoteSymbol = symbol1;
+    }
+
+    const poolTokenAddress = isShort ? baseTokenAddress : quoteTokenAddress;
+    const poolSymbol = isShort ? baseSymbol : quoteSymbol;
+    
     const poolAddress = await marketContract.getTokenToLiquidityPools(poolTokenAddress);
+    if (!poolAddress || poolAddress === ethers.ZeroAddress) {
+        console.error(`❌ No liquidity pool found for ${poolSymbol}`);
+        return false;
+    }
 
     const poolTokenContract = new ethers.Contract(poolTokenAddress, erc20Abi, provider);
     const poolDecimals = await poolTokenContract.decimals();
@@ -313,12 +335,33 @@ async function checkAndLogPreflightTable(
     const liquidityPoolContract = new ethers.Contract(poolAddress, lpAbi, provider);
     const capacityLeftRaw = await liquidityPoolContract.borrowCapacityLeft();
 
+    // Uniswap V3 Factory address from Positions.sol or HelperConfig.sol
+    const UNISWAP_V3_FACTORY = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
+    const v3FactoryAbi = ["function getPool(address,address,uint24) view returns (address)"];
+    const v3Factory = new ethers.Contract(UNISWAP_V3_FACTORY, v3FactoryAbi, provider);
+    const v3Pool = await v3Factory.getPool(token0Address, token1Address, 3000);
+
     let expectedBorrowAmountRaw;
     if (isShort) {
-        expectedBorrowAmountRaw = positionAmount * BigInt(leverage);
+        // Short: Borrow baseToken
+        // For simulation, we simplify: positionAmount is in token0.
+        // If token0 is base, it's easy.
+        if (!isToken0Stable) {
+            expectedBorrowAmountRaw = positionAmount * BigInt(leverage);
+        } else {
+            const priceRaw = await priceFeedL1Contract.getPairLatestPrice(baseTokenAddress, quoteTokenAddress);
+            expectedBorrowAmountRaw = (positionAmount * BigInt(10 ** poolDecimals) * BigInt(leverage)) / priceRaw;
+        }
     } else {
-        const priceRaw = await priceFeedL1Contract.getPairLatestPrice(token0Address, token1Address);
-        expectedBorrowAmountRaw = (positionAmount * BigInt(leverage - 1) * priceRaw) / (10n ** BigInt(decimals));
+        // Long: Borrow quoteToken
+        if (isToken0Stable) {
+            // positionAmount is in USDC, we borrow USDC
+            expectedBorrowAmountRaw = positionAmount * BigInt(leverage - 1);
+        } else {
+            // positionAmount is in WBTC, we borrow USDC
+            const priceRaw = await priceFeedL1Contract.getPairLatestPrice(baseTokenAddress, quoteTokenAddress);
+            expectedBorrowAmountRaw = (positionAmount * BigInt(leverage - 1) * priceRaw) / (10n ** BigInt(poolDecimals));
+        }
     }
 
     const willPass = capacityLeftRaw >= expectedBorrowAmountRaw;
@@ -327,6 +370,7 @@ async function checkAndLogPreflightTable(
     console.log(`Operation:       ${isShort ? "Short" : "Long"}`);
     console.log(`Collateral:      ${symbol0}`);
     console.log(`Target:          ${symbol1}`);
+    console.log(`V3 Pool:         ${v3Pool}`);
     console.log(`Borrow Amount:   ${ethers.formatUnits(expectedBorrowAmountRaw, poolDecimals)} ${poolSymbol}`);
     console.log(`Borrow Pool:     ${poolAddress}`);
     console.log(`Pool Balance:    ${ethers.formatUnits(poolBalanceRaw, poolDecimals)} ${poolSymbol}`);
