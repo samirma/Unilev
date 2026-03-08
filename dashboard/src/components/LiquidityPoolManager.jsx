@@ -84,7 +84,8 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
         } catch (error) {
             console.error(error);
             if (isUserCancellation(error)) {
-                setTxStatus(''); // Clear status if cancelled
+                setTxStatus('⚠️ Transaction was canceled by user.');
+                setTimeout(() => setTxStatus(''), 3000);
             } else {
                 const friendlyError = formatContractError(error);
                 setTxStatus(`❌ Error: ${friendlyError}`);

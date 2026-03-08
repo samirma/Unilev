@@ -40,9 +40,9 @@ async function main() {
 
     try {
         // --- 1. Calculate Amount of USDC ---
-        console.log("Using 0.4 USDC as collateral with leverage = 2...")
+        console.log("Using 1.1 USDC as collateral with leverage = 2...")
         const decimals = await token0Contract.decimals()
-        const positionAmount = ethers.parseUnits("0.4", decimals)
+        const positionAmount = ethers.parseUnits("1.1", decimals)
 
         console.log(`Amount: ${ethers.formatUnits(positionAmount, decimals)} USDC`)
 

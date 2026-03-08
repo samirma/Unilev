@@ -42,7 +42,8 @@ export function FeeManager() {
         } catch (error) {
             console.error(error);
             if (isUserCancellation(error)) {
-                setStatus(''); // Clear if cancelled
+                setStatus('⚠️ Transaction was canceled by user.');
+                setTimeout(() => setStatus(''), 3000);
             } else {
                 const friendlyError = formatContractError(error);
                 setStatus(`❌ Error: ${friendlyError}`);

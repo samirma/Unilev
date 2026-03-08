@@ -17,20 +17,25 @@ export function TradeForm() {
         SUPPORTED_TOKENS_LIST,
         isMetaMaskInstalled,
         getTokenBalance,
-        getAmountInUsd
+        getAmountInUsd,
+        getAllowance,
+        approveToken,
+        simulateOpenPosition
     } = useDeFi();
 
     const [marginToken, setMarginToken] = useState('USDC');
     const [tradingToken, setTradingToken] = useState('WBTC');
     const [amount, setAmount] = useState('0');
-    const [leverage, setLeverage] = useState('1');
+    const [leverage, setLeverage] = useState('2');
     const [isShort, setIsShort] = useState(false);
     const [status, setStatus] = useState('');
     const [loading, setLoading] = useState(false);
+    const [simulating, setSimulating] = useState(false);
 
-    // Balance & Value State
+    // Balance & Value & Allowance State
     const [balanceData, setBalanceData] = useState(null);
     const [usdValue, setUsdValue] = useState('0.00');
+    const [allowance, setAllowance] = useState(0n);
 
     // Liquidity State
     const [borrowCapacity, setBorrowCapacity] = useState(null);
@@ -70,6 +75,19 @@ export function TradeForm() {
         };
         fetchBalance();
     }, [isConnected, address, isCorrectNetwork, marginToken, ADDRESSES, getTokenBalance]);
+
+    // Fetch allowance for the selected margin token
+    useEffect(() => {
+        const fetchAllowance = async () => {
+            if (!isConnected || !address || !isCorrectNetwork || !ADDRESSES.POSITIONS) return;
+            const marginAddr = ADDRESSES[marginToken];
+            if (!marginAddr) return;
+
+            const currentAllowance = await getAllowance(marginAddr, address, ADDRESSES.POSITIONS);
+            setAllowance(currentAllowance);
+        };
+        fetchAllowance();
+    }, [isConnected, address, isCorrectNetwork, marginToken, ADDRESSES, getAllowance]);
 
     // Fetch pool capacity when collateral token changes
     useEffect(() => {
@@ -136,9 +154,43 @@ export function TradeForm() {
         return () => clearTimeout(timeout);
     }, [isConnected, isCorrectNetwork, borrowCapacity, amount, leverage, marginToken, ADDRESSES, balanceData]);
 
+    const handleApprove = async () => {
+        if (!isConnected || !isCorrectNetwork || !balanceData) return;
+        setLoading(true);
+        setStatus('Approving token usage...');
+        try {
+            const marginAddr = ADDRESSES[marginToken];
+            const tx = await approveToken(marginAddr, ADDRESSES.POSITIONS);
+            setStatus(`Approval Sent: ${tx.hash}`);
+            await tx.wait();
+            setStatus('✅ Token Approved!');
+            
+            // Refresh allowance
+            const currentAllowance = await getAllowance(marginAddr, address, ADDRESSES.POSITIONS);
+            setAllowance(currentAllowance);
+        } catch (error) {
+            console.error(error);
+            if (isUserCancellation(error)) {
+                setStatus('⚠️ Approval was canceled by user.');
+                setTimeout(() => setStatus(''), 3000);
+            } else {
+                const friendlyError = formatContractError(error);
+                setStatus(`❌ Error: ${friendlyError}`);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!isConnected || !isCorrectNetwork || !balanceData) return;
+        
+        const amountBig = ethers.parseUnits(amount.toString(), balanceData.decimals);
+        if (allowance < amountBig) {
+            return handleApprove();
+        }
+
         setLoading(true);
         setStatus('Preparing transaction...');
 
@@ -153,14 +205,15 @@ export function TradeForm() {
                 throw new Error("Margin token and Trade token cannot be the same.");
             }
 
-            const amountBig = ethers.parseUnits(amount.toString(), balanceData.decimals);
-
             if (amountBig === 0n) {
                 throw new Error("Amount cannot be zero");
             }
 
-            // Validation 1: Leverage limit
+            // Validation 1: Leverage limit (must be > 1 and <= 5)
             const levInt = parseInt(leverage);
+            if (levInt < 2) {
+                throw new Error("Minimum allowed leverage is 2x.");
+            }
             if (levInt > 5) {
                 throw new Error("Maximum allowed leverage is 5x.");
             }
@@ -171,7 +224,7 @@ export function TradeForm() {
                 throw new Error("Minimum position size is $1 USD.");
             }
 
-            setStatus('Approving & Opening Position...');
+            setStatus('Opening Position...');
 
             const tx = await openPosition(
                 marginAddr,
@@ -185,10 +238,20 @@ export function TradeForm() {
             await tx.wait();
             setStatus('✅ Position Opened Successfully!');
 
+            // Refresh allowance & balance
+            const [newAllowance, newData] = await Promise.all([
+                getAllowance(marginAddr, address, ADDRESSES.POSITIONS),
+                getTokenBalance(marginAddr, address)
+            ]);
+            setAllowance(newAllowance);
+            setBalanceData(newData);
+
         } catch (error) {
             console.error(error);
             if (isUserCancellation(error)) {
-                setStatus(''); // Just clear it if they cancel
+                setStatus('⚠️ Transaction was canceled by user.');
+                // Clear the status after 3 seconds since it's just a cancellation
+                setTimeout(() => setStatus(''), 3000);
             } else {
                 const friendlyError = formatContractError(error);
                 setStatus(`❌ Error: ${friendlyError}`);
@@ -197,6 +260,74 @@ export function TradeForm() {
             setLoading(false);
         }
     };
+
+    const handleSimulate = async () => {
+        if (!isConnected || !isCorrectNetwork || !balanceData) return;
+        setSimulating(true);
+        setStatus('Simulating transaction...');
+
+        try {
+            const marginAddr = ADDRESSES[marginToken];
+            const tradingAddr = ADDRESSES[tradingToken];
+            const amountBig = ethers.parseUnits(amount.toString(), balanceData.decimals);
+
+            if (amountBig === 0n) {
+                throw new Error("Amount cannot be zero");
+            }
+
+            // Check balance
+            if (balanceData.rawBalance < amountBig) {
+                throw new Error(`Insufficient balance of ${marginToken}. You have ${balanceData.balance} but are trying to use ${amount}.`);
+            }
+
+            // Check allowance
+            if (allowance < amountBig) {
+                throw new Error(`Insufficient allowance. You must approve ${marginToken} to be used by the protocol before this transaction can succeed.`);
+            }
+
+            // Check liquidity locally first for better error message
+            if (!isLiquiditySufficient) {
+                throw new Error(`Insufficient liquidity in the ${isShort ? tradingToken : marginToken} pool. The protocol cannot lend you the required amount for this leverage.`);
+            }
+
+            const result = await simulateOpenPosition(
+                marginAddr,
+                tradingAddr,
+                isShort,
+                amountBig,
+                parseInt(leverage)
+            );
+
+            if (result.success) {
+                setStatus('✅ Simulation Successful! The transaction is expected to pass with current market conditions.');
+            } else {
+                let explanation = "";
+                const friendlyError = formatContractError(result.error);
+                
+                // Try to provide a more detailed explanation based on common errors
+                if (friendlyError.includes("Not enough liquidity")) {
+                    explanation = " The protocol doesn't have enough assets to lend for this position size and leverage.";
+                } else if (friendlyError.includes("size is too small")) {
+                    explanation = " The protocol requires a minimum position size (usually $1 USD) to prevent dust positions.";
+                } else if (friendlyError.includes("leverage is out of the allowed range")) {
+                    explanation = " The requested leverage is either too low (min 2x) or too high (max 5x).";
+                } else if (friendlyError.includes("stale price") || friendlyError.includes("too old")) {
+                    explanation = " The Oracle price data is currently outdated on-chain. Please wait for an update.";
+                }
+
+                setStatus(`❌ Simulation Failed: ${friendlyError}.${explanation}`);
+            }
+
+        } catch (error) {
+            console.error(error);
+            setStatus(`❌ Simulation Error: ${error.message}`);
+        } finally {
+            setSimulating(false);
+        }
+    };
+
+    const amountBig = balanceData ? ethers.parseUnits(amount || "0", balanceData.decimals) : 0n;
+    const needsApproval = isConnected && isCorrectNetwork && amountBig > 0n && allowance < amountBig;
 
     return (
         <div className="glass-panel p-6 w-full max-w-md">
@@ -299,7 +430,8 @@ export function TradeForm() {
                             value={leverage}
                             onChange={(e) => setLeverage(e.target.value)}
                             className="input-field"
-                            min="1" max="5"
+                            min="2" max="5"
+                            step="1"
                         />
                     </div>
                 </div>
@@ -351,9 +483,22 @@ export function TradeForm() {
                                 ? 'Insufficient Liquidity'
                                 : loading
                                     ? 'Processing...'
-                                    : 'Open Position'}
-                </button>
+                                    : needsApproval
+                                        ? `Approve ${marginToken}`
+                                        : 'Open Position'}
+                                        </button>
 
+                                        <button
+                                        type="button"
+                                        onClick={handleSimulate}
+                                        disabled={loading || simulating || !isConnected || !isCorrectNetwork || !isLiquiditySufficient || !isMetaMaskInstalled}
+                                        className={clsx(
+                                        "w-full secondary-button mt-2",
+                                        (loading || simulating || !isCorrectNetwork || !isLiquiditySufficient || !isMetaMaskInstalled) && "opacity-50 cursor-not-allowed"
+                                        )}
+                                        >
+                                        {simulating ? 'Simulating...' : 'Simulate Transaction'}
+                                        </button>
                 {status && (
                     <div className="mt-4 p-3 bg-white/5 rounded border border-white/10 text-xs font-mono break-all">
                         {status}

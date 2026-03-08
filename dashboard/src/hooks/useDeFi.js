@@ -189,20 +189,129 @@ export function useDeFi() {
         [readProvider]
     )
 
+    const getAllowance = useCallback(
+        async (tokenAddress, owner, spender) => {
+            if (!readProvider || !tokenAddress || !owner || !spender) return 0n
+            try {
+                const contract = new ethers.Contract(tokenAddress, ERC20ABI.abi, readProvider)
+                return await contract.allowance(owner, spender)
+            } catch (error) {
+                console.error("Error fetching allowance:", error)
+                return 0n
+            }
+        },
+        [readProvider]
+    )
+
+    const approveToken = useCallback(
+        async (tokenAddress, spender, amount = ethers.MaxUint256) => {
+            const signer = await getSigner()
+            if (!signer) throw new Error("Wallet not connected")
+            const contract = new ethers.Contract(tokenAddress, ERC20ABI.abi, signer)
+            return await contract.approve(spender, amount)
+        },
+        [getSigner]
+    )
+
+    const simulateOpenPosition = useCallback(
+        async (token0, token1, isShort, amount, leverage) => {
+            const signer = await getSigner()
+            if (!signer) throw new Error("Wallet not connected")
+
+            // Validate leverage before simulation
+            if (leverage < 2) {
+                return { 
+                    success: false, 
+                    error: { 
+                        message: "Positions__LEVERAGE_NOT_IN_RANGE",
+                        reason: "Leverage must be at least 2x"
+                    } 
+                }
+            }
+
+            const marketContract = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, signer)
+
+            try {
+                if (isShort) {
+                    await marketContract.openShortPosition.staticCall(
+                        token0,
+                        token1,
+                        3000, // fee
+                        leverage,
+                        amount,
+                        0, // limitPrice
+                        0, // stopLossPrice
+                        { gasLimit: 5000000 }
+                    )
+                } else {
+                    await marketContract.openLongPosition.staticCall(
+                        token0,
+                        token1,
+                        3000, // fee
+                        leverage,
+                        amount,
+                        0, // limitPrice
+                        0, // stopLossPrice
+                        { gasLimit: 5000000 }
+                    )
+                }
+                return { success: true }
+            } catch (error) {
+                return { success: false, error }
+            }
+        },
+        [getSigner]
+    )
+
     const openPosition = useCallback(
         async (token0, token1, isShort, amount, leverage) => {
             const signer = await getSigner()
             if (!signer) throw new Error("Wallet not connected")
 
+            // Validate leverage before sending transaction
+            if (leverage < 2) {
+                throw new Error("Leverage must be at least 2x (contract requires leverage > 1)")
+            }
+
             // Re-create instances with the correct signer
             const marketContract = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, signer)
-            const tokenContract = new ethers.Contract(token0, ERC20ABI.abi, signer)
 
-            // Approve
-            const allowance = await tokenContract.allowance(address, ADDRESSES.POSITIONS)
-            if (allowance < amount) {
-                const txApprove = await tokenContract.approve(ADDRESSES.POSITIONS, ethers.MaxUint256)
-                await txApprove.wait()
+            // First simulate to catch any revert errors before sending
+            let simulationSuccess = false
+            try {
+                if (isShort) {
+                    await marketContract.openShortPosition.staticCall(
+                        token0,
+                        token1,
+                        3000, // fee
+                        leverage,
+                        amount,
+                        0, // limitPrice
+                        0, // stopLossPrice
+                        { gasLimit: 5000000 }
+                    )
+                } else {
+                    await marketContract.openLongPosition.staticCall(
+                        token0,
+                        token1,
+                        3000, // fee
+                        leverage,
+                        amount,
+                        0, // limitPrice
+                        0, // stopLossPrice
+                        { gasLimit: 5000000 }
+                    )
+                }
+                simulationSuccess = true
+            } catch (simError) {
+                console.error("Simulation failed:", simError)
+                // Re-throw the simulation error so the UI can handle it
+                throw simError
+            }
+
+            // Only proceed if simulation passed
+            if (!simulationSuccess) {
+                throw new Error("Transaction simulation failed")
             }
 
             // Open Position
@@ -232,7 +341,7 @@ export function useDeFi() {
             }
             return tx
         },
-        [address, getSigner]
+        [getSigner]
     )
 
     const closePosition = useCallback(
@@ -559,6 +668,7 @@ export function useDeFi() {
         getAmountInUsd,
         calculateTokenAmountFromUsd,
         openPosition,
+        simulateOpenPosition,
         closePosition,
         getPositionDetails,
         getPositionsCount,
@@ -569,6 +679,8 @@ export function useDeFi() {
         getFeeDefaults,
         updateFeeDefaults,
         getNativeBalance,
+        getAllowance,
+        approveToken,
         SUPPORTED_TOKENS_LIST,
         isMetaMaskInstalled,
     }

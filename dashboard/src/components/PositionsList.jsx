@@ -4,6 +4,7 @@ import { useDeFi } from '../hooks/useDeFi';
 import { useAccount } from 'wagmi';
 import clsx from 'clsx';
 import { ethers } from 'ethers';
+import { formatContractError, isUserCancellation } from '../utils/formatContractError';
 
 export function PositionsList() {
     const { isConnected, address } = useAccount();
@@ -160,7 +161,12 @@ function PositionCard({ position, isOwner, onClose }) {
             }
         } catch (e) {
             console.error(e);
-            alert("Failed to close position");
+            if (isUserCancellation(e)) {
+                alert("Transaction was canceled by user.");
+            } else {
+                const friendlyError = formatContractError(e);
+                alert(`Failed to close position: ${friendlyError}`);
+            }
         } finally {
             setClosing(false);
         }

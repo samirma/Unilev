@@ -1,12 +1,20 @@
 export function isUserCancellation(error) {
     if (!error) return false;
-    const errorMsg = (error.message || error.reason || error.toString()).toLowerCase();
+    
+    // Handle nested error structure from some providers (e.g., MetaMask via ethers)
+    const nestedError = error.info?.error;
+    const errorCode = error.code || nestedError?.code;
+    
+    const errorMsg = (error.message || error.reason || nestedError?.message || error.toString()).toLowerCase();
+    
     return (
-        error.code === 'ACTION_REJECTED' || 
-        error.code === 4001 || 
+        errorCode === 'ACTION_REJECTED' || 
+        errorCode === 4001 || 
         errorMsg.includes("user rejected action") || 
         errorMsg.includes("user denied transaction signature") ||
-        errorMsg.includes("rejected by user")
+        errorMsg.includes("rejected by user") ||
+        errorMsg.includes("ethers-user-denied") ||
+        errorMsg.includes("user denied")
     );
 }
 
@@ -14,7 +22,7 @@ export function formatContractError(error) {
     if (!error) return "Unknown Error";
 
     if (isUserCancellation(error)) {
-        return "Transaction cancelled by user.";
+        return "Operation was canceled by the user.";
     }
 
     const errorMsg = error.message || error.reason || error.toString();
@@ -36,7 +44,7 @@ export function formatContractError(error) {
         "Positions__TOKEN_NOT_SUPPORTED": "This token is not supported by the protocol.",
         "Positions__TOKEN_NOT_SUPPORTED_ON_MARGIN": "This token is not supported for margin trading.",
         "Positions__NO_PRICE_FEED": "No price feed available for the given token pair.",
-        "Positions__LEVERAGE_NOT_IN_RANGE": "The specified leverage is out of the allowed range.",
+        "Positions__LEVERAGE_NOT_IN_RANGE": "The specified leverage is out of the allowed range (min: 2x, max: 5x).",
         "Positions__AMOUNT_TO_SMALL": "The position size is too small; it must meet the minimum USD requirement.",
         "Positions__LIMIT_ORDER_PRICE_NOT_CONCISTENT": "Limit order price is inconsistent with the market.",
         "Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT": "Stop loss price is inconsistent with the market.",
@@ -65,12 +73,21 @@ export function formatContractError(error) {
         }
     }
 
-    // Attempt to extract the custom error name if it's formatted like `CustomErrorName()`
-    const customErrorMatch = errorMsg.match(/([a-zA-Z0-9_]+)\(\)/);
+    // Attempt to extract the custom error name if it's formatted like `ErrorName(...)`
+    const customErrorMatch = errorMsg.match(/([a-zA-Z0-9_]+)\(/);
     if (customErrorMatch && customErrorMatch[1]) {
         const name = customErrorMatch[1];
-        // return mapped error, or generic "Contract error: ErrorName"
-        return errorMap[name] || `Contract error: ${name}`;
+        if (errorMap[name]) return errorMap[name];
+        
+        // If not in map, try to make the name readable
+        // e.g. "LiquidityPool__NOT_ENOUGH_LIQUIDITY" -> "Not Enough Liquidity"
+        const readableName = name
+            .split('__').pop()
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+        
+        return `Protocol Error: ${readableName}`;
     }
 
     // If it's a generic revert, ethers sometimes puts it in `reason`
