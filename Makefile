@@ -21,8 +21,8 @@ sizer:; forge build --sizes --via-ir
 
 compile:; forge compile --via-ir
 
-test :; forge test --fork-url ${ETH_RPC_URL} -vv --via-ir 
-test-gas :; forge test --fork-url ${ETH_RPC_URL} -vv --gas-report --via-ir 
+test :; forge test --fork-url ${POLYGON_RPC_URL} -vv --via-ir 
+test-gas :; forge test --fork-url ${POLYGON_RPC_URL} -vv --gas-report --via-ir 
 
 slither :; slither ./src 
 
@@ -31,7 +31,7 @@ format :; prettier --write src/**/*.sol && prettier --write src/*.sol
 # solhint should be installed globally
 lint :; solhint src/**/*.sol && solhint src/*.sol
 
-anvil :; anvil -m 'test test test test test test test test test test test junk' --fork-url ${ETH_RPC_URL}
+anvil :; anvil -m 'test test test test test test test test test test test junk' --fork-url ${POLYGON_RPC_URL}
 anvil-polygon :; anvil -m 'test test test test test test test test test test test junk' --chain-id 137  --fork-url ${POLYGON_RPC_URL}
 
 # This is the private key of account from the mnemonic from the "make anvil" command

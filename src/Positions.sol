@@ -695,15 +695,32 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         uint256 initialPrice = pos.initialPrice;
         uint256 currentPrice = PRICE_FEED.getPairLatestPrice(baseToken_, quoteToken_);
 
+        // Calculate raw PnL based on price change
+        // share represents the percentage change (in basis points)
         int256 share = 10000 - int(currentPrice * 10000) / int(initialPrice);
 
+        // Calculate PnL in base token units
         currentPnL_ = int128((int128(positionSize_) * share) / 10000);
 
+        // Invert for long positions (when price goes UP, share is negative, but PnL should be positive)
         currentPnL_ = isShort_ ? currentPnL_ : -currentPnL_;
 
-        currentPnL_ = currentPnL_ - int128(pos.liquidationReward);
-
+        // Calculate collateral left (collateral + unrealized PnL)
+        // Note: liquidationReward is already deducted from collateralSize during position opening
         collateralLeft_ = int128(pos.collateralSize) + currentPnL_;
+
+        // Convert PnL to quote token (USDC) decimals
+        // The price from PRICE_FEED has 8 decimals (Chainlink standard)
+        // PnL in quote = (PnL in base * currentPrice) / 10^8
+        if (currentPnL_ > 0) {
+            uint256 pnlAbs = uint256(int256(currentPnL_));
+            uint256 pnlInQuote = (pnlAbs * currentPrice) / (10 ** 8);
+            currentPnL_ = int128(int256(pnlInQuote));
+        } else if (currentPnL_ < 0) {
+            uint256 pnlAbs = uint256(int256(-currentPnL_));
+            uint256 pnlInQuote = (pnlAbs * currentPrice) / (10 ** 8);
+            currentPnL_ = -int128(int256(pnlInQuote));
+        }
     }
 
     function swapMaxTokenPossible(
