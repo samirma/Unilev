@@ -597,3 +597,7 @@ node javascript/checkPositions.js
 -   Update README if needed
 -   Follow conventional commit messages
 -   Request review from maintainers
+
+# Mocking strategy
+Never create mock ERC classes. In case it is requeried use Utils.writeTokenBalance
+
