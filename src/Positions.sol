@@ -59,6 +59,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
     uint256 public constant MIN_POSITION_AMOUNT_IN_USD = 1e18;
     uint256 public constant MAX_LEVERAGE = 5;
     uint256 public constant USD_DECIMALS = 18; // The standard for USD values in this contract
+    uint256 public constant SLIPPAGE_TOLERANCE = 9900; // 99% = 1% slippage buffer (9900/10000)
 
     LiquidityPoolFactory public immutable LIQUIDITY_POOL_FACTORY;
     PriceFeedL1 public immutable PRICE_FEED;
@@ -272,7 +273,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
             uint256 priceToCollateral = PRICE_FEED.getPairLatestPrice(params.token0, collateralToken);
             uint256 minOut = (params.amount * priceToCollateral) / (params.isShort ? baseDecimalsPow : quoteDecimalsPow);
-            minOut = (minOut * 9500) / 10000;
+            minOut = (minOut * SLIPPAGE_TOLERANCE) / 10000;
 
             baseCollateralAmount = uint128(
                 UNISWAP_V3_HELPER.swapExactInputSingle(
@@ -314,7 +315,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
         uint256 priceBorrow = PRICE_FEED.getPairLatestPrice(swapFrom, swapTo);
         uint256 minOutBorrow = (totalBorrow * priceBorrow) / (params.isShort ? baseDecimalsPow : quoteDecimalsPow);
-        minOutBorrow = (minOutBorrow * 9500) / 10000;
+        minOutBorrow = (minOutBorrow * SLIPPAGE_TOLERANCE) / 10000;
 
         uint256 amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
             swapFrom,
@@ -504,7 +505,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                         );
                         uint256 minOut = (netReceived * priceBaseToQuote) /
                             (10 ** IERC20Metadata(addTokenReceived).decimals());
-                        minOut = (minOut * 9500) / 10000;
+                        minOut = (minOut * SLIPPAGE_TOLERANCE) / 10000;
 
                         uint256 finalOut = UNISWAP_V3_HELPER.swapExactInputSingle(
                             addTokenReceived,
@@ -533,7 +534,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                 uint256 price = PRICE_FEED.getPairLatestPrice(addTokenReceived, tokenToTrader);
                 uint256 minOut = (amountTokenReceived * price) /
                     (10 ** IERC20Metadata(addTokenReceived).decimals());
-                minOut = (minOut * 9500) / 10000;
+                minOut = (minOut * SLIPPAGE_TOLERANCE) / 10000;
 
                 uint256 outAmount = UNISWAP_V3_HELPER.swapExactInputSingle(
                     addTokenReceived,
@@ -558,7 +559,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                     );
                     uint256 minOut2 = (netReceived * priceQuoteToBase) /
                         (10 ** IERC20Metadata(tokenToTrader).decimals());
-                    minOut2 = (minOut2 * 9500) / 10000;
+                    minOut2 = (minOut2 * SLIPPAGE_TOLERANCE) / 10000;
 
                     uint256 finalOut = UNISWAP_V3_HELPER.swapExactInputSingle(
                         tokenToTrader,
@@ -705,10 +706,6 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         // Invert for long positions (when price goes UP, share is negative, but PnL should be positive)
         currentPnL_ = isShort_ ? currentPnL_ : -currentPnL_;
 
-        // Calculate collateral left (collateral + unrealized PnL)
-        // Note: liquidationReward is already deducted from collateralSize during position opening
-        collateralLeft_ = int128(pos.collateralSize) + currentPnL_;
-
         // Convert PnL to quote token (USDC) decimals
         // The price from PRICE_FEED has 8 decimals (Chainlink standard)
         // PnL in quote = (PnL in base * currentPrice) / 10^8
@@ -720,6 +717,30 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             uint256 pnlAbs = uint256(int256(-currentPnL_));
             uint256 pnlInQuote = (pnlAbs * currentPrice) / (10 ** 8);
             currentPnL_ = -int128(int256(pnlInQuote));
+        }
+
+        // Calculate collateral left (collateral + unrealized PnL)
+        // Note: liquidationReward is already deducted from collateralSize during position opening
+        collateralLeft_ = int128(pos.collateralSize) + currentPnL_;
+
+        // Get fee predictions to calculate net PnL
+        address trader = _ownerOf(_posId);
+        if (trader != address(0)) {
+            (uint128 treasureFee, ) = feeManager.getFees(trader);
+            uint24 poolFee = IUniswapV3Pool(pos.v3Pool).fee();
+            
+            // Total estimated fees (in basis points):
+            // - Protocol fee: treasureFee (5 bps default)
+            // - Uniswap swap fees: poolFee (e.g., 3000 for 0.3%) - we divide by 100 to convert to bps
+            // - Slippage buffer: 100 bps (1%) - reduced from previous 500 bps (5%)
+            uint256 totalFeeBps = uint256(treasureFee) + uint256(poolFee) / 100 + 100;
+            
+            // Deduct estimated fees from positive PnL
+            if (currentPnL_ > 0) {
+                uint256 feeDeduction = (uint256(int256(currentPnL_)) * totalFeeBps) / 10000;
+                currentPnL_ = currentPnL_ - int128(int256(feeDeduction));
+                collateralLeft_ = int128(pos.collateralSize) + currentPnL_;
+            }
         }
     }
 
@@ -742,7 +763,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         if (swapCost == 0) {
             uint256 price = PRICE_FEED.getPairLatestPrice(_token0, _token1);
             uint256 minOut = (amountInMaximum * price) / token0DecimalsPow;
-            minOut = (minOut * 9500) / 10000;
+            minOut = (minOut * SLIPPAGE_TOLERANCE) / 10000;
 
             uint256 out = UNISWAP_V3_HELPER.swapExactInputSingle(
                 _token0,
