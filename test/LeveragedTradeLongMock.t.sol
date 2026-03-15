@@ -20,10 +20,9 @@ import "./utils/TestSetupMock.sol";
  * - For 10 USDC with 2x: 10 / (100 * 2) = 5% = 500 bps
  * - For 50 USDC with 2x: 50 / (100 * 2) = 25% = 2500 bps
  * 
- * Swap Fee Impact (0.3% each way):
- * - Entry: 100 USDC -> 99.7 USDC worth of WBTC
- * - Exit: Additional 0.3% fee on the total returned amount
- * - Net PnL = Gross PnL - (Swap Fees + Protocol Fees)
+ * Final Balance Formula:
+ * - finalBalance = initialBalance + pnl
+ * - The PnL value from the contract already includes all fees (swap fees + protocol fees)
  */
 contract LeveragedTradeLongMock is TestSetupMock {
     
@@ -51,7 +50,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
     // ===================================================================
     // EXPECTED PnL VALUES (in USDC with 6 decimals)
     // These are the TARGET PnL values we expect to achieve
-    // Actual PnL may differ slightly due to fees and price impact
+    // Actual PnL from contract includes all fees (swap + protocol)
     // ===================================================================
     int256 constant TARGET_PROFIT_1_USDC = 1e6;        // 1 USDC
     int256 constant TARGET_PROFIT_10_USDC = 10e6;      // 10 USDC
@@ -61,23 +60,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
     int256 constant TARGET_LOSS_50_USDC = -50e6;       // -50 USDC
     
     // ===================================================================
-    // EXPECTED NET BALANCE CHANGES (PnL after all fees)
-    // Estimated net amounts after accounting for:
-    // - 0.3% swap fee on entry (0.30 USDC)
-    // - 0.3% swap fee on exit (~0.30 USDC for small positions)
-    // - 0.05% treasure fee (~0.05-0.15 USDC depending on position size)
-    // - 0.03% liquidation reward (if applicable)
-    // ===================================================================
-    uint256 constant NET_PROFIT_1_USDC = 1e6 - 6e5;     // ~0.4 USDC net (1 - 0.6 fees)
-    uint256 constant NET_PROFIT_10_USDC = 10e6 - 7e5;   // ~9.3 USDC net (10 - 0.7 fees)
-    uint256 constant NET_PROFIT_50_USDC = 50e6 - 1e6;   // ~49 USDC net (50 - 1.0 fees)
-    uint256 constant NET_LOSS_1_USDC = 1e6 + 6e5;       // ~1.6 USDC total loss
-    uint256 constant NET_LOSS_10_USDC = 10e6 + 7e5;     // ~10.7 USDC total loss
-    uint256 constant NET_LOSS_50_USDC = 50e6 + 1e6;     // ~51 USDC total loss
-    
-    // ===================================================================
     // TOLERANCE FOR ASSERTIONS
-    // Allow for 1 USDC tolerance due to fee calculation variations
     // ===================================================================
     uint256 constant PNL_TOLERANCE = 1e6;
     uint256 constant BALANCE_TOLERANCE = 1e6;
@@ -142,13 +125,13 @@ contract LeveragedTradeLongMock is TestSetupMock {
         assertGt(pnl, 0, "PnL should be positive for long profit");
         assertApproxEqAbs(uint256(pnl), uint256(TARGET_PROFIT_1_USDC), PNL_TOLERANCE);
 
-        // Close position and verify net result
+        // Close position and verify final balance = initial + pnl (pnl includes fees)
         vm.startPrank(alice); 
         market.closePosition(positionId); 
         vm.stopPrank();
         
         uint256 finalBalance = IERC20(usdc).balanceOf(alice);
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_1_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(finalBalance, expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -174,7 +157,6 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Increase price by 5% to get ~10 USDC profit
-        // Math: 200 USDC position * 5% = 10 USDC
         int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_10_USDC_2X, true);
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
@@ -188,7 +170,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_10_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -214,7 +196,6 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Increase price by 25% to get ~50 USDC profit
-        // Math: 200 USDC position * 25% = 50 USDC
         int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_50_USDC_2X, true);
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
@@ -228,7 +209,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_50_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -258,7 +239,6 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // With 3x leverage, need smaller price change for same PnL
-        // Math: 300 USDC position * 0.34% ≈ 1 USDC
         int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_1_USDC_3X, true);
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
@@ -272,7 +252,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_1_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -297,7 +277,6 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
-        // Math: 300 USDC position * 3.34% ≈ 10 USDC
         int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_10_USDC_3X, true);
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
@@ -311,7 +290,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_10_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -336,7 +315,6 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
-        // Math: 300 USDC position * 16.67% ≈ 50 USDC
         int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_50_USDC_3X, true);
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
@@ -350,7 +328,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_50_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -393,7 +371,8 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_1_USDC;
+        // finalBalance = initialBalance + pnl (pnl is negative and includes fees)
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -432,7 +411,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_10_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -471,7 +450,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_50_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -513,7 +492,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_1_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -551,7 +530,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_10_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
@@ -589,7 +568,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_50_USDC;
+        uint256 expectedBalance = uint256(int256(initialBalance) + pnl);
         assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
