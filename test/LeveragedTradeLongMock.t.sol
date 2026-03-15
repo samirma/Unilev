@@ -4,359 +4,671 @@ pragma solidity ^0.8.0;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./utils/TestSetupMock.sol";
 
+/**
+ * @title LeveragedTradeLongMock
+ * @notice Test suite for long leveraged positions with 2x and 3x leverage
+ * @dev PnL Calculation Logic:
+ * - Collateral: 100 USDC
+ * - 2x leverage: Position size = 200 USDC worth of WBTC
+ * - 3x leverage: Position size = 300 USDC worth of WBTC
+ * - PnL = Position Size * Price Change %
+ * - Example: 200 USDC * 0.5% = 1 USDC profit
+ * 
+ * Price Change Formula (for target PnL):
+ * - Price Change % = Target PnL / (Collateral * Leverage)
+ * - For 1 USDC with 2x: 1 / (100 * 2) = 0.5% = 50 bps
+ * - For 10 USDC with 2x: 10 / (100 * 2) = 5% = 500 bps
+ * - For 50 USDC with 2x: 50 / (100 * 2) = 25% = 2500 bps
+ * 
+ * Swap Fee Impact (0.3% each way):
+ * - Entry: 100 USDC -> 99.7 USDC worth of WBTC
+ * - Exit: Additional 0.3% fee on the total returned amount
+ * - Net PnL = Gross PnL - (Swap Fees + Protocol Fees)
+ */
 contract LeveragedTradeLongMock is TestSetupMock {
-    // ----------------------------------------------------------------------
-    // Helper function to get PnL from position
-    // Note: PnL is returned in quote token decimals (USDC = 6 decimals)
-    // ----------------------------------------------------------------------
-    function getPositionPnL(uint256 positionId) internal view returns (int256) {
-        (
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            int128 currentPnL,
+    
+    // ===================================================================
+    // COLLATERAL AND LEVERAGE CONFIGURATION
+    // ===================================================================
+    uint128 constant COLLATERAL_AMOUNT = 100e6;  // 100 USDC
+    uint24 constant FEE_TIER = 3000;              // 0.3% Uniswap fee tier
+    
+    // ===================================================================
+    // PRICE CHANGE CONSTANTS (in basis points, 1 bp = 0.01%)
+    // Calculated as: Target PnL / (Collateral * Leverage) * 10000
+    // ===================================================================
+    
+    // 2x Leverage Price Changes
+    uint256 constant PRICE_CHANGE_1_USDC_2X = 50;      // 0.5% for 1 USDC profit
+    uint256 constant PRICE_CHANGE_10_USDC_2X = 500;    // 5% for 10 USDC profit  
+    uint256 constant PRICE_CHANGE_50_USDC_2X = 2500;   // 25% for 50 USDC profit
+    
+    // 3x Leverage Price Changes (smaller % needed due to higher leverage)
+    uint256 constant PRICE_CHANGE_1_USDC_3X = 34;      // 0.34% for 1 USDC profit (50 * 2/3)
+    uint256 constant PRICE_CHANGE_10_USDC_3X = 334;    // 3.34% for 10 USDC profit (500 * 2/3)
+    uint256 constant PRICE_CHANGE_50_USDC_3X = 1667;   // 16.67% for 50 USDC profit (2500 * 2/3)
+    
+    // ===================================================================
+    // EXPECTED PnL VALUES (in USDC with 6 decimals)
+    // These are the TARGET PnL values we expect to achieve
+    // Actual PnL may differ slightly due to fees and price impact
+    // ===================================================================
+    int256 constant TARGET_PROFIT_1_USDC = 1e6;        // 1 USDC
+    int256 constant TARGET_PROFIT_10_USDC = 10e6;      // 10 USDC
+    int256 constant TARGET_PROFIT_50_USDC = 50e6;      // 50 USDC
+    int256 constant TARGET_LOSS_1_USDC = -1e6;         // -1 USDC
+    int256 constant TARGET_LOSS_10_USDC = -10e6;       // -10 USDC
+    int256 constant TARGET_LOSS_50_USDC = -50e6;       // -50 USDC
+    
+    // ===================================================================
+    // EXPECTED NET BALANCE CHANGES (PnL after all fees)
+    // Estimated net amounts after accounting for:
+    // - 0.3% swap fee on entry (0.30 USDC)
+    // - 0.3% swap fee on exit (~0.30 USDC for small positions)
+    // - 0.05% treasure fee (~0.05-0.15 USDC depending on position size)
+    // - 0.03% liquidation reward (if applicable)
+    // ===================================================================
+    uint256 constant NET_PROFIT_1_USDC = 1e6 - 6e5;     // ~0.4 USDC net (1 - 0.6 fees)
+    uint256 constant NET_PROFIT_10_USDC = 10e6 - 7e5;   // ~9.3 USDC net (10 - 0.7 fees)
+    uint256 constant NET_PROFIT_50_USDC = 50e6 - 1e6;   // ~49 USDC net (50 - 1.0 fees)
+    uint256 constant NET_LOSS_1_USDC = 1e6 + 6e5;       // ~1.6 USDC total loss
+    uint256 constant NET_LOSS_10_USDC = 10e6 + 7e5;     // ~10.7 USDC total loss
+    uint256 constant NET_LOSS_50_USDC = 50e6 + 1e6;     // ~51 USDC total loss
+    
+    // ===================================================================
+    // TOLERANCE FOR ASSERTIONS
+    // Allow for 1 USDC tolerance due to fee calculation variations
+    // ===================================================================
+    uint256 constant PNL_TOLERANCE = 1e6;
+    uint256 constant BALANCE_TOLERANCE = 1e6;
 
-        ) = positions.getPositionParams(positionId);
+    function getPositionPnL(uint256 positionId) internal view returns (int256) {
+        (, , , , , , , , , int128 currentPnL, ) = positions.getPositionParams(positionId);
         return int256(currentPnL);
     }
 
-    // ----------------------------------------------------------------------
-    // Scenario: Long - Profit 2x (WBTC Price Rise) - ~1 USDC Net Profit
-    // ----------------------------------------------------------------------
-    // User deposits 100 USDC as collateral to buy a 2x leveraged long position on WBTC.
-    // The WBTC price rises by ~0.5% to generate approximately 1 USDC net profit.
-    // ----------------------------------------------------------------------
-    function test_Long_Profit_2x_WBTC_Rise_1USDC() public {
-        address usdc = getUsdcAddress();
-        address wbtc = getWbtcAddress();
-        uint128 collateralAmount = 100e6; // 100 USDC
-        uint24 fee = 3000;
-
-        // Deposit liquidity for both tokens
-        depositLiquidity(usdc, 100_000e6);
-        depositLiquidity(wbtc, 10e8);
-
-        // 1. Initial State - Set initial prices
-        writeTokenBalance(alice, usdc, collateralAmount);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
-        console.log("Initial USDC Balance:", initialBalance);
-
-        vm.startPrank(deployer);
-        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8); // USDC = $1
-        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8); // WBTC = $100,000
-        vm.stopPrank();
-
-        // 2. Open Position (Long WBTC/USDC 2x)
-        vm.startPrank(alice);
-        IERC20(usdc).approve(address(positions), collateralAmount);
-        market.openLongPosition(usdc, wbtc, fee, 2, collateralAmount, 0, 0);
-        vm.stopPrank();
-
-        uint256[] memory posAlice = positions.getTraderPositions(alice);
-        assertEq(posAlice.length, 1);
-        uint256 positionId = posAlice[0];
-
-        // 3. Mock Price Change - ~0.75% increase should generate ~1.5 USDC gross profit
-        // After fees (~0.3 USDC), net profit should be ~1 USDC
-        vm.startPrank(deployer);
-        mockV3AggregatorWbtcUsd.updateAnswer(100_750 * 1e8); // WBTC = $100,750 (0.75% increase)
-        vm.stopPrank();
-
-        // 4. Assert PnL before closing
-        int256 pnlAfterPriceChange = getPositionPnL(positionId);
-        console.log("PnL after price change (USDC units):");
-        console.logInt(pnlAfterPriceChange);
-
-        // PnL should be positive for profit
-        assertGt(pnlAfterPriceChange, 0, "PnL should be positive for profit");
-
-        // Assert PnL is approximately 1.5 USDC (gross profit before closing fees)
-        assertApproxEqAbs(uint256(pnlAfterPriceChange), 15e5, 3e5); // ~1.5 USDC, allow 0.3 USDC tolerance
-
-        // 5. Close Position
-        vm.startPrank(alice);
-        market.closePosition(positionId);
-        vm.stopPrank();
-
-        // 6. Final Assertions
-        uint256 finalBalance = IERC20(usdc).balanceOf(alice);
-        console.log("Final USDC Balance:", finalBalance);
-
-        // The final balance should be higher than initial (net profit after all fees)
-        assertGt(finalBalance, initialBalance, "Final balance should be greater than initial");
-
-        // Net profit is approximately 0.2 USDC after all fees (entry + exit fees)
-        // Entry fees: ~0.15 USDC (treasure fee 0.05% + liquidation reward 0.03%)
-        // Exit fees: ~0.05 USDC (treasure fee 0.05%)
-        // Total fees: ~0.2 USDC, Net profit: ~1.5 - ~0.2 = ~0.3 USDC (approximate due to slippage)
-        uint256 netProfit = finalBalance - initialBalance;
-        console.log("Net profit:", netProfit);
-        assertGt(netProfit, 0, "Net profit should be positive");
+    /**
+     * @notice Calculate new price with basis point change
+     * @param basePrice8Dec Base price with 8 decimals (Chainlink format)
+     * @param bps Basis points to change (1 bp = 0.01%)
+     * @param increase True for price increase, false for decrease
+     * @return New price as int256 for MockV3Aggregator
+     */
+    function getPriceWithBpsChange(uint256 basePrice8Dec, uint256 bps, bool increase) internal pure returns (int256) {
+        uint256 change = (basePrice8Dec * bps) / 10000;
+        if (increase) {
+            return int256(basePrice8Dec + change);
+        } else {
+            return int256(basePrice8Dec - change);
+        }
     }
 
-    // ----------------------------------------------------------------------
-    // Scenario: Long - Profit 2x (WBTC Price Rise) - ~10 USDC Net Profit
-    // ----------------------------------------------------------------------
-    // User deposits 100 USDC as collateral to buy a 2x leveraged long position on WBTC.
-    // The WBTC price rises by ~5% to generate approximately 10 USDC net profit.
-    // ----------------------------------------------------------------------
-    function test_Long_Profit_2x_WBTC_Rise_10USDC() public {
-        address usdc = getUsdcAddress();
+    // ===================================================================
+    // 2x LEVERAGE - PROFIT TESTS
+    // ===================================================================
+
+    function test_Profit_of_1_USDC() public {
+        address usdc = getUsdcAddress(); 
         address wbtc = getWbtcAddress();
-        uint128 collateralAmount = 100e6; // 100 USDC
-        uint24 fee = 3000;
-
-        // Deposit liquidity for both tokens
-        depositLiquidity(usdc, 100_000e6);
+        
+        depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
-
-        // 1. Initial State - Set initial prices
-        writeTokenBalance(alice, usdc, collateralAmount);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
         uint256 initialBalance = IERC20(usdc).balanceOf(alice);
-        console.log("Initial USDC Balance:", initialBalance);
 
+        // Setup: WBTC = $100,000, USDC = $1
         vm.startPrank(deployer);
-        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8); // USDC = $1
-        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8); // WBTC = $100,000
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
         vm.stopPrank();
 
-        // 2. Open Position (Long WBTC/USDC 2x)
+        // Open long position with 2x leverage
         vm.startPrank(alice);
-        IERC20(usdc).approve(address(positions), collateralAmount);
-        market.openLongPosition(usdc, wbtc, fee, 2, collateralAmount, 0, 0);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 2, COLLATERAL_AMOUNT, 0, 0);
         vm.stopPrank();
 
-        uint256[] memory posAlice = positions.getTraderPositions(alice);
-        assertEq(posAlice.length, 1);
-        uint256 positionId = posAlice[0];
+        uint256 positionId = positions.getTraderPositions(alice)[0];
 
-        // 3. Mock Price Change - ~5% increase should generate ~10 USDC profit
-        // Based on actual contract behavior: 5% price increase → ~10 USDC profit
-        vm.startPrank(deployer);
-        mockV3AggregatorWbtcUsd.updateAnswer(105_000 * 1e8); // WBTC = $105,000 (5% increase)
+        // Increase price by 0.5% to get ~1 USDC profit
+        // Math: 200 USDC position * 0.5% = 1 USDC
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_1_USDC_2X, true);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
 
-        // 4. Assert PnL before closing
-        int256 pnlAfterPriceChange = getPositionPnL(positionId);
-        console.log("PnL after price change (USDC units):");
-        console.logInt(pnlAfterPriceChange);
+        // Verify PnL
+        int256 pnl = getPositionPnL(positionId);
+        assertGt(pnl, 0, "PnL should be positive for long profit");
+        assertApproxEqAbs(uint256(pnl), uint256(TARGET_PROFIT_1_USDC), PNL_TOLERANCE);
 
-        // PnL should be positive for profit
-        assertGt(pnlAfterPriceChange, 0, "PnL should be positive for profit");
-
-        // Assert PnL is approximately 10 USDC
-        assertApproxEqAbs(uint256(pnlAfterPriceChange), 10e6, 2e6); // ~10 USDC, allow 2 USDC tolerance
-
-        // 5. Close Position
-        vm.startPrank(alice);
-        market.closePosition(positionId);
+        // Close position and verify net result
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
         vm.stopPrank();
-
-        // 6. Final Assertions
+        
         uint256 finalBalance = IERC20(usdc).balanceOf(alice);
-        console.log("Final USDC Balance:", finalBalance);
-
-        // The final balance should be higher than initial (profit)
-        assertGt(finalBalance, initialBalance, "Final balance should be greater than initial");
-
-        // Assert final balance is approximately initial + 10 USDC (with fee tolerance)
-        assertApproxEqAbs(finalBalance, initialBalance + 10e6, 2e6);
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_1_USDC;
+        assertApproxEqAbs(finalBalance, expectedBalance, BALANCE_TOLERANCE);
     }
 
-    // ----------------------------------------------------------------------
-    // Scenario: Long - Loss 2x (WBTC Price Drop) - ~10 USDC Loss
-    // ----------------------------------------------------------------------
-    // User deposits 100 USDC as collateral to buy a 2x leveraged long position on WBTC.
-    // The WBTC price drops by ~5% to generate approximately 10 USDC loss.
-    // ----------------------------------------------------------------------
-    function test_Long_Loss_2x_WBTC_Drop_10USDC() public {
-        address usdc = getUsdcAddress();
+    function test_Profit_of_10_USDC() public {
+        address usdc = getUsdcAddress(); 
         address wbtc = getWbtcAddress();
-        uint128 collateralAmount = 100e6; // 100 USDC
-        uint24 fee = 3000;
-
-        // Deposit liquidity for both tokens
-        depositLiquidity(usdc, 100_000e6);
+        
+        depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
-
-        // 1. Initial State - Set initial prices
-        writeTokenBalance(alice, usdc, collateralAmount);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
         uint256 initialBalance = IERC20(usdc).balanceOf(alice);
-        console.log("Initial USDC Balance:", initialBalance);
 
         vm.startPrank(deployer);
-        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8); // USDC = $1
-        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8); // WBTC = $100,000
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
         vm.stopPrank();
 
-        // 2. Open Position (Long WBTC/USDC 2x)
         vm.startPrank(alice);
-        IERC20(usdc).approve(address(positions), collateralAmount);
-        market.openLongPosition(usdc, wbtc, fee, 2, collateralAmount, 0, 0);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 2, COLLATERAL_AMOUNT, 0, 0);
         vm.stopPrank();
 
-        uint256[] memory posAlice = positions.getTraderPositions(alice);
-        assertEq(posAlice.length, 1);
-        uint256 positionId = posAlice[0];
+        uint256 positionId = positions.getTraderPositions(alice)[0];
 
-        // 3. Mock Price Change - ~5% decrease generates ~10 USDC loss
-        vm.startPrank(deployer);
-        mockV3AggregatorWbtcUsd.updateAnswer(95_000 * 1e8); // WBTC = $95,000 (5% decrease)
+        // Increase price by 5% to get ~10 USDC profit
+        // Math: 200 USDC position * 5% = 10 USDC
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_10_USDC_2X, true);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
 
-        // 4. Assert PnL before closing
-        int256 pnlAfterPriceChange = getPositionPnL(positionId);
-        console.log("PnL after price change (USDC units):");
-        console.logInt(pnlAfterPriceChange);
+        int256 pnl = getPositionPnL(positionId);
+        assertGt(pnl, 0, "PnL should be positive for long profit");
+        assertApproxEqAbs(uint256(pnl), uint256(TARGET_PROFIT_10_USDC), PNL_TOLERANCE);
 
-        // PnL should be negative for loss
-        assertLt(pnlAfterPriceChange, 0, "PnL should be negative for loss");
-
-        // Assert PnL magnitude is approximately 10 USDC
-        uint256 pnlAbs = uint256(-pnlAfterPriceChange);
-        assertApproxEqAbs(pnlAbs, 10e6, 2e6); // ~10 USDC loss, allow 2 USDC tolerance
-
-        // 5. Close Position
-        vm.startPrank(alice);
-        market.closePosition(positionId);
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
         vm.stopPrank();
-
-        // 6. Final Assertions
-        uint256 finalBalance = IERC20(usdc).balanceOf(alice);
-        console.log("Final USDC Balance:", finalBalance);
-
-        // The final balance should be lower than initial (loss)
-        assertLt(finalBalance, initialBalance, "Final balance should be less than initial");
-
-        // Assert final balance is approximately initial - 10 USDC (with fee tolerance)
-        assertApproxEqAbs(finalBalance, initialBalance - 10e6, 2e6);
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_10_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
     }
 
-    // ----------------------------------------------------------------------
-    // Scenario: Whitelist Fees Test
-    // ----------------------------------------------------------------------
+    function test_Profit_of_50_USDC() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 2, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        // Increase price by 25% to get ~50 USDC profit
+        // Math: 200 USDC position * 25% = 50 USDC
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_50_USDC_2X, true);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertGt(pnl, 0, "PnL should be positive for long profit");
+        assertApproxEqAbs(uint256(pnl), uint256(TARGET_PROFIT_50_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_50_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    // ===================================================================
+    // 3x LEVERAGE - PROFIT TESTS
+    // ===================================================================
+
+    function test_Profit_of_1_USDC_3x() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 3, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        // With 3x leverage, need smaller price change for same PnL
+        // Math: 300 USDC position * 0.34% ≈ 1 USDC
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_1_USDC_3X, true);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertGt(pnl, 0, "PnL should be positive for long profit");
+        assertApproxEqAbs(uint256(pnl), uint256(TARGET_PROFIT_1_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_1_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    function test_Profit_of_10_USDC_3x() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 3, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        // Math: 300 USDC position * 3.34% ≈ 10 USDC
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_10_USDC_3X, true);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertGt(pnl, 0, "PnL should be positive for long profit");
+        assertApproxEqAbs(uint256(pnl), uint256(TARGET_PROFIT_10_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_10_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    function test_Profit_of_50_USDC_3x() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 3, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        // Math: 300 USDC position * 16.67% ≈ 50 USDC
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_50_USDC_3X, true);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertGt(pnl, 0, "PnL should be positive for long profit");
+        assertApproxEqAbs(uint256(pnl), uint256(TARGET_PROFIT_50_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT + NET_PROFIT_50_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    // ===================================================================
+    // 2x LEVERAGE - LOSS TESTS
+    // ===================================================================
+
+    function test_Loss_of_minus_1_USDC() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 2, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        // Decrease price by 0.5% to get ~1 USDC loss
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_1_USDC_2X, false);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertLt(pnl, 0, "PnL should be negative for long loss");
+        assertApproxEqAbs(uint256(-pnl), uint256(-TARGET_LOSS_1_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_1_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    function test_Loss_of_minus_10_USDC() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 2, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        // Decrease price by 5% to get ~10 USDC loss
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_10_USDC_2X, false);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertLt(pnl, 0, "PnL should be negative for long loss");
+        assertApproxEqAbs(uint256(-pnl), uint256(-TARGET_LOSS_10_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_10_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    function test_Loss_of_minus_50_USDC() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 2, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        // Decrease price by 25% to get ~50 USDC loss
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_50_USDC_2X, false);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertLt(pnl, 0, "PnL should be negative for long loss");
+        assertApproxEqAbs(uint256(-pnl), uint256(-TARGET_LOSS_50_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_50_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    // ===================================================================
+    // 3x LEVERAGE - LOSS TESTS
+    // ===================================================================
+
+    function test_Loss_of_minus_1_USDC_3x() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 3, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_1_USDC_3X, false);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertLt(pnl, 0, "PnL should be negative for long loss");
+        assertApproxEqAbs(uint256(-pnl), uint256(-TARGET_LOSS_1_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_1_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    function test_Loss_of_minus_10_USDC_3x() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 3, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_10_USDC_3X, false);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertLt(pnl, 0, "PnL should be negative for long loss");
+        assertApproxEqAbs(uint256(-pnl), uint256(-TARGET_LOSS_10_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_10_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    function test_Loss_of_minus_50_USDC_3x() public {
+        address usdc = getUsdcAddress(); 
+        address wbtc = getWbtcAddress();
+        
+        depositLiquidity(usdc, 100_000e6); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT);
+        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+
+        vm.startPrank(deployer);
+        mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100_000 * 1e8);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), COLLATERAL_AMOUNT);
+        market.openLongPosition(usdc, wbtc, FEE_TIER, 3, COLLATERAL_AMOUNT, 0, 0);
+        vm.stopPrank();
+
+        uint256 positionId = positions.getTraderPositions(alice)[0];
+
+        int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_50_USDC_3X, false);
+        vm.startPrank(deployer); 
+        mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
+        vm.stopPrank();
+
+        int256 pnl = getPositionPnL(positionId);
+        assertLt(pnl, 0, "PnL should be negative for long loss");
+        assertApproxEqAbs(uint256(-pnl), uint256(-TARGET_LOSS_50_USDC), PNL_TOLERANCE);
+
+        vm.startPrank(alice); 
+        market.closePosition(positionId); 
+        vm.stopPrank();
+        
+        uint256 expectedBalance = initialBalance - COLLATERAL_AMOUNT - NET_LOSS_50_USDC;
+        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, BALANCE_TOLERANCE);
+    }
+
+    // ===================================================================
+    // UTILITY TESTS
+    // ===================================================================
+
     function test_WhitelistFees() public {
-        address weth = getWethAddress();
+        address weth = getWethAddress(); 
         address wbtc = getWbtcAddress();
-        uint128 amount = 1e18;
-        uint24 fee = 3000;
+        uint128 amount = 1e18; 
         address whitelistedUser = address(0x88);
-
-        depositLiquidity(weth, 1000e18);
+        
+        depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
-
-        // 1. Initial State
         writeTokenBalance(whitelistedUser, weth, amount);
-
-        // 2. Add to Whitelist with reduced fees (0.01% treasure, 0% liquidation reward)
+        
         vm.startPrank(deployer);
         feeManager.setCustomFees(whitelistedUser, 1, 0);
+        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
+        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
         vm.stopPrank();
+        
+        vm.startPrank(whitelistedUser);
+        IERC20(weth).approve(address(positions), amount);
+        market.openLongPosition(weth, wbtc, FEE_TIER, 2, amount, 0, 0);
+        vm.stopPrank();
+        
+        uint256 treasureBalance = IERC20(weth).balanceOf(conf.treasure);
+        assertApproxEqAbs(treasureBalance, 1e14, 100);
+    }
 
+    function test_MultipleLiquidations_Market() public {
+        address weth = getWethAddress(); 
+        address wbtc = getWbtcAddress();
+        uint128 amountAlice = 1e18; 
+        uint128 amountBob = 2e18;
+        
+        depositLiquidity(weth, 1000e18); 
+        depositLiquidity(wbtc, 10e8);
+        writeTokenBalance(alice, weth, amountAlice); 
+        writeTokenBalance(bob, weth, amountBob);
+        
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
         mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8);
         vm.stopPrank();
-
-        // 3. Open Position
-        vm.startPrank(whitelistedUser);
-        IERC20(weth).approve(address(positions), amount);
-        market.openLongPosition(weth, wbtc, fee, 2, amount, 0, 0);
-        vm.stopPrank();
-
-        // 4. Verification of Treasure Fee
-        // Liquidation Reward = 0
-        // Amount used for fee calc = 1e18
-        // Treasure Fee = 1e18 * 1 / 10000 = 1e14
-
-        uint256 treasureBalance = IERC20(weth).balanceOf(conf.treasure);
-        console.log("Treasure Balance (Whitelisted):", treasureBalance);
-        assertApproxEqAbs(treasureBalance, 1e14, 100); // Allow small rounding
-    }
-
-    // ----------------------------------------------------------------------
-    // Scenario: Multiple Liquidations via Market Contract
-    // ----------------------------------------------------------------------
-    function test_MultipleLiquidations_Market() public {
-        address weth = getWethAddress();
-        address wbtc = getWbtcAddress();
-        uint128 amountAlice = 1e18; // 1 WETH
-        uint128 amountBob = 2e18; // 2 WETH
-        uint24 fee = 3000;
-
-        depositLiquidity(weth, 1000e18);
-        depositLiquidity(wbtc, 10e8);
-
-        // 1. Initial State
-        writeTokenBalance(alice, weth, amountAlice);
-        writeTokenBalance(bob, weth, amountBob);
-
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8); // ETH = $4,000
-        mockV3AggregatorWbtcUsd.updateAnswer(100000 * 1e8); // WBTC = $100,000
-        vm.stopPrank();
-
-        // 2. Open Positions
+        
         vm.startPrank(alice);
         IERC20(weth).approve(address(positions), amountAlice);
-        market.openLongPosition(weth, wbtc, fee, 2, amountAlice, 0, 0);
+        market.openLongPosition(weth, wbtc, FEE_TIER, 2, amountAlice, 0, 0);
         vm.stopPrank();
-
+        
         vm.startPrank(bob);
         IERC20(weth).approve(address(positions), amountBob);
-        market.openLongPosition(weth, wbtc, fee, 3, amountBob, 0, 0);
+        market.openLongPosition(weth, wbtc, FEE_TIER, 3, amountBob, 0, 0);
         vm.stopPrank();
-
-        uint256[] memory posAlice = positions.getTraderPositions(alice);
-        uint256[] memory posBob = positions.getTraderPositions(bob);
-
-        assertEq(posAlice.length, 1);
-        assertEq(posBob.length, 1);
-
-        // 3. Mock Price Change to trigger liquidations (ETH price drop significantly)
-        // Alice leverage 2x: breakEvenLimit = 4000 - (4000 * 0.5) = 2000
-        // Bob leverage 3x: breakEvenLimit = 4000 - (4000 * 1/3) = 2666.6
-        // Liquidation Threshold 10%
-        // Alice lidTresh = 2000 * 1.1 = 2200
-        // Bob lidTresh = 2666.6 * 1.1 = 2933.2
-
-        vm.startPrank(deployer);
-        mockV3AggregatorEthUsd.updateAnswer(2100 * 1e8); // Both should be liquidatable
+        
+        // Drop ETH price to liquidate positions
+        vm.startPrank(deployer); 
+        mockV3AggregatorEthUsd.updateAnswer(2100 * 1e8); 
         vm.stopPrank();
-
-        // 4. Verify they are liquidatable
+        
         uint256[] memory liquidablePos = market.getLiquidablePositions();
-
-        // Count non-zero IDs
         uint256 count = 0;
         for (uint256 i = 0; i < liquidablePos.length; i++) {
             if (liquidablePos[i] != 0) count++;
         }
         assertTrue(count >= 2, "Should have at least 2 liquidable positions");
-
-        // 5. Liquidate via Market
+        
         uint256 liquidatorBalanceBefore = IERC20(weth).balanceOf(deployer);
-
-        vm.startPrank(deployer);
-        market.liquidatePositions(liquidablePos);
+        vm.startPrank(deployer); 
+        market.liquidatePositions(liquidablePos); 
         vm.stopPrank();
-
-        // 6. Final Assertions
-        assertEq(positions.getTraderPositions(alice).length, 0, "Alice position should be closed");
-        assertEq(positions.getTraderPositions(bob).length, 0, "Bob position should be closed");
-
+        
+        assertEq(positions.getTraderPositions(alice).length, 0, "Alice positions should be liquidated");
+        assertEq(positions.getTraderPositions(bob).length, 0, "Bob positions should be liquidated");
+        
         uint256 liquidatorBalanceAfter = IERC20(weth).balanceOf(deployer);
-        assertTrue(
-            liquidatorBalanceAfter > liquidatorBalanceBefore,
-            "Liquidator should receive rewards"
-        );
-
-        console.log("Liquidator reward (WETH):", liquidatorBalanceAfter - liquidatorBalanceBefore);
+        assertTrue(liquidatorBalanceAfter > liquidatorBalanceBefore, "Liquidator should receive reward");
     }
 }
