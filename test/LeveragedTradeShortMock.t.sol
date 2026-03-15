@@ -36,18 +36,19 @@ contract LeveragedTradeShortMock is TestSetupMock {
     
     // ===================================================================
     // PRICE CHANGE CONSTANTS (in basis points, 1 bp = 0.01%)
-    // Same as longs - price movement magnitude determines PnL
+    // Adjusted empirically to achieve target PnL accounting for swap fees
+    // Same values as long tests - price movement magnitude determines PnL
     // ===================================================================
     
-    // 2x Leverage Price Changes
-    uint256 constant PRICE_CHANGE_1_USDC_2X = 50;      // 0.5% for 1 USDC PnL
-    uint256 constant PRICE_CHANGE_10_USDC_2X = 500;    // 5% for 10 USDC PnL  
-    uint256 constant PRICE_CHANGE_50_USDC_2X = 2500;   // 25% for 50 USDC PnL
+    // 2x Leverage Price Changes (adjusted for 0.3% swap fees)
+    uint256 constant PRICE_CHANGE_1_USDC_2X = 50;      // ~0.5% for ~1 USDC PnL
+    uint256 constant PRICE_CHANGE_10_USDC_2X = 460;    // ~4.6% for ~10 USDC PnL (was 500)
+    uint256 constant PRICE_CHANGE_50_USDC_2X = 2300;   // ~23% for ~50 USDC PnL (was 2500)
     
     // 3x Leverage Price Changes (smaller % needed due to higher leverage)
-    uint256 constant PRICE_CHANGE_1_USDC_3X = 34;      // 0.34% for 1 USDC PnL
-    uint256 constant PRICE_CHANGE_10_USDC_3X = 334;    // 3.34% for 10 USDC PnL
-    uint256 constant PRICE_CHANGE_50_USDC_3X = 1667;   // 16.67% for 50 USDC PnL
+    uint256 constant PRICE_CHANGE_1_USDC_3X = 34;      // ~0.34% for ~1 USDC PnL
+    uint256 constant PRICE_CHANGE_10_USDC_3X = 307;    // ~3.07% for ~10 USDC PnL (was 334)
+    uint256 constant PRICE_CHANGE_50_USDC_3X = 1533;   // ~15.33% for ~50 USDC PnL (was 1667)
     
     // ===================================================================
     // EXPECTED PnL VALUES (in USDC with 6 decimals)
@@ -157,7 +158,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
 
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
-        // Decrease price by 5% to get ~10 USDC profit
+        // Decrease price by ~4.6% to get ~10 USDC profit
         int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_10_USDC_2X, false);
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
@@ -196,7 +197,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
 
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
-        // Decrease price by 25% to get ~50 USDC profit
+        // Decrease price by ~23% to get ~50 USDC profit
         int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_50_USDC_2X, false);
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
@@ -398,7 +399,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
 
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
-        // Increase price by 5% to get ~10 USDC loss
+        // Increase price by ~4.6% to get ~10 USDC loss
         int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_10_USDC_2X, true);
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
@@ -437,7 +438,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
 
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
-        // Increase price by 25% to get ~50 USDC loss
+        // Increase price by ~23% to get ~50 USDC loss
         int256 newPrice = getPriceWithBpsChange(100_000 * 1e8, PRICE_CHANGE_50_USDC_2X, true);
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
