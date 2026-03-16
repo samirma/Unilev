@@ -79,9 +79,9 @@ contract LeveragedTradeShortMock is TestSetupMock {
     uint256 constant PNL_TOLERANCE_50_USDC = 400e6;         // 400 USDC (~1% of ~30000 USDC)
     
     // Balance tolerances (slightly looser due to swap fee variance)
-    uint256 constant BALANCE_TOLERANCE_1_USDC = 35e6;       // 35 USDC
-    uint256 constant BALANCE_TOLERANCE_10_USDC = 120e6;     // 120 USDC
-    uint256 constant BALANCE_TOLERANCE_50_USDC = 500e6;     // 500 USDC
+    uint256 constant BALANCE_TOLERANCE_1_USDC = 1e6;       // 1 USDC
+    uint256 constant BALANCE_TOLERANCE_10_USDC = 5e6;     // 5 USDC
+    uint256 constant BALANCE_TOLERANCE_50_USDC = 15e6;     // 15 USDC
 
     function getPositionPnL(uint256 positionId) internal view returns (int256) {
         (, , , , , , , , , int128 currentPnL, ) = positions.getPositionParams(positionId);
