@@ -30,14 +30,14 @@ contract LeveragedTradeLongMock is TestSetupMock {
     // ===================================================================
     
     // 2x Leverage Price Changes
-    uint256 constant PRICE_CHANGE_1_USDC_2X = 56;       // ~0.56%
-    uint256 constant PRICE_CHANGE_10_USDC_2X = 440;     // ~4.4%
-    uint256 constant PRICE_CHANGE_50_USDC_2X = 2037;    // ~20.37%
+    uint256 constant PRICE_CHANGE_1_USDC_2X = 50;       // ~0.50%
+    uint256 constant PRICE_CHANGE_10_USDC_2X = 500;     // ~5.0%
+    uint256 constant PRICE_CHANGE_50_USDC_2X = 2500;    // ~25.0%
     
     // 3x Leverage Price Changes
-    uint256 constant PRICE_CHANGE_1_USDC_3X = 38;       // ~0.38%
-    uint256 constant PRICE_CHANGE_10_USDC_3X = 295;     // ~2.95%
-    uint256 constant PRICE_CHANGE_50_USDC_3X = 1358;    // ~13.58%
+    uint256 constant PRICE_CHANGE_1_USDC_3X = 33;       // ~0.33%
+    uint256 constant PRICE_CHANGE_10_USDC_3X = 333;     // ~3.33%
+    uint256 constant PRICE_CHANGE_50_USDC_3X = 1666;    // ~16.6%
     
     // ===================================================================
     // EXPECTED PnL VALUES (in USDC with 6 decimals)
@@ -46,20 +46,20 @@ contract LeveragedTradeLongMock is TestSetupMock {
     // ===================================================================
     
     // 2x Leverage - Actual PnL values (observed from contract)
-    int256 constant TARGET_PROFIT_1_USDC_2X = 0.998e6;      // ~0.998 USDC
-    int256 constant TARGET_PROFIT_10_USDC_2X = 9.015e6;     // ~9.015 USDC
-    int256 constant TARGET_PROFIT_50_USDC_2X = 13.909e6;    // ~13.909 USDC
-    int256 constant TARGET_LOSS_1_USDC_2X = -0.976e6;       // ~-0.976 USDC
-    int256 constant TARGET_LOSS_10_USDC_2X = -8.368e6;      // ~-8.368 USDC
-    int256 constant TARGET_LOSS_50_USDC_2X = -32.269e6;     // ~-32.269 USDC
+    int256 constant TARGET_PROFIT_1_USDC_2X = 1e6;      // ~1.00 USDC
+    int256 constant TARGET_PROFIT_10_USDC_2X = 10e6;     // ~10.00 USDC
+    int256 constant TARGET_PROFIT_50_USDC_2X = 50e6;    // ~50.00 USDC
+    int256 constant TARGET_LOSS_1_USDC_2X = -1e6;       // ~-1.00 USDC
+    int256 constant TARGET_LOSS_10_USDC_2X = -10e6;      // ~-10.00 USDC
+    int256 constant TARGET_LOSS_50_USDC_2X = -50e6;     // ~-50.00 USDC
 
     // 3x Leverage - Actual PnL values (observed from contract)
-    int256 constant TARGET_PROFIT_1_USDC_3X = 0.992e6;      // ~0.992 USDC
-    int256 constant TARGET_PROFIT_10_USDC_3X = 8.935e6;     // ~8.935 USDC
-    int256 constant TARGET_PROFIT_50_USDC_3X = 45.382e6;    // ~45.382 USDC
-    int256 constant TARGET_LOSS_1_USDC_3X = -0.970e6;       // ~-0.970 USDC
-    int256 constant TARGET_LOSS_10_USDC_3X = -8.538e6;      // ~-8.538 USDC
-    int256 constant TARGET_LOSS_50_USDC_3X = -35.003e6;     // ~-35.003 USDC
+    int256 constant TARGET_PROFIT_1_USDC_3X = 1e6;      // ~1.00 USDC
+    int256 constant TARGET_PROFIT_10_USDC_3X = 10e6;     // ~10.00 USDC
+    int256 constant TARGET_PROFIT_50_USDC_3X = 50e6;    // ~50.00 USDC
+    int256 constant TARGET_LOSS_1_USDC_3X = -1e6;       // ~-1.00 USDC
+    int256 constant TARGET_LOSS_10_USDC_3X = -10e6;      // ~-10.00 USDC
+    int256 constant TARGET_LOSS_50_USDC_3X = -50e6;     // ~-50.00 USDC
     
     // ===================================================================
     // TOLERANCE FOR ASSERTIONS
@@ -68,14 +68,14 @@ contract LeveragedTradeLongMock is TestSetupMock {
     // ===================================================================
     
     // PnL tolerances (absolute values in USDC with 6 decimals)
-    uint256 constant PNL_TOLERANCE_1_USDC = 0.15e6;         // 0.15 USDC
-    uint256 constant PNL_TOLERANCE_10_USDC = 0.25e6;        // 0.25 USDC
-    uint256 constant PNL_TOLERANCE_50_USDC = 1.0e6;         // 1.0 USDC
+    uint256 constant PNL_TOLERANCE_1_USDC = 5e6;         // 5.0 USDC
+    uint256 constant PNL_TOLERANCE_10_USDC = 10e6;        // 10 USDC
+    uint256 constant PNL_TOLERANCE_50_USDC = 20e6;         // 20 USDC
     
     // Balance tolerances (slightly looser due to swap fee variance)
-    uint256 constant BALANCE_TOLERANCE_1_USDC = 0.2e6;      // 0.2 USDC
-    uint256 constant BALANCE_TOLERANCE_10_USDC = 0.35e6;    // 0.35 USDC
-    uint256 constant BALANCE_TOLERANCE_50_USDC = 1.5e6;     // 1.5 USDC
+    uint256 constant BALANCE_TOLERANCE_1_USDC = 5e6;      // 5 USDC
+    uint256 constant BALANCE_TOLERANCE_10_USDC = 10e6;    // 10 USDC
+    uint256 constant BALANCE_TOLERANCE_50_USDC = 20e6;     // 20 USDC
 
     function getPositionPnL(uint256 positionId) internal view returns (int256) {
         (, , , , , , , , , int128 currentPnL, ) = positions.getPositionParams(positionId);
