@@ -48,7 +48,7 @@ contract TestSetupMock is Test, HelperConfig, Utils {
 
     mapping(string => address) public mockV3AggregatorBySymbol;
 
-    function setUp() public {
+    function setUp() public virtual {
         conf = getActiveNetworkConfig();
 
         // create users

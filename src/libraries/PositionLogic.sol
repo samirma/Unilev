@@ -40,6 +40,59 @@ library PositionLogic {
         address v3Pool;
     }
 
+    struct PnLCalculationParams {
+        uint256 initialPrice;
+        uint256 currentPrice;
+        uint256 totalBorrow;
+        uint128 collateralSize;
+        uint8 leverage;
+        bool isShort;
+        address initialToken;
+        address priceFeed;
+    }
+
+    struct PnLCalculationResult {
+        int128 currentPnL;
+        int128 collateralLeft;
+    }
+
+    /**
+     * @notice Calculate the PnL and collateral left for a position
+     * @param params PnL calculation parameters
+     * @return result Current PnL and collateral left
+     * @dev PnL Calculation Logic:
+     * - Long: profit when price goes UP (base token appreciates vs quote)
+     * - Short: profit when price goes DOWN (base token depreciates vs quote)
+     * - PnL = totalBorrow * priceChangePercent / 10000
+     */
+    function calculatePnL(
+        PnLCalculationParams memory params
+    ) internal view returns (PnLCalculationResult memory result) {
+        // Calculate price change percentage
+        int256 priceChangePercent;
+        if (params.currentPrice > params.initialPrice) {
+            // Price increased
+            priceChangePercent = int256((params.currentPrice - params.initialPrice) * 10000) / int256(params.initialPrice);
+        } else {
+            // Price decreased
+            priceChangePercent = -int256((params.initialPrice - params.currentPrice) * 10000) / int256(params.initialPrice);
+        }
+
+        // Calculate PnL based on position size (collateral * leverage)
+        // Position Size = collateralSize * leverage
+        // PnL = Position Size * priceChangePercent / 10000
+        uint256 positionSize = uint256(params.collateralSize) * params.leverage;
+        int256 pnl;
+        if (params.isShort) {
+            pnl = -int256(positionSize) * priceChangePercent / 10000;
+        } else {
+            pnl = int256(positionSize) * priceChangePercent / 10000;
+        }
+
+        result.currentPnL = int128(pnl);
+        result.collateralLeft = int128(params.collateralSize) + result.currentPnL;
+    }
+
     function _getBaseValidationResult(
         ValidationParams memory params
     ) private view returns (ValidationResult memory result) {
