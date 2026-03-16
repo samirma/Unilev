@@ -599,5 +599,6 @@ node javascript/checkPositions.js
 -   Request review from maintainers
 
 # Mocking strategy
-Never create mock ERC classes. In case it is requeried use Utils.writeTokenBalance
+
+Since the test runs in a polygon fork (POLYGON_RPC_URL) you shall not create mock ERC20 contracts
 
