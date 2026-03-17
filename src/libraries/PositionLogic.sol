@@ -49,6 +49,9 @@ library PositionLogic {
         bool isShort;
         address initialToken;
         address priceFeed;
+        uint24 poolFee;
+        address feeManager;
+        address trader;
     }
 
     struct PnLCalculationResult {
@@ -71,26 +74,39 @@ library PositionLogic {
         // Calculate price change percentage
         int256 priceChangePercent;
         if (params.currentPrice > params.initialPrice) {
-            // Price increased
             priceChangePercent = int256((params.currentPrice - params.initialPrice) * 10000) / int256(params.initialPrice);
         } else {
-            // Price decreased
             priceChangePercent = -int256((params.initialPrice - params.currentPrice) * 10000) / int256(params.initialPrice);
         }
 
-        // Calculate PnL based on position size (collateral * leverage)
-        // Position Size = collateralSize * leverage
-        // PnL = Position Size * priceChangePercent / 10000
         uint256 positionSize = uint256(params.collateralSize) * params.leverage;
-        int256 pnl;
+        int256 rawPnl;
         if (params.isShort) {
-            pnl = -int256(positionSize) * priceChangePercent / 10000;
+            rawPnl = -int256(positionSize) * priceChangePercent / 10000;
         } else {
-            pnl = int256(positionSize) * priceChangePercent / 10000;
+            rawPnl = int256(positionSize) * priceChangePercent / 10000;
         }
 
-        result.currentPnL = int128(pnl);
-        result.collateralLeft = int128(params.collateralSize) + result.currentPnL;
+        int256 finalValue = int256(uint256(params.collateralSize)) + rawPnl;
+
+        if (finalValue > 0 && params.poolFee > 0) {
+            int256 swapFee = (finalValue * int256(uint256(params.poolFee))) / 1_000_000;
+            finalValue -= swapFee;
+        }
+
+        if (finalValue > 0 && params.feeManager != address(0)) {
+            (bool success, bytes memory data) = params.feeManager.staticcall(
+                abi.encodeWithSignature("getFees(address)", params.trader)
+            );
+            if (success) {
+                (uint128 treasureFee, ) = abi.decode(data, (uint128, uint128));
+                int256 treasureDeduction = (finalValue * int256(uint256(treasureFee))) / 10000;
+                finalValue -= treasureDeduction;
+            }
+        }
+
+        result.currentPnL = int128(finalValue - int256(uint256(params.collateralSize)));
+        result.collateralLeft = int128(finalValue);
     }
 
     function _getBaseValidationResult(

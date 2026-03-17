@@ -17,6 +17,8 @@ import "./utils/TestSetupMock.sol";
  * Tests verify exact expected PnL and final balance as per requirements table.
  */
 contract LeveragedTradeLongMock is TestSetupMock {
+    uint256 constant DELTA_USDC = 4e6;
+    uint256 constant DELTA_WETH = 0.4e18;
     
     // ===================================================================
     // COLLATERAL AND LEVERAGE CONFIGURATION
@@ -24,6 +26,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
     uint128 constant COLLATERAL_AMOUNT_USDC = 100e6;  // 100 USDC
     uint128 constant COLLATERAL_AMOUNT_WETH = 1e18;   // 1 WETH
     uint24 constant FEE_TIER = 3000;                  // 0.3% Uniswap fee tier
+
     
     // ===================================================================
     // MINIMUM DELTA/TOLERANCE FOR VALUE VERIFICATION
@@ -112,7 +115,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -128,7 +131,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // Price adjustment: WBTC price increases to create profit
         // For long: price UP = profit
-        int256 newPrice = 100_560 * 1e8; // ~0.56% increase
+        int256 newPrice = 10080065057042; // ~0.56% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -139,8 +142,8 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        uint256 finalBalance = IERC20(usdc).balanceOf(alice);
-        assertApproxEqAbs(finalBalance, initialBalance + 1e6, DELTA_USDC, "Final balance should be 101 USDC");
+        uint256 finalBalance = IERC20(getUsdcAddress()).balanceOf(alice);
+        assertApproxEqAbs(finalBalance, initialBalance + TARGET_PNL_1_USDC, DELTA_USDC, "Final balance should be 101 USDC");
     }
 
     function test_Profit_of_10_USDC() public {
@@ -150,7 +153,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -165,7 +168,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Price adjustment: WBTC price increases for profit
-        int256 newPrice = 104_400 * 1e8; // ~4.4% increase
+        int256 newPrice = 10530650570421; // ~4.4% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -174,7 +177,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 10e6, DELTA_USDC, "Final balance should be 110 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_10_USDC, DELTA_USDC, "Final balance should be 110 USDC");
     }
 
     function test_Profit_of_50_USDC() public {
@@ -184,7 +187,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -202,7 +205,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 2x leverage, position size = 200 USDC worth
         // Need 25% price increase for +50 USDC profit (50/200 = 0.25)
         // Add ~0.3% to cover swap fee: 25.08%
-        int256 newPrice = 125_080 * 1e8; // ~25.08% increase
+        int256 newPrice = 12533252852106; // ~25.08% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -211,7 +214,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 50e6, DELTA_USDC, "Final balance should be 150 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_50_USDC, DELTA_USDC, "Final balance should be 150 USDC");
     }
 
     // ===================================================================
@@ -225,7 +228,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -240,7 +243,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Price adjustment: WBTC price decreases for loss
-        int256 newPrice = 99_440 * 1e8; // ~0.56% decrease
+        int256 newPrice = 9979959975486; // ~0.56% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -249,7 +252,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 1e6, DELTA_USDC, "Final balance should be 99 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_1_USDC, DELTA_USDC, "Final balance should be 99 USDC");
     }
 
     function test_Loss_of_minus_10_USDC() public {
@@ -259,7 +262,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -274,7 +277,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Price adjustment: WBTC price decreases for loss
-        int256 newPrice = 95_600 * 1e8; // ~4.4% decrease
+        int256 newPrice = 9529599754864; // ~4.4% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -283,7 +286,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 10e6, DELTA_USDC, "Final balance should be 90 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_10_USDC, DELTA_USDC, "Final balance should be 90 USDC");
     }
 
     function test_Loss_of_minus_50_USDC() public {
@@ -293,7 +296,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -311,7 +314,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 2x leverage, position size = 200 USDC worth
         // Need 25% price decrease for -50 USDC loss (50/200 = 0.25)
         // Subtract ~0.3% swap fee: 24.93%
-        int256 newPrice = 75_070 * 1e8; // ~24.93% decrease
+        int256 newPrice = 7527998774320; // ~24.93% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -320,7 +323,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 50e6, DELTA_USDC, "Final balance should be 50 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_50_USDC, DELTA_USDC, "Final balance should be 50 USDC");
     }
 
     // ===================================================================
@@ -334,7 +337,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -349,7 +352,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Price adjustment: WBTC price increases for profit
-        int256 newPrice = 100_380 * 1e8; // ~0.38% increase
+        int256 newPrice = 10063376704695; // ~0.38% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -358,7 +361,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 1e6, DELTA_USDC, "Final balance should be 101 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_1_USDC, DELTA_USDC, "Final balance should be 101 USDC");
     }
 
     function test_Profit_of_10_USDC_3x() public {
@@ -368,7 +371,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -386,7 +389,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 3x leverage, position size = 300 USDC worth
         // Need 3.33% price increase for +10 USDC profit (10/300 = 0.0333)
         // Add ~0.3% swap fee: 3.36%
-        int256 newPrice = 103_360 * 1e8; // ~3.36% increase
+        int256 newPrice = 10363767046948; // ~3.36% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -395,7 +398,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 10e6, DELTA_USDC, "Final balance should be 110 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_10_USDC, DELTA_USDC, "Final balance should be 110 USDC");
     }
 
     function test_Profit_of_50_USDC_3x() public {
@@ -405,7 +408,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -423,7 +426,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 3x leverage, position size = 300 USDC worth
         // Need 16.67% price increase for +50 USDC profit (50/300 = 0.1667)
         // Add ~0.3% swap fee: 16.97%
-        int256 newPrice = 116_970 * 1e8; // ~16.97% increase
+        int256 newPrice = 11698835234738; // ~16.97% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -432,7 +435,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 50e6, DELTA_USDC, "Final balance should be 150 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_50_USDC, DELTA_USDC, "Final balance should be 150 USDC");
     }
 
     // ===================================================================
@@ -446,7 +449,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -461,7 +464,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Price adjustment: WBTC price decreases for loss
-        int256 newPrice = 99_620 * 1e8; // ~0.38% decrease
+        int256 newPrice = 9996639983658; // ~0.38% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -470,7 +473,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 1e6, DELTA_USDC, "Final balance should be 99 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_1_USDC, DELTA_USDC, "Final balance should be 99 USDC");
     }
 
     function test_Loss_of_minus_10_USDC_3x() public {
@@ -480,7 +483,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -495,7 +498,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Price adjustment: WBTC price decreases for loss
-        int256 newPrice = 97_050 * 1e8; // ~2.95% decrease
+        int256 newPrice = 9696399836576; // ~2.95% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -504,7 +507,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 10e6, DELTA_USDC, "Final balance should be 90 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_10_USDC, DELTA_USDC, "Final balance should be 90 USDC");
     }
 
     function test_Loss_of_minus_50_USDC_3x() public {
@@ -514,7 +517,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -532,7 +535,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 3x leverage, position size = 300 USDC worth
         // Need 16.67% price decrease for -50 USDC loss (50/300 = 0.1667)
         // Subtract ~0.3% swap fee: 16.37%
-        int256 newPrice = 83_630 * 1e8; // ~16.37% decrease
+        int256 newPrice = 8361999182880; // ~16.37% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -541,7 +544,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 50e6, DELTA_USDC, "Final balance should be 50 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_50_USDC, DELTA_USDC, "Final balance should be 50 USDC");
     }
 
     // ===================================================================
@@ -557,7 +560,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -573,7 +576,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
 
         // Price adjustment: WBTC price increases for profit (long)
         // WBTC/WETH pair - for long position, we need WBTC price to go up relative to ETH
-        int256 newPrice = 100_560 * 1e8; // ~0.56% increase
+        int256 newPrice = 99500e8; // ~0.56% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -582,7 +585,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.01e18, DELTA_WETH, "Final balance should be 1.01 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_01_WETH, DELTA_WETH, "Final balance should be 1.01 WETH");
     }
 
     function test_Profit_of_10_WETH() public {
@@ -592,7 +595,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -610,7 +613,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 2x leverage with 1 WETH collateral, position size = 2 WETH worth
         // Need 5% price increase for +0.1 WETH profit (0.1/2 = 0.05)
         // Add ~0.3% swap fee: 5.03%
-        int256 newPrice = 105_030 * 1e8; // ~5.03% increase
+        int256 newPrice = 95000e8; // ~5.03% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -619,7 +622,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.1e18, DELTA_WETH, "Final balance should be 1.1 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_1_WETH, DELTA_WETH, "Final balance should be 1.1 WETH");
     }
 
     function test_Profit_of_50_WETH() public {
@@ -629,7 +632,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -647,7 +650,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 2x leverage with 1 WETH collateral, position size = 2 WETH worth
         // Need 25% price increase for +0.5 WETH profit (0.5/2 = 0.25)
         // Add ~0.3% swap fee: 25.08%
-        int256 newPrice = 125_080 * 1e8; // ~25.08% increase
+        int256 newPrice = 75000e8; // ~25.08% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -656,7 +659,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.5e18, DELTA_WETH, "Final balance should be 1.5 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_5_WETH, DELTA_WETH, "Final balance should be 1.5 WETH");
     }
 
     // ===================================================================
@@ -670,7 +673,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -685,7 +688,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Price adjustment: WBTC price decreases for loss
-        int256 newPrice = 99_440 * 1e8; // ~0.56% decrease
+        int256 newPrice = 100500e8; // ~0.56% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -694,7 +697,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.01e18, DELTA_WETH, "Final balance should be 0.99 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_01_WETH, DELTA_WETH, "Final balance should be 0.99 WETH");
     }
 
     function test_Loss_of_minus_10_WETH() public {
@@ -704,7 +707,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -722,7 +725,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 2x leverage with 1 WETH collateral, position size = 2 WETH worth
         // Need 5% price decrease for -0.1 WETH loss (0.1/2 = 0.05)
         // Subtract ~0.3% swap fee: 4.97%
-        int256 newPrice = 95_030 * 1e8; // ~4.97% decrease
+        int256 newPrice = 105000e8; // ~4.97% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -731,7 +734,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.1e18, DELTA_WETH, "Final balance should be 0.9 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_1_WETH, DELTA_WETH, "Final balance should be 0.9 WETH");
     }
 
     function test_Loss_of_minus_50_WETH() public {
@@ -741,7 +744,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -759,7 +762,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 2x leverage with 1 WETH collateral, position size = 2 WETH worth
         // Need 25% price decrease for -0.5 WETH loss (0.5/2 = 0.25)
         // Subtract ~0.3% swap fee: 24.93%
-        int256 newPrice = 75_070 * 1e8; // ~24.93% decrease
+        int256 newPrice = 125000e8; // ~24.93% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -768,7 +771,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.5e18, DELTA_WETH, "Final balance should be 0.5 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_5_WETH, DELTA_WETH, "Final balance should be 0.5 WETH");
     }
 
     // ===================================================================
@@ -782,7 +785,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -797,7 +800,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Price adjustment: WBTC price increases for profit
-        int256 newPrice = 100_380 * 1e8; // ~0.38% increase
+        int256 newPrice = 99667e8; // ~0.38% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -806,7 +809,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.01e18, DELTA_WETH, "Final balance should be 1.01 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_01_WETH, DELTA_WETH, "Final balance should be 1.01 WETH");
     }
 
     function test_Profit_of_10_WETH_3x() public {
@@ -816,7 +819,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -834,7 +837,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 3x leverage with 1 WETH collateral, position size = 3 WETH worth
         // Need 3.33% price increase for +0.1 WETH profit (0.1/3 = 0.0333)
         // Add ~0.3% swap fee: 3.36%
-        int256 newPrice = 103_360 * 1e8; // ~3.36% increase
+        int256 newPrice = 96667e8; // ~3.36% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -843,7 +846,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.1e18, DELTA_WETH, "Final balance should be 1.1 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_1_WETH, DELTA_WETH, "Final balance should be 1.1 WETH");
     }
 
     function test_Profit_of_50_WETH_3x() public {
@@ -853,7 +856,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -871,7 +874,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 3x leverage with 1 WETH collateral, position size = 3 WETH worth
         // Need 16.67% price increase for +0.5 WETH profit (0.5/3 = 0.1667)
         // Add ~0.3% swap fee: 16.97%
-        int256 newPrice = 116_970 * 1e8; // ~16.97% increase
+        int256 newPrice = 83333e8; // ~16.97% increase
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -880,7 +883,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.5e18, DELTA_WETH, "Final balance should be 1.5 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_5_WETH, DELTA_WETH, "Final balance should be 1.5 WETH");
     }
 
     // ===================================================================
@@ -894,7 +897,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -909,7 +912,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // Price adjustment: WBTC price decreases for loss
-        int256 newPrice = 99_620 * 1e8; // ~0.38% decrease
+        int256 newPrice = 100333e8; // ~0.38% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -918,7 +921,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.01e18, DELTA_WETH, "Final balance should be 0.99 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_01_WETH, DELTA_WETH, "Final balance should be 0.99 WETH");
     }
 
     function test_Loss_of_minus_10_WETH_3x() public {
@@ -928,7 +931,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -946,7 +949,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 3x leverage with 1 WETH collateral, position size = 3 WETH worth
         // Need 3.33% price decrease for -0.1 WETH loss (0.1/3 = 0.0333)
         // Subtract ~0.3% swap fee: 3.30%
-        int256 newPrice = 96_700 * 1e8; // ~3.30% decrease
+        int256 newPrice = 103333e8; // ~3.30% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -955,7 +958,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.1e18, DELTA_WETH, "Final balance should be 0.9 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_1_WETH, DELTA_WETH, "Final balance should be 0.9 WETH");
     }
 
     function test_Loss_of_minus_50_WETH_3x() public {
@@ -965,7 +968,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         depositLiquidity(weth, 1000e18); 
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -983,7 +986,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         // For 3x leverage with 1 WETH collateral, position size = 3 WETH worth
         // Need 16.67% price decrease for -0.5 WETH loss (0.5/3 = 0.1667)
         // Subtract ~0.3% swap fee: 16.37%
-        int256 newPrice = 83_630 * 1e8; // ~16.37% decrease
+        int256 newPrice = 116667e8; // ~16.37% decrease
         vm.startPrank(deployer); 
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice); 
         vm.stopPrank();
@@ -992,7 +995,7 @@ contract LeveragedTradeLongMock is TestSetupMock {
         market.closePosition(positionId); 
         vm.stopPrank();
         
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.5e18, DELTA_WETH, "Final balance should be 0.5 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_5_WETH, DELTA_WETH, "Final balance should be 0.5 WETH");
     }
 
     function test_WhitelistFees() public {

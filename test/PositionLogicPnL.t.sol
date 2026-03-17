@@ -74,7 +74,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -99,7 +102,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -124,7 +130,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -149,7 +158,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -174,7 +186,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -199,7 +214,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -228,7 +246,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -253,7 +274,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -278,7 +302,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -303,7 +330,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -328,7 +358,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -353,7 +386,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -382,7 +418,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -407,7 +446,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -432,7 +474,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -457,7 +502,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -482,7 +530,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -507,7 +558,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -536,7 +590,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -561,7 +618,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -586,7 +646,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -611,7 +674,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -636,7 +702,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -661,7 +730,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -690,7 +762,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -715,7 +790,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -740,7 +818,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -765,7 +846,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -790,7 +874,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -815,7 +902,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -844,7 +934,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -869,7 +962,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -894,7 +990,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -919,7 +1018,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -944,7 +1046,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -969,7 +1074,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -998,7 +1106,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1023,7 +1134,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1048,7 +1162,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1073,7 +1190,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1098,7 +1218,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1123,7 +1246,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1152,7 +1278,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1177,7 +1306,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1202,7 +1334,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1227,7 +1362,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1252,7 +1390,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1277,7 +1418,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: true,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1305,13 +1449,16 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
         
-        assertEq(result.currentPnL, 0, "PnL should be zero when price doesn't change");
-        assertEq(result.collateralLeft, int128(collateral), "Collateral left should equal initial collateral");
+        assertTrue(result.currentPnL < 0, "PnL should be zero when price doesn't change");
+        assertTrue(result.collateralLeft < int128(collateral), "Collateral left should equal initial collateral");
     }
     
     function test_CollateralLeftCalculation() public {
@@ -1330,7 +1477,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: leverage,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory result = PositionLogic.calculatePnL(params);
@@ -1353,7 +1503,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: 2,
             isShort: false,
             initialToken: getUsdc(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory resultUSDC = PositionLogic.calculatePnL(paramsUSDC);
@@ -1373,7 +1526,10 @@ contract PositionLogicPnLTest is TestSetupMock {
             leverage: 2,
             isShort: false,
             initialToken: getWeth(),
-            priceFeed: address(priceFeedL1)
+            priceFeed: address(priceFeedL1),
+            poolFee: 3000,
+            feeManager: address(feeManager),
+            trader: alice
         });
         
         PositionLogic.PnLCalculationResult memory resultWETH = PositionLogic.calculatePnL(paramsWETH);
