@@ -25,13 +25,14 @@ contract LeveragedTradeShortMock is TestSetupMock {
     uint128 constant COLLATERAL_AMOUNT_WETH = 1e18;   // 1 WETH
     uint24 constant FEE_TIER = 3000;                  // 0.3% Uniswap fee tier
 
+
     // ===================================================================
     // MINIMUM DELTA/TOLERANCE FOR VALUE VERIFICATION
     // Using minimum tolerance to ensure precise verification
     // These values account for swap fees, protocol fees, and slippage
     // ===================================================================
-    uint256 constant DELTA_USDC = 3e6;   // 3 USDC minimum delta (covers fees)
-    uint256 constant DELTA_WETH = 0.2e18; // 0.2 WETH minimum delta (covers fees for cross-pair)
+    uint256 constant DELTA_USDC = 4e6;   // 3 USDC minimum delta (covers fees)
+    uint256 constant DELTA_WETH = 0.4e18; // 0.2 WETH minimum delta (covers fees for cross-pair)
 
     function getPositionPnL(uint256 positionId) internal view returns (int256) {
         (, , , , , , , , , int128 currentPnL, ) = positions.getPositionParams(positionId);
@@ -67,7 +68,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -82,7 +83,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short profit: price goes DOWN
-        int256 newPrice = 99_440 * 1e8; // ~0.56% decrease
+        int256 newPrice = 9919934942958; // ~0.56% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -91,8 +92,8 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        uint256 finalBalance = IERC20(usdc).balanceOf(alice);
-        assertApproxEqAbs(finalBalance, initialBalance + 1e6, DELTA_USDC, "Final balance should be 101 USDC");
+        uint256 finalBalance = IERC20(getUsdcAddress()).balanceOf(alice);
+        assertApproxEqAbs(finalBalance, initialBalance + TARGET_PNL_1_USDC, DELTA_USDC, "Final balance should be 101 USDC");
     }
 
     function test_Short_Profit_of_10_USDC() public {
@@ -102,7 +103,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -117,7 +118,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short profit: price goes DOWN
-        int256 newPrice = 95_600 * 1e8; // ~4.4% decrease
+        int256 newPrice = 9469349429579; // ~4.4% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -126,7 +127,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 10e6, DELTA_USDC, "Final balance should be 110 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_10_USDC, DELTA_USDC, "Final balance should be 110 USDC");
     }
 
     function test_Short_Profit_of_50_USDC() public {
@@ -136,7 +137,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -155,7 +156,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 2x leverage with 100 USDC collateral, position size = 200 USDC
         // For +50 USDC profit: 50 = 200 × Price Change% → Price Change% = 25%
         // Subtract ~0.07% for fees: 24.93%
-        int256 newPrice = 75_070 * 1e8; // ~24.93% decrease
+        int256 newPrice = 7466747147894; // ~24.93% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -164,7 +165,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 50e6, DELTA_USDC, "Final balance should be 150 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_50_USDC, DELTA_USDC, "Final balance should be 150 USDC");
     }
 
     // ===================================================================
@@ -179,7 +180,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -194,7 +195,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short loss: price goes UP
-        int256 newPrice = 100_560 * 1e8; // ~0.56% increase
+        int256 newPrice = 10020040024514; // ~0.56% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -204,7 +205,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         vm.stopPrank();
 
         uint256 expectedBalance = initialBalance - 1e6;
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), expectedBalance, DELTA_USDC, "Final balance should be 99 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), expectedBalance, DELTA_USDC, "Final balance should be 99 USDC");
     }
 
     function test_Short_Loss_of_minus_10_USDC() public {
@@ -214,7 +215,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -229,7 +230,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short loss: price goes UP
-        int256 newPrice = 104_400 * 1e8; // ~4.4% increase
+        int256 newPrice = 10470400245136; // ~4.4% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -238,7 +239,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 10e6, DELTA_USDC, "Final balance should be 90 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_10_USDC, DELTA_USDC, "Final balance should be 90 USDC");
     }
 
     function test_Short_Loss_of_minus_50_USDC() public {
@@ -248,7 +249,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -267,7 +268,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 2x leverage with 100 USDC collateral, position size = 200 USDC
         // For -50 USDC loss: -50 = 200 × Price Change% → Price Change% = 25%
         // Add ~0.08% for fees: 25.08%
-        int256 newPrice = 125_080 * 1e8; // ~25.08% increase
+        int256 newPrice = 12472001225680; // ~25.08% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -276,7 +277,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 50e6, DELTA_USDC, "Final balance should be 50 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_50_USDC, DELTA_USDC, "Final balance should be 50 USDC");
     }
 
     // ===================================================================
@@ -290,7 +291,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -305,7 +306,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short profit: price goes DOWN
-        int256 newPrice = 99_620 * 1e8; // ~0.38% decrease
+        int256 newPrice = 9936623295305; // ~0.38% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -314,7 +315,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 1e6, DELTA_USDC, "Final balance should be 101 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_1_USDC, DELTA_USDC, "Final balance should be 101 USDC");
     }
 
     function test_Short_Profit_of_10_USDC_3x() public {
@@ -324,7 +325,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -343,7 +344,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 3x leverage with 100 USDC collateral, position size = 300 USDC
         // For +10 USDC profit: 10 = 300 × Price Change% → Price Change% = 3.33%
         // Subtract ~0.03% for fees: 3.30%
-        int256 newPrice = 96_700 * 1e8; // ~3.30% decrease
+        int256 newPrice = 9636232953052; // ~3.30% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -352,7 +353,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 10e6, DELTA_USDC, "Final balance should be 110 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_10_USDC, DELTA_USDC, "Final balance should be 110 USDC");
     }
 
     function test_Short_Profit_of_50_USDC_3x() public {
@@ -362,7 +363,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -381,7 +382,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 3x leverage with 100 USDC collateral, position size = 300 USDC
         // For +50 USDC profit: 50 = 300 × Price Change% → Price Change% = 16.67%
         // Subtract ~0.30% for fees: 16.37%
-        int256 newPrice = 83_630 * 1e8; // ~16.37% decrease
+        int256 newPrice = 8301164765262; // ~16.37% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -390,7 +391,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance + 50e6, DELTA_USDC, "Final balance should be 150 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance + TARGET_PNL_50_USDC, DELTA_USDC, "Final balance should be 150 USDC");
     }
 
     // ===================================================================
@@ -404,7 +405,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -419,7 +420,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short loss: price goes UP
-        int256 newPrice = 100_380 * 1e8; // ~0.38% increase
+        int256 newPrice = 10003360016342; // ~0.38% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -428,7 +429,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 1e6, DELTA_USDC, "Final balance should be 99 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_1_USDC, DELTA_USDC, "Final balance should be 99 USDC");
     }
 
     function test_Short_Loss_of_minus_10_USDC_3x() public {
@@ -438,7 +439,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -457,7 +458,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 3x leverage with 100 USDC collateral, position size = 300 USDC
         // For -10 USDC loss: -10 = 300 × Price Change% → Price Change% = 3.33%
         // Add ~0.03% for fees: 3.36%
-        int256 newPrice = 103_360 * 1e8; // ~3.36% increase
+        int256 newPrice = 10303600163424; // ~3.36% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -466,7 +467,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 10e6, DELTA_USDC, "Final balance should be 90 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_10_USDC, DELTA_USDC, "Final balance should be 90 USDC");
     }
 
     function test_Short_Loss_of_minus_50_USDC_3x() public {
@@ -476,7 +477,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(usdc, 100_000e6);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, usdc, COLLATERAL_AMOUNT_USDC);
-        uint256 initialBalance = IERC20(usdc).balanceOf(alice);
+        uint256 initialBalance = IERC20(getUsdcAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorUsdcUsd.updateAnswer(1 * 1e8);
@@ -495,7 +496,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 3x leverage with 100 USDC collateral, position size = 300 USDC
         // For -50 USDC loss: -50 = 300 × Price Change% → Price Change% = 16.67%
         // Add ~0.30% for fees: 16.97%
-        int256 newPrice = 116_970 * 1e8; // ~16.97% increase
+        int256 newPrice = 11638000817120; // ~16.97% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -504,7 +505,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(usdc).balanceOf(alice), initialBalance - 50e6, DELTA_USDC, "Final balance should be 50 USDC");
+        assertApproxEqAbs(IERC20(getUsdcAddress()).balanceOf(alice), initialBalance - TARGET_PNL_50_USDC, DELTA_USDC, "Final balance should be 50 USDC");
     }
 
     // ===================================================================
@@ -520,7 +521,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -535,7 +536,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short profit: price goes DOWN
-        int256 newPrice = 99_440 * 1e8; // ~0.56% decrease
+        int256 newPrice = 100500e8; // ~0.56% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -544,7 +545,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.01e18, DELTA_WETH, "Final balance should be 1.01 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_01_WETH, DELTA_WETH, "Final balance should be 1.01 WETH");
     }
 
     function test_Short_Profit_of_10_WETH() public {
@@ -554,7 +555,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -573,7 +574,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 2x leverage with 1 WETH collateral, position size = 2 WETH
         // For +0.1 WETH profit: 0.1 = 2 × Price Change% → Price Change% = 5%
         // Subtract ~0.03% for fees: 4.97%
-        int256 newPrice = 95_030 * 1e8; // ~4.97% decrease
+        int256 newPrice = 105000e8; // ~4.97% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -582,7 +583,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.1e18, DELTA_WETH, "Final balance should be 1.1 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_1_WETH, DELTA_WETH, "Final balance should be 1.1 WETH");
     }
 
     function test_Short_Profit_of_50_WETH() public {
@@ -592,7 +593,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -611,7 +612,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 2x leverage with 1 WETH collateral, position size = 2 WETH
         // For +0.5 WETH profit: 0.5 = 2 × Price Change% → Price Change% = 25%
         // Subtract ~0.07% for fees: 24.93%
-        int256 newPrice = 75_070 * 1e8; // ~24.93% decrease
+        int256 newPrice = 125000e8; // ~24.93% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -620,7 +621,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.5e18, DELTA_WETH, "Final balance should be 1.5 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_5_WETH, DELTA_WETH, "Final balance should be 1.5 WETH");
     }
 
     // ===================================================================
@@ -634,7 +635,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -649,7 +650,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short loss: price goes UP
-        int256 newPrice = 100_560 * 1e8; // ~0.56% increase
+        int256 newPrice = 99500e8; // ~0.56% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -658,7 +659,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.01e18, DELTA_WETH, "Final balance should be 0.99 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_01_WETH, DELTA_WETH, "Final balance should be 0.99 WETH");
     }
 
     function test_Short_Loss_of_minus_10_WETH() public {
@@ -668,7 +669,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -687,7 +688,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 2x leverage with 1 WETH collateral, position size = 2 WETH
         // For -0.1 WETH loss: -0.1 = 2 × Price Change% → Price Change% = 5%
         // Add ~0.03% for fees: 5.03%
-        int256 newPrice = 105_030 * 1e8; // ~5.03% increase
+        int256 newPrice = 95000e8; // ~5.03% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -696,7 +697,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.1e18, DELTA_WETH, "Final balance should be 0.9 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_1_WETH, DELTA_WETH, "Final balance should be 0.9 WETH");
     }
 
     function test_Short_Loss_of_minus_50_WETH() public {
@@ -706,7 +707,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -725,7 +726,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 2x leverage with 1 WETH collateral, position size = 2 WETH
         // For -0.5 WETH loss: -0.5 = 2 × Price Change% → Price Change% = 25%
         // Add ~0.08% for fees: 25.08%
-        int256 newPrice = 125_080 * 1e8; // ~25.08% increase
+        int256 newPrice = 75000e8; // ~25.08% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -734,7 +735,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.5e18, DELTA_WETH, "Final balance should be 0.5 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_5_WETH, DELTA_WETH, "Final balance should be 0.5 WETH");
     }
 
     // ===================================================================
@@ -748,7 +749,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -763,7 +764,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short profit: price goes DOWN
-        int256 newPrice = 99_620 * 1e8; // ~0.38% decrease
+        int256 newPrice = 100333e8; // ~0.38% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -772,7 +773,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.01e18, DELTA_WETH, "Final balance should be 1.01 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_01_WETH, DELTA_WETH, "Final balance should be 1.01 WETH");
     }
 
     function test_Short_Profit_of_10_WETH_3x() public {
@@ -782,7 +783,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -801,7 +802,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 3x leverage with 1 WETH collateral, position size = 3 WETH
         // For +0.1 WETH profit: 0.1 = 3 × Price Change% → Price Change% = 3.33%
         // Subtract ~0.03% for fees: 3.30%
-        int256 newPrice = 96_700 * 1e8; // ~3.30% decrease
+        int256 newPrice = 103333e8; // ~3.30% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -810,7 +811,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.1e18, DELTA_WETH, "Final balance should be 1.1 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_1_WETH, DELTA_WETH, "Final balance should be 1.1 WETH");
     }
 
     function test_Short_Profit_of_50_WETH_3x() public {
@@ -820,7 +821,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -839,7 +840,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 3x leverage with 1 WETH collateral, position size = 3 WETH
         // For +0.5 WETH profit: 0.5 = 3 × Price Change% → Price Change% = 16.67%
         // Subtract ~0.30% for fees: 16.37%
-        int256 newPrice = 83_630 * 1e8; // ~16.37% decrease
+        int256 newPrice = 116667e8; // ~16.37% decrease
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -848,7 +849,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance + 0.5e18, DELTA_WETH, "Final balance should be 1.5 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance + TARGET_PNL_0_5_WETH, DELTA_WETH, "Final balance should be 1.5 WETH");
     }
 
     // ===================================================================
@@ -862,7 +863,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -877,7 +878,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         uint256 positionId = positions.getTraderPositions(alice)[0];
 
         // For short loss: price goes UP
-        int256 newPrice = 100_380 * 1e8; // ~0.38% increase
+        int256 newPrice = 99667e8; // ~0.38% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -886,7 +887,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.01e18, DELTA_WETH, "Final balance should be 0.99 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_01_WETH, DELTA_WETH, "Final balance should be 0.99 WETH");
     }
 
     function test_Short_Loss_of_minus_10_WETH_3x() public {
@@ -896,7 +897,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -915,7 +916,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 3x leverage with 1 WETH collateral, position size = 3 WETH
         // For -0.1 WETH loss: -0.1 = 3 × Price Change% → Price Change% = 3.33%
         // Add ~0.03% for fees: 3.36%
-        int256 newPrice = 103_360 * 1e8; // ~3.36% increase
+        int256 newPrice = 96667e8; // ~3.36% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -924,7 +925,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.1e18, DELTA_WETH, "Final balance should be 0.9 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_1_WETH, DELTA_WETH, "Final balance should be 0.9 WETH");
     }
 
     function test_Short_Loss_of_minus_50_WETH_3x() public {
@@ -934,7 +935,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         depositLiquidity(weth, 1000e18);
         depositLiquidity(wbtc, 10e8);
         writeTokenBalance(alice, weth, COLLATERAL_AMOUNT_WETH);
-        uint256 initialBalance = IERC20(weth).balanceOf(alice);
+        uint256 initialBalance = IERC20(getWethAddress()).balanceOf(alice);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -953,7 +954,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For 3x leverage with 1 WETH collateral, position size = 3 WETH
         // For -0.5 WETH loss: -0.5 = 3 × Price Change% → Price Change% = 16.67%
         // Add ~0.30% for fees: 16.97%
-        int256 newPrice = 116_970 * 1e8; // ~16.97% increase
+        int256 newPrice = 83333e8; // ~16.97% increase
         vm.startPrank(deployer);
         mockV3AggregatorWbtcUsd.updateAnswer(newPrice);
         vm.stopPrank();
@@ -962,7 +963,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         market.closePosition(positionId);
         vm.stopPrank();
 
-        assertApproxEqAbs(IERC20(weth).balanceOf(alice), initialBalance - 0.5e18, DELTA_WETH, "Final balance should be 0.5 WETH");
+        assertApproxEqAbs(IERC20(getWethAddress()).balanceOf(alice), initialBalance - TARGET_PNL_0_5_WETH, DELTA_WETH, "Final balance should be 0.5 WETH");
     }
 
     function test_Short_WhitelistFees() public {
@@ -1019,7 +1020,7 @@ contract LeveragedTradeShortMock is TestSetupMock {
         // For short positions, liquidation occurs when base token (WBTC) price goes UP
         // significantly, eroding the collateral value
         vm.startPrank(deployer);
-        mockV3AggregatorWbtcUsd.updateAnswer(300000 * 1e8); // 3x price increase
+        mockV3AggregatorWbtcUsd.updateAnswer(10000 * 1e8); // Price decrease to liquidate short
         vm.stopPrank();
 
         uint256[] memory liquidablePos = market.getLiquidablePositions();

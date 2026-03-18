@@ -27,6 +27,18 @@ contract MockUniswapV3Helper is Utils {
     uint24 public constant FEE_TIER_0_3 = 3000;     // 0.3%
     uint24 public constant FEE_TIER_1 = 10000;      // 1%
 
+    // Optional override for amount out to skip slippage issues in exact target testing
+    uint256 public nextExactAmountOut;
+    uint256 public nextExactAmountIn;
+
+    function setNextExactAmountOut(uint256 _amount) public {
+        nextExactAmountOut = _amount;
+    }
+
+    function setNextExactAmountIn(uint256 _amount) public {
+        nextExactAmountIn = _amount;
+    }
+
     constructor(address _priceFeed) {
         PRICE_FEED = PriceFeedL1(_priceFeed);
     }
@@ -77,24 +89,30 @@ contract MockUniswapV3Helper is Utils {
     ) public returns (uint256 amountOut) {
         // --- 1. Calculate amountOut (Net Effect of Swap) ---
 
-        // Price of tokenIn in USD (18 decimals)
-        uint256 priceInUsd = PRICE_FEED.getTokenLatestPriceInUsd(_tokenIn);
-        // Price of tokenOut in USD (18 decimals)
-        uint256 priceOutUsd = PRICE_FEED.getTokenLatestPriceInUsd(_tokenOut);
+        if (nextExactAmountOut != 0) {
+            amountOut = nextExactAmountOut;
+            nextExactAmountOut = 0; // reset
+        } else {
+            // Price of tokenIn in USD (18 decimals)
+            uint256 priceInUsd = PRICE_FEED.getTokenLatestPriceInUsd(_tokenIn);
+            // Price of tokenOut in USD (18 decimals)
+            uint256 priceOutUsd = PRICE_FEED.getTokenLatestPriceInUsd(_tokenOut);
 
-        // Value of input amount in USD (18 decimals)
-        uint8 tokenInDecimals = IERC20Metadata(_tokenIn).decimals();
-        uint256 valueUsd = (_amountIn * priceInUsd) / (10 ** tokenInDecimals);
+            // Value of input amount in USD (18 decimals)
+            uint8 tokenInDecimals = IERC20Metadata(_tokenIn).decimals();
+            uint256 valueUsd = (_amountIn * priceInUsd) / (10 ** tokenInDecimals);
 
-        // Amount of tokenOut received (in its own decimals)
-        uint8 tokenOutDecimals = IERC20Metadata(_tokenOut).decimals();
-        // Calculate raw amountOut
-        amountOut = (valueUsd * (10 ** tokenOutDecimals)) / priceOutUsd;
+            // Amount of tokenOut received (in its own decimals)
+            uint8 tokenOutDecimals = IERC20Metadata(_tokenOut).decimals();
+            // Calculate raw amountOut
+            amountOut = (valueUsd * (10 ** tokenOutDecimals)) / priceOutUsd;
 
-        // Apply the fee based on the fee tier
-        // Uniswap V3 fees are in hundredths of a bip (1e6 = 100%)
-        // For exact input: amountOut = amountOut * (1_000_000 - fee) / 1_000_000
-        amountOut = (amountOut * getFeeMultiplier(_fee)) / 1_000_000;
+            // Apply the fee based on the fee tier
+            // Uniswap V3 fees are in hundredths of a bip (1e6 = 100%)
+            // For exact input: amountOut = amountOut * (1_000_000 - fee) / 1_000_000
+            // When mock slippage override is set, this is skipped!
+            amountOut = (amountOut * getFeeMultiplier(_fee)) / 1_000_000;
+        }
 
         if (amountOut < _amountOutMinimum) {
             revert("Amount out less than minimum");
@@ -135,24 +153,29 @@ contract MockUniswapV3Helper is Utils {
     ) public returns (uint256 amountIn) {
         // --- 1. Calculate amountIn (Net Cost of Swap) ---
 
-        // Price of tokenIn in USD (18 decimals)
-        uint256 priceInUsd = PRICE_FEED.getTokenLatestPriceInUsd(_tokenIn);
-        // Price of tokenOut in USD (18 decimals)
-        uint256 priceOutUsd = PRICE_FEED.getTokenLatestPriceInUsd(_tokenOut);
+        if (nextExactAmountIn != 0) {
+            amountIn = nextExactAmountIn;
+            nextExactAmountIn = 0; // reset
+        } else {
+            // Price of tokenIn in USD (18 decimals)
+            uint256 priceInUsd = PRICE_FEED.getTokenLatestPriceInUsd(_tokenIn);
+            // Price of tokenOut in USD (18 decimals)
+            uint256 priceOutUsd = PRICE_FEED.getTokenLatestPriceInUsd(_tokenOut);
 
-        // Value of output amount in USD (18 decimals)
-        uint8 tokenOutDecimals = IERC20Metadata(_tokenOut).decimals();
-        uint256 valueUsd = (_amountOut * priceOutUsd) / (10 ** tokenOutDecimals);
+            // Value of output amount in USD (18 decimals)
+            uint8 tokenOutDecimals = IERC20Metadata(_tokenOut).decimals();
+            uint256 valueUsd = (_amountOut * priceOutUsd) / (10 ** tokenOutDecimals);
 
-        // Amount of tokenIn required (in its own decimals)
-        uint8 tokenInDecimals = IERC20Metadata(_tokenIn).decimals();
-        // Calculate raw amountIn
-        amountIn = (valueUsd * (10 ** tokenInDecimals)) / priceInUsd;
+            // Amount of tokenIn required (in its own decimals)
+            uint8 tokenInDecimals = IERC20Metadata(_tokenIn).decimals();
+            // Calculate raw amountIn
+            amountIn = (valueUsd * (10 ** tokenInDecimals)) / priceInUsd;
 
-        // Apply the fee based on the fee tier
-        // Uniswap V3 fees are in hundredths of a bip (1e6 = 100%)
-        // For exact output: amountIn = amountIn * (1_000_000 + fee) / 1_000_000
-        amountIn = (amountIn * getInputFeeMultiplier(_fee)) / 1_000_000;
+            // Apply the fee based on the fee tier
+            // Uniswap V3 fees are in hundredths of a bip (1e6 = 100%)
+            // For exact output: amountIn = amountIn * (1_000_000 + fee) / 1_000_000
+            amountIn = (amountIn * getInputFeeMultiplier(_fee)) / 1_000_000;
+        }
 
         // Check against the maximum allowed input
         if (amountIn > _amountInMaximum) {

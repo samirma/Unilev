@@ -705,7 +705,10 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             leverage: pos.leverage,
             isShort: isShort_,
             initialToken: address(pos.initialToken),
-            priceFeed: address(PRICE_FEED)
+            priceFeed: address(PRICE_FEED),
+            poolFee: IUniswapV3Pool(pos.v3Pool).fee(),
+            feeManager: address(feeManager),
+            trader: ownerOf(_posId)
         });
         
         PositionLogic.PnLCalculationResult memory pnlResult = PositionLogic.calculatePnL(pnlParams);

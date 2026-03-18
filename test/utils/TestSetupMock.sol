@@ -21,6 +21,16 @@ import {HelperConfig} from "../../scripts/HelperConfig.sol";
 import {Utils} from "./Utils.sol";
 
 contract TestSetupMock is Test, HelperConfig, Utils {
+
+    // Target PNL values to be tested
+    uint256 constant TARGET_PNL_1_USDC = 1e6;
+    uint256 constant TARGET_PNL_10_USDC = 10e6;
+    uint256 constant TARGET_PNL_50_USDC = 50e6;
+
+    uint256 constant TARGET_PNL_0_01_WETH = 0.01e18;
+    uint256 constant TARGET_PNL_0_1_WETH = 0.1e18;
+    uint256 constant TARGET_PNL_0_5_WETH = 0.5e18;
+
     MockUniswapV3Helper public uniswapV3Helper;
     LiquidityPoolFactory public liquidityPoolFactory;
     PriceFeedL1 public priceFeedL1;
