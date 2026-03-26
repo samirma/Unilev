@@ -1,5 +1,5 @@
 const { ethers } = require("ethers");
-const { getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails, getMarketAbi, getPriceFeedL1Abi } = require("./utils");
+const { getErc20Abi, getEnvVars, setupProviderAndWallet, calculateTokenAmountFromUsd, logPositionDetails, getMarketAbi, getPriceFeedL1Abi, getSupportedTokens, checkAndLogPreflightTable } = require("./utils");
 
 
 async function main() {
@@ -14,20 +14,22 @@ async function main() {
     const marketAbi = getMarketAbi();
     const priceFeedL1Abi = getPriceFeedL1Abi();
 
+    const supportedTokens = getSupportedTokens();
+
     // We are using WBTC as collateral to short WETH
     // token0 = WBTC (Collateral)
     // token1 = WETH (Short Target)
-    const token0Address = env.WBTC; // Collateral
-    const token1Address = env.WETH; // Shield/Target
+    const token0Address = supportedTokens.WBTC; // Collateral
+    const token1Address = supportedTokens.WETH; // Shield/Target
 
     const token0Contract = new ethers.Contract(token0Address, erc20Abi, wallet);
     const marketContract = new ethers.Contract(env.MARKET_ADDRESS, marketAbi, wallet);
     const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
 
     try {
-        // --- 1. Calculate Amount of WBTC for $10 ---
-        console.log("Calculating WBTC amount for $10...");
-        const positionAmount = await calculateTokenAmountFromUsd(token0Contract, priceFeedL1Contract, "10");
+        // --- 1. Calculate Amount of WBTC for $8 ---
+        console.log("Calculating WBTC amount for $8...");
+        const positionAmount = await calculateTokenAmountFromUsd(token0Contract, priceFeedL1Contract, "8");
         const decimals = await token0Contract.decimals();
 
         console.log(`Amount: ${ethers.formatUnits(positionAmount, decimals)} WBTC`);
@@ -35,17 +37,18 @@ async function main() {
         const balance = await token0Contract.balanceOf(wallet.address);
         console.log(`Wallet WBTC Balance: ${ethers.formatUnits(balance, decimals)}`);
 
-        if (balance < positionAmount) {
-            console.error("❌ Insufficient WBTC Balance!");
-            process.exit(1);
-        }
-
         // --- 2. Approve Positions Contract ---
-        console.log("Approving Positions contract...");
-        // Note: Market.sol calls SafeERC20.forceApprove, but we must approve POSITIONS directly as it pulls funds from msg.sender (Trader)
-        const txApprove = await token0Contract.approve(env.POSITIONS_ADDRESS, positionAmount);
-        await txApprove.wait();
-        console.log("- Approved Positions.");
+        console.log("Checking allowance for Positions contract...");
+        const currentAllowance = await token0Contract.allowance(wallet.address, env.POSITIONS_ADDRESS);
+
+        if (currentAllowance < positionAmount) {
+            console.log("Allowance too low. Approving Positions contract...");
+            const txApprove = await token0Contract.approve(env.POSITIONS_ADDRESS, ethers.MaxUint256);
+            await txApprove.wait();
+            console.log("- Approved Positions.");
+        } else {
+            console.log("- Sufficient allowance exists. Skipping approval.");
+        }
 
         // --- 3. Open Short Position ---
         console.log("Opening Short Position...");
@@ -65,6 +68,21 @@ async function main() {
         const leverage = 1;
         const limitPrice = 0;
         const stopLossPrice = 0;
+
+        const willPass = await checkAndLogPreflightTable(
+            provider,
+            marketContract,
+            priceFeedL1Contract,
+            token0Address,
+            token1Address,
+            positionAmount,
+            leverage,
+            isShort
+        );
+
+        if (!willPass) {
+            console.warn("⚠️ Warning: Transaction might fail due to lack of borrow capacity.");
+        }
 
         const txOpen = await marketContract.openPosition(
             token0Address,

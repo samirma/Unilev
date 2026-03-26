@@ -12,10 +12,15 @@ contract LiquidityPoolTest is TestSetup {
 
     function setUp() public override {
         super.setUp();
-        pool = lbPoolWbtc;
-        asset = IERC20(conf.wbtc);
+        pool = LiquidityPool(
+            liquidityPoolFactory.getTokenToLiquidityPools(conf.supportedTokens[0].token)
+        );
+        asset = IERC20(conf.supportedTokens[0].token);
 
-        // Ensure alice has some funds and approves the pool
+        // Ensure bob deposits 10e8 for initial pool liquidity
+        depositLiquidity(address(asset), 10e8);
+
+        // Ensure alice has some funds and approves the pool for her tests
         vm.startPrank(alice);
         writeTokenBalance(alice, address(asset), 100e8);
         asset.approve(address(pool), 100e8);
@@ -52,7 +57,6 @@ contract LiquidityPoolTest is TestSetup {
         vm.startPrank(alice);
         uint256 depositAmount = 10e8;
 
-        uint256 balanceDeposit = asset.balanceOf(alice);
         pool.deposit(depositAmount, alice);
 
         uint256 withdrawAmount = 5e8;
@@ -79,7 +83,6 @@ contract LiquidityPoolTest is TestSetup {
         vm.startPrank(alice);
         uint256 depositAmount = 10e8;
 
-        uint256 balanceDeposit = asset.balanceOf(alice);
         pool.deposit(depositAmount, alice);
 
         vm.stopPrank();
@@ -110,7 +113,7 @@ contract LiquidityPoolTest is TestSetup {
         vm.stopPrank();
     }
 
-    function testShares() public {
+    function testShares() public view {
         uint256 assets = 100e8;
         uint256 expectedShares = pool.previewDeposit(assets);
         assertEq(expectedShares, assets, "Preview deposit should match assets 1:1 initially");

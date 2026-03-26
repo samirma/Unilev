@@ -10,25 +10,19 @@ error LiquidityPoolFactory__POOL_ALREADY_EXIST(address pool);
 error LiquidityPoolFactory__POSITIONS_ALREADY_DEFINED();
 
 contract LiquidityPoolFactory is Ownable {
-    address public positions;
-
     mapping(address => address) private tokenToLiquidityPools;
 
     constructor() Ownable(msg.sender) {}
-
-    function addPositionsAddress(address _positions) external onlyOwner {
-        if (positions != address(0)) {
-            revert LiquidityPoolFactory__POSITIONS_ALREADY_DEFINED();
-        }
-        positions = _positions;
-    }
 
     /**
      * @notice function to create a new liquidity from
      * @param _asset address of the ERC20 token
      * @return address of the new liquidity pool
      */
-    function createLiquidityPool(address _asset) external onlyOwner returns (address) {
+    function createLiquidityPool(
+        address _asset,
+        address positions
+    ) external onlyOwner returns (address) {
         address cachedLiquidityPools = tokenToLiquidityPools[_asset];
 
         if (cachedLiquidityPools != address(0))

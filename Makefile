@@ -21,8 +21,8 @@ sizer:; forge build --sizes --via-ir
 
 compile:; forge compile --via-ir
 
-test :; forge test --fork-url ${ETH_RPC_URL} -vv --via-ir 
-test-gas :; forge test --fork-url ${ETH_RPC_URL} -vv --gas-report --via-ir 
+test :; forge test --fork-url ${POLYGON_RPC_URL} -vv --via-ir 
+test-gas :; forge test --fork-url ${POLYGON_RPC_URL} -vv --gas-report --via-ir 
 
 slither :; slither ./src 
 
@@ -31,11 +31,12 @@ format :; prettier --write src/**/*.sol && prettier --write src/*.sol
 # solhint should be installed globally
 lint :; solhint src/**/*.sol && solhint src/*.sol
 
-anvil :; anvil -m 'test test test test test test test test test test test junk' --fork-url ${ETH_RPC_URL}
+anvil :; anvil -m 'test test test test test test test test test test test junk' --fork-url ${POLYGON_RPC_URL}
+anvil-polygon :; anvil -m 'test test test test test test test test test test test junk' --chain-id 137  --fork-url ${POLYGON_RPC_URL}
 
 # This is the private key of account from the mnemonic from the "make anvil" command
 deploy-anvil :; @forge script scripts/Deployments.s.sol:Deployments --via-ir --fork-url http://localhost:8545  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast
 
 # Deploy to Polygon mainnet
-deploy-polygon :; @forge script scripts/Deployments.s.sol:Deployments --via-ir --rpc-url ${POLYGON_RPC_URL} --private-key ${PRIVATE_KEY} --broadcast
+deploy-polygon :; @forge script scripts/Deployments.s.sol:Deployments --via-ir --rpc-url ${POLYGON_RPC_URL} --private-key ${PRIVATE_KEY} --broadcast --slow
 

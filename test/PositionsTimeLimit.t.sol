@@ -7,11 +7,15 @@ import "./utils/TestSetupMock.sol";
 
 contract PositionsTimeLimitTest is TestSetupMock {
     function test_DefaultTimeLimit_30Days() public {
-        uint128 amount = 1e18; // 1 WETH
+        address usdc = getUsdcAddress();
+        address wbtc = getWbtcAddress();
+        uint128 amount = 2e6; // 2 USDC
         uint24 fee = 3000;
 
+        depositLiquidity(usdc, 1000_000e6);
+
         // 1. Initial State
-        writeTokenBalance(alice, conf.weth, amount);
+        writeTokenBalance(alice, usdc, amount);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8); // ETH = $4,000
@@ -20,8 +24,8 @@ contract PositionsTimeLimitTest is TestSetupMock {
 
         // 2. Open Position
         vm.startPrank(alice);
-        IERC20(conf.weth).approve(address(positions), amount);
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 2, amount, 0, 0);
+        IERC20(usdc).approve(address(positions), amount);
+        market.openLongPosition(usdc, wbtc, fee, 2, amount, 0, 0);
         vm.stopPrank();
 
         uint256[] memory posAlice = positions.getTraderPositions(alice);
@@ -58,12 +62,16 @@ contract PositionsTimeLimitTest is TestSetupMock {
     }
 
     function test_CustomTimeLimit_SpecificUser() public {
-        uint128 amount = 1e18; // 1 WETH
+        address usdc = getUsdcAddress();
+        address wbtc = getWbtcAddress();
+        uint128 amount = 2e6; // 2 USDC
         uint24 fee = 3000;
 
+        depositLiquidity(usdc, 1000_000e6);
+
         // 1. Setup
-        writeTokenBalance(alice, conf.weth, amount);
-        writeTokenBalance(bob, conf.weth, amount);
+        writeTokenBalance(alice, usdc, amount);
+        writeTokenBalance(bob, usdc, amount);
 
         vm.startPrank(deployer);
         mockV3AggregatorEthUsd.updateAnswer(4000 * 1e8);
@@ -76,13 +84,13 @@ contract PositionsTimeLimitTest is TestSetupMock {
 
         // 2. Open Positions (Alice and Bob)
         vm.startPrank(alice);
-        IERC20(conf.weth).approve(address(positions), amount);
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 2, amount, 0, 0);
+        IERC20(usdc).approve(address(positions), amount);
+        market.openLongPosition(usdc, wbtc, fee, 2, amount, 0, 0);
         vm.stopPrank();
 
         vm.startPrank(bob);
-        IERC20(conf.weth).approve(address(positions), amount);
-        market.openPosition(conf.weth, conf.wbtc, fee, false, 2, amount, 0, 0);
+        IERC20(usdc).approve(address(positions), amount);
+        market.openLongPosition(usdc, wbtc, fee, 2, amount, 0, 0);
         vm.stopPrank();
 
         uint256 posIdAlice = positions.getTraderPositions(alice)[0];

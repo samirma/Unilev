@@ -199,3 +199,30 @@ https://docs.uniswap.org/contracts/v3/guides/providing-liquidity/the-full-contra
 https://docs.uniswap.org/contracts/v3/guides/swaps/single-swaps
 
 
+
+# Dashboard
+
+The project includes a Next.js dashboard to interact with the protocol.
+
+### Setup
+
+1. **Install Dependencies**:
+   ```bash
+   cd dashboard
+   npm install
+   ```
+
+2. **Sync Configuration**:
+   Run the update script to sync your root `.env` variables and contract ABIs to the dashboard:
+   ```bash
+   node javascript/update-dashboard.js
+   ```
+
+3. **Run Development Server**:
+   ```bash
+   cd dashboard
+   npm run dev
+   ```
+
+4. **Open in Browser**:
+   Visit [http://localhost:3000](http://localhost:3000)

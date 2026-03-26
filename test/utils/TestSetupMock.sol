@@ -12,26 +12,40 @@ import {MockUniswapV3Helper} from "../mocks/MockUniswapV3Helper.sol";
 import {FeeManager} from "../../src/FeeManager.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
+import {ERC20Mock} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/mocks/ERC20Mock.sol";
 
 import "forge-std/Test.sol";
 import {HelperConfig} from "../../scripts/HelperConfig.sol";
 import {Utils} from "./Utils.sol";
 
 contract TestSetupMock is Test, HelperConfig, Utils {
+
+    // Target PNL values to be tested
+    uint256 constant TARGET_PNL_1_USDC = 1e6;
+    uint256 constant TARGET_PNL_10_USDC = 10e6;
+    uint256 constant TARGET_PNL_50_USDC = 50e6;
+
+    uint256 constant TARGET_PNL_0_01_WETH = 0.01e18;
+    uint256 constant TARGET_PNL_0_1_WETH = 0.1e18;
+    uint256 constant TARGET_PNL_0_5_WETH = 0.5e18;
+
     MockUniswapV3Helper public uniswapV3Helper;
     LiquidityPoolFactory public liquidityPoolFactory;
     PriceFeedL1 public priceFeedL1;
     Market public market;
     Positions public positions;
     FeeManager public feeManager;
+
     MockV3Aggregator public mockV3AggregatorWbtcUsd;
-    MockV3Aggregator public mockV3AggregatorUsdcUsd;
-    MockV3Aggregator public mockV3AggregatorDaiUsd;
     MockV3Aggregator public mockV3AggregatorEthUsd;
-    LiquidityPool public lbPoolWbtc;
-    LiquidityPool public lbPoolWeth;
-    LiquidityPool public lbPoolUsdc;
-    LiquidityPool public lbPoolDai;
+    MockV3Aggregator public mockV3AggregatorUsdcUsd;
+
+    ERC20Mock public mockWbtc;
+    ERC20Mock public mockWeth;
+    ERC20Mock public mockUsdc;
+    ERC20Mock public mockDai;
 
     address public alice;
     address public bob;
@@ -40,7 +54,11 @@ contract TestSetupMock is Test, HelperConfig, Utils {
 
     HelperConfig.NetworkConfig public conf;
 
-    function setUp() public {
+    mapping(string => address) public tokenBySymbol;
+
+    mapping(string => address) public mockV3AggregatorBySymbol;
+
+    function setUp() public virtual {
         conf = getActiveNetworkConfig();
 
         // create users
@@ -50,13 +68,6 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         carol = address(0x31);
 
         vm.startPrank(deployer);
-
-        /// deployments
-        // mocks - Chainlink USD feeds usually have 8 decimals
-        mockV3AggregatorWbtcUsd = new MockV3Aggregator(8, 60000 * 1e8); // 1 WBTC = $60,000
-        mockV3AggregatorUsdcUsd = new MockV3Aggregator(8, 1 * 1e8); // 1 USDC = $1
-        mockV3AggregatorDaiUsd = new MockV3Aggregator(8, 1 * 1e8); // 1 DAI = $1
-        mockV3AggregatorEthUsd = new MockV3Aggregator(8, 3000 * 1e8); // 1 ETH = $3000
 
         priceFeedL1 = new PriceFeedL1();
         liquidityPoolFactory = new LiquidityPoolFactory();
@@ -81,9 +92,6 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         );
 
         /// configurations
-        // add position addres to the factory
-        liquidityPoolFactory.addPositionsAddress(address(positions));
-
         // Set a longer staleness threshold for mock testing (365 days for time limit tests)
         // Must be done BEFORE transferring ownership
         priceFeedL1.setStalenessThreshold(365 days);
@@ -93,37 +101,51 @@ contract TestSetupMock is Test, HelperConfig, Utils {
         liquidityPoolFactory.transferOwnership(address(market));
         priceFeedL1.transferOwnership(address(market));
 
-        // create liquidity pools
-        lbPoolWbtc = LiquidityPool(market.createLiquidityPool(conf.wbtc));
-        lbPoolWeth = LiquidityPool(market.createLiquidityPool(conf.weth));
-        lbPoolUsdc = LiquidityPool(market.createLiquidityPool(conf.usdc));
-        lbPoolDai = LiquidityPool(market.createLiquidityPool(conf.dai));
+        // initialize tokens (create pools + add price feeds)
+        uint256 numTokens = conf.supportedTokens.length;
+        address[] memory tokens = new address[](numTokens);
+        address[] memory priceFeeds = new address[](numTokens);
 
-        // add price feeds
-        market.addPriceFeed(conf.wbtc, address(mockV3AggregatorWbtcUsd));
-        market.addPriceFeed(conf.usdc, address(mockV3AggregatorUsdcUsd));
-        market.addPriceFeed(conf.dai, address(mockV3AggregatorDaiUsd));
-        market.addPriceFeed(conf.weth, address(mockV3AggregatorEthUsd));
+        for (uint256 i = 0; i < numTokens; i++) {
+            tokens[i] = conf.supportedTokens[i].token;
+            string memory symbol = IERC20Metadata(tokens[i]).symbol();
+
+            priceFeeds[i] = address(new MockV3Aggregator(8, 1 * 1e8));
+
+            // Populate mapping
+            tokenBySymbol[symbol] = tokens[i];
+            mockV3AggregatorBySymbol[symbol] = priceFeeds[i];
+        }
+
+        market.initializeTokens(tokens, priceFeeds);
+
+        mockV3AggregatorEthUsd = MockV3Aggregator(mockV3AggregatorBySymbol["WETH"]);
+        mockV3AggregatorWbtcUsd= MockV3Aggregator(mockV3AggregatorBySymbol["WBTC"]);
+        mockV3AggregatorUsdcUsd = MockV3Aggregator(mockV3AggregatorBySymbol["USDC"]);
 
         vm.stopPrank();
+    }
 
-        // add liquidity to a pool to be able to open a short position
+    function depositLiquidity(address token, uint256 amount) internal {
         vm.startPrank(bob);
-        writeTokenBalance(bob, conf.wbtc, 10e8);
-        writeTokenBalance(bob, conf.weth, 100e18);
-        writeTokenBalance(bob, conf.usdc, 10000000e6);
-        writeTokenBalance(bob, conf.dai, 10000000e6);
-
-        IERC20(conf.wbtc).approve(address(lbPoolWbtc), 10e8);
-        IERC20(conf.weth).approve(address(lbPoolWeth), 100e18);
-        IERC20(conf.usdc).approve(address(lbPoolUsdc), 10000000e6);
-        IERC20(conf.dai).approve(address(lbPoolDai), 10000000e6);
-
-        lbPoolWbtc.deposit(10e8, bob);
-        lbPoolWeth.deposit(100e18, bob);
-        lbPoolUsdc.deposit(10000000e6, bob);
-        lbPoolDai.deposit(10000000e6, bob);
-
+        LiquidityPool liquidityPool = LiquidityPool(
+            liquidityPoolFactory.getTokenToLiquidityPools(token)
+        );
+        writeTokenBalance(bob, token, amount);
+        IERC20(token).approve(address(liquidityPool), amount);
+        liquidityPool.deposit(amount, bob);
         vm.stopPrank();
+    }
+
+    function getUsdcAddress() internal view returns (address) {
+        return tokenBySymbol["USDC"];
+    }
+
+    function getWbtcAddress() internal view returns (address) {
+        return tokenBySymbol["WBTC"];
+    }
+
+    function getWethAddress() internal view returns (address) {
+        return tokenBySymbol["WETH"];
     }
 }

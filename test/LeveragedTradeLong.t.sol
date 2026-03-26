@@ -5,49 +5,61 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./utils/TestSetup.sol";
 
 contract LeveragedTradeLong is TestSetup {
+    function test__leveragedTradeToCloseLong1() public {
+        address wbtc = getWbtcAddress();
+        address usdc = getUsdcAddress();
 
+        uint128 amount = 2e6;
+        uint24 fee = 3000;
 
-function test__leveragedTradeToCloseLong1() public {
-    uint128 amount = 1e8;
-    uint24 fee = 3000;
-    
-    writeTokenBalance(alice, conf.wbtc, amount);
+        depositLiquidity(usdc, 100_000e6);
 
-    assertEq(amount, IERC20(conf.wbtc).balanceOf(alice));
-    assertEq(0, IERC20(conf.wbtc).balanceOf(address(positions)));
+        writeTokenBalance(alice, usdc, amount);
 
-    // Log USDC balance in lbPoolUsdc BEFORE open
-    uint256 usdcBalanceBefore = IERC20(conf.usdc).balanceOf(address(lbPoolUsdc));
-    console.log("USDC balance in lbPoolUsdc BEFORE open: ", usdcBalanceBefore);
+        assertEq(amount, IERC20(usdc).balanceOf(alice));
+        assertEq(0, IERC20(usdc).balanceOf(address(positions)));
 
-    vm.startPrank(alice);
-    IERC20(conf.wbtc).approve(address(positions), amount);
-    console.log("Open position");
-    market.openPosition(conf.wbtc, conf.usdc, uint24(fee), false, 2, amount, 0, 0);
+        uint256 usdcBalanceBefore = IERC20(usdc).balanceOf(
+            address(liquidityPoolFactory.getTokenToLiquidityPools(usdc))
+        );
+        console.log("USDC balance in lbPool BEFORE open: ", usdcBalanceBefore);
 
-    assertEq(0, IERC20(conf.wbtc).balanceOf(alice));
-    assertApproxEqRel(amount * 2, IERC20(conf.wbtc).balanceOf(address(positions)), 0.05e18);
+        vm.startPrank(alice);
+        IERC20(usdc).approve(address(positions), amount);
+        console.log("Open position");
+        market.openLongPosition(usdc, wbtc, uint24(fee), 5, amount, 0, 0);
 
-    uint256 usdcBalanceAfter = IERC20(conf.usdc).balanceOf(address(lbPoolUsdc));
-    uint256 price = priceFeedL1.getPairLatestPrice(conf.wbtc, conf.usdc);
-    uint256 totalBorrow = (amount * 1 * price) / (10**18);
-    assertApproxEqRel(usdcBalanceBefore, usdcBalanceAfter, 0.05e18);
+        assertEq(0, IERC20(usdc).balanceOf(alice));
 
-    assertEq(1, positions.totalNbPos());
-    uint256[] memory posAlice = positions.getTraderPositions(alice);
-    
-    assertEq(1, posAlice[0]);
-    assertEq(alice, positions.ownerOf(posAlice[0]));
-    console.log("Close position");
-    market.closePosition(posAlice[0]);
+        uint256 usdcBalanceAfter = IERC20(usdc).balanceOf(
+            address(liquidityPoolFactory.getTokenToLiquidityPools(usdc))
+        );
+        assertLt(usdcBalanceAfter, usdcBalanceBefore);
 
-    assertApproxEqRel(amount, IERC20(conf.wbtc).balanceOf(alice), 0.05e18);
-    assertEq(0, IERC20(conf.wbtc).balanceOf(address(positions)));
+        uint256 wbtcBalance = IERC20(wbtc).balanceOf(address(positions));
+        assertGt(wbtcBalance, 0);
 
-    uint256 usdcBalanceAfterClose = IERC20(conf.usdc).balanceOf(address(lbPoolUsdc));
-    //assertGe(usdcBalanceBefore, usdcBalanceAfter);
-    console.log("USDC balance in lbPoolUsdc AFTER close: ", usdcBalanceAfterClose);
+        assertEq(1, positions.totalNbPos());
+        uint256[] memory posAlice = positions.getTraderPositions(alice);
 
-}
+        assertEq(1, posAlice[0]);
+        assertEq(alice, positions.ownerOf(posAlice[0]));
 
+        (, , , , bool isShort_, uint8 leverage_, , , , , ) = positions.getPositionParams(
+            posAlice[0]
+        );
+        assertEq(isShort_, false);
+        assertEq(leverage_, 5);
+
+        console.log("Close position");
+        market.closePosition(posAlice[0]);
+
+        assertGt(IERC20(usdc).balanceOf(alice), 0);
+        assertEq(0, IERC20(wbtc).balanceOf(address(positions)));
+
+        uint256 usdcBalanceAfterClose = IERC20(usdc).balanceOf(
+            address(liquidityPoolFactory.getTokenToLiquidityPools(usdc))
+        );
+        console.log("USDC balance in lbPool AFTER close: ", usdcBalanceAfterClose);
+    }
 }

@@ -18,9 +18,6 @@ contract PriceFeedL1 is Ownable {
     mapping(address => AggregatorV3Interface) public tokenToPriceFeedUsd;
     
     uint256 public stalenessThreshold = 1 hours; // Maximum acceptable price age (configurable)
-    uint256 public constant MAX_PRICE_DEVIATION = 500; // 5% max deviation between updates (basis points)
-    mapping(address => uint256) public lastPrices; // Track last prices for deviation checks
-    mapping(address => uint256) public lastUpdateTime; // Track last update times
     
     constructor() Ownable(msg.sender) {}
     
@@ -107,12 +104,7 @@ contract PriceFeedL1 is Ownable {
     }
 
     function isPairSupported(address _token0, address _token1) public view returns (bool) {
-        if (address(tokenToPriceFeedUsd[_token0]) == address(0)) {
-            return false;
-        }
-        if (address(tokenToPriceFeedUsd[_token1]) == address(0)) {
-            return false;
-        }
-        return true;
+        return address(tokenToPriceFeedUsd[_token0]) != address(0) &&
+               address(tokenToPriceFeedUsd[_token1]) != address(0);
     }
 }

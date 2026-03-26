@@ -2,6 +2,16 @@ const { ethers } = require("ethers")
 const path = require("path")
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") })
 
+async function getChainId() {
+    const rpcUrl = process.env.RPC_URL
+    if (!rpcUrl) {
+        throw new Error("RPC_URL not set in ../.env")
+    }
+    const provider = new ethers.JsonRpcProvider(rpcUrl)
+    const network = await provider.getNetwork()
+    return network.chainId.toString()
+}
+
 async function main() {
     const rpcUrl = process.env.RPC_URL
     const privateKey = process.env.PRIVATE_KEY
@@ -23,4 +33,8 @@ async function main() {
     }
 }
 
-main()
+if (require.main === module) {
+    main()
+}
+
+module.exports = { getChainId, main }

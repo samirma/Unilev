@@ -19,19 +19,10 @@ contract Deployments is Script, HelperConfig {
     Market public market;
     Positions public positions;
     FeeManager public feeManager;
-    LiquidityPool public lbPoolWBTC;
-    LiquidityPool public lbPoolWETH;
-    LiquidityPool public lbPoolUSDC;
-    LiquidityPool public lbPoolDAI;
-
-    address public alice;
-    address public bob;
-    address public carol;
-    address public deployer;
 
     HelperConfig.NetworkConfig public conf;
 
-    function run() public {
+    function run() public returns (address wrapperAddress) {
         conf = getActiveNetworkConfig();
 
         vm.startBroadcast();
@@ -57,35 +48,25 @@ contract Deployments is Script, HelperConfig {
             msg.sender
         );
 
-        /// configurations
-        // add position address to the factory
-        liquidityPoolFactory.addPositionsAddress(address(positions));
-
         // transfer ownership
         positions.transferOwnership(address(market));
         liquidityPoolFactory.transferOwnership(address(market));
         priceFeedL1.transferOwnership(address(market));
 
-        // create liquidity pools
-        address[] memory tokens = new address[](4);
-        tokens[0] = conf.wbtc;
-        tokens[1] = conf.weth;
-        tokens[2] = conf.usdc;
-        tokens[3] = conf.dai;
-        address[] memory pools = market.createLiquidityPools(tokens);
-        lbPoolWBTC = LiquidityPool(pools[0]);
-        lbPoolWETH = LiquidityPool(pools[1]);
-        lbPoolUSDC = LiquidityPool(pools[2]);
-        lbPoolDAI = LiquidityPool(pools[3]);
+        // initialize tokens (create pools + add price feeds)
+        uint256 numTokens = conf.supportedTokens.length;
+        address[] memory tokens = new address[](numTokens);
+        address[] memory priceFeeds = new address[](numTokens);
 
-        // add price feeds
-        address[] memory priceFeeds = new address[](4);
-        priceFeeds[0] = conf.priceFeedWbtcUsd;
-        priceFeeds[1] = conf.priceFeedEthUsd;
-        priceFeeds[2] = conf.priceFeedUsdcUsd;
-        priceFeeds[3] = conf.priceFeedDaiUsd;
-        market.addPriceFeeds(tokens, priceFeeds);
+        for (uint256 i = 0; i < numTokens; i++) {
+            tokens[i] = conf.supportedTokens[i].token;
+            priceFeeds[i] = conf.supportedTokens[i].priceFeed;
+        }
+
+        market.initializeTokens(tokens, priceFeeds);
 
         vm.stopBroadcast();
+
+        wrapperAddress = conf.wrapper.token;
     }
 }

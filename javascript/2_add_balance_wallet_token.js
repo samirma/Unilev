@@ -3,7 +3,7 @@
 // Configuration is loaded from a .env file.
 
 const { ethers } = require("ethers");
-const { getErc20Abi, getEnvVars, setupProviderAndWallet, getPriceFeedL1Abi, getPositionsAbi, getLiquidityPoolFactoryAbi, getLiquidityPoolAbi, getUniswapV3HelperAbi } = require("./utils");
+const { getErc20Abi, getEnvVars, setupProviderAndWallet, getPriceFeedL1Abi, getPositionsAbi, getLiquidityPoolFactoryAbi, getLiquidityPoolAbi, getUniswapV3HelperAbi, getSupportedTokens } = require("./utils");
 const { logWalletBalances } = require("./balance");
 
 async function main() {
@@ -20,62 +20,71 @@ async function main() {
   const liquidityPoolAbi = getLiquidityPoolAbi();
   const uniswapV3HelperAbi = getUniswapV3HelperAbi();
 
-  const wethContract = new ethers.Contract(env.WETH, erc20Abi, wallet);
-  const daiContract = new ethers.Contract(env.DAI, erc20Abi, provider);
-  const usdcContract = new ethers.Contract(env.USDC, erc20Abi, provider);
-  const wbtcContract = new ethers.Contract(env.WBTC, erc20Abi, provider);
+  const supportedTokens = getSupportedTokens();
+  if (!supportedTokens) {
+    console.error("Could not load supported tokens");
+    process.exit(1);
+  }
+
+  const wrapperAddress = env.WRAPPER_ADDRESS || supportedTokens.wrapper;
+  const wrapperContract = new ethers.Contract(wrapperAddress, erc20Abi, wallet);
 
   const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
-  const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider);
-
-  const liquidityPoolFactoryAddress = await positionsContract.LIQUIDITY_POOL_FACTORY();
-  const liquidityPoolFactoryContract = new ethers.Contract(liquidityPoolFactoryAddress, liquidityPoolFactoryAbi, provider);
 
   try {
     console.log(`Attaching to UniswapV3Helper at ${env.UNISWAPV3HELPER_ADDRESS}...`);
     const uniswapV3Helper = new ethers.Contract(env.UNISWAPV3HELPER_ADDRESS, uniswapV3HelperAbi, wallet);
 
-    console.log("\nCalculating ETH amount for $100...");
-    const targetUsdValue = ethers.parseUnits("100", 18);
+    console.log("\nCalculating ETH amount for $5...");
+    const targetUsdValue = ethers.parseUnits("5", 18);
 
-    const ethPriceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(env.WETH);
-    console.log(`ETH Price: $${ethers.formatUnits(ethPriceInUsd, 18)}`);
+    const wrapperPriceInUsd = await priceFeedL1Contract.getTokenLatestPriceInUsd(wrapperAddress);
+    console.log(`Wrapper Token Price: $${ethers.formatUnits(wrapperPriceInUsd, 18)}`);
 
-    const ethAmountFor100USD = (targetUsdValue * BigInt(1e18)) / ethPriceInUsd;
-    console.log(`ETH Amount for $100: ${ethers.formatEther(ethAmountFor100USD)} ETH`);
+    const wrapperAmountFor10USD = (targetUsdValue * BigInt(1e18)) / wrapperPriceInUsd;
+    console.log(`Wrapper Amount for $10: ${ethers.formatEther(wrapperAmountFor10USD)}`);
 
     console.log("\nperforming Swaps...");
 
     const swapFee = 3000;
     let nonce = await provider.getTransactionCount(wallet.address);
 
-    const totalEthNeeded = ethAmountFor100USD * 4n;
-    console.log(`Total ETH to wrap: ${ethers.formatEther(totalEthNeeded)} ETH`);
+    const swapParams = [];
+    const seenAddresses = new Set([wrapperAddress.toLowerCase()]); // Skip wrapper token itself and duplicates
 
-    console.log("Wrapping ETH...");
-    const txWrap = await wethContract.deposit({ value: totalEthNeeded, nonce: nonce++ });
+    for (const [symbol, address] of Object.entries(supportedTokens)) {
+      if (symbol === "wrapper") continue;
+
+      const lowerAddress = address.toLowerCase();
+      if (!seenAddresses.has(lowerAddress)) {
+        seenAddresses.add(lowerAddress);
+        swapParams.push({ token: address, name: symbol });
+      }
+    }
+
+    const tokensNeedingSwap = BigInt(swapParams.length);
+    const totalWrapperNeeded = wrapperAmountFor10USD * (tokensNeedingSwap + 1n); // +1 to keep some wrapper balance
+    console.log(`Total wrapper to wrap: ${ethers.formatEther(totalWrapperNeeded)}`);
+
+    console.log("Wrapping native token...");
+    const txWrap = await wrapperContract.deposit({ value: totalWrapperNeeded, nonce: nonce++ });
     await txWrap.wait();
-    console.log("- Wrapped ETH to WETH");
+    console.log("- Wrapped native token");
 
-    const amountToApprove = ethAmountFor100USD * 3n;
-    console.log(`Approving Helper to spend ${ethers.formatEther(amountToApprove)} WETH...`);
-    const txApprove = await wethContract.approve(env.UNISWAPV3HELPER_ADDRESS, amountToApprove, { nonce: nonce++ });
+    const amountToApprove = wrapperAmountFor10USD * tokensNeedingSwap;
+    console.log(`Approving Helper to spend ${ethers.formatEther(amountToApprove)} wrapper token...`);
+    const txApprove = await wrapperContract.approve(env.UNISWAPV3HELPER_ADDRESS, amountToApprove, { nonce: nonce++ });
     await txApprove.wait();
     console.log("- Approved Helper");
 
-    const swapParams = [
-      { token: env.DAI, name: "DAI" },
-      { token: env.USDC, name: "USDC" },
-      { token: env.WBTC, name: "WBTC" }
-    ];
-
     for (const p of swapParams) {
-      console.log(`Swapping WETH for ${p.name}...`);
+      console.log(`Swapping Wrapper Token for ${p.name}...`);
       const tx = await uniswapV3Helper.swapExactInputSingle(
-        env.WETH,
+        wrapperAddress,
         p.token,
         swapFee,
-        ethAmountFor100USD,
+        wrapperAmountFor10USD,
+        0n,
         { nonce: nonce++ }
       );
       await tx.wait();

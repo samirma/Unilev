@@ -9,11 +9,20 @@ pragma solidity ^0.8.19;
  **/
 interface IMarket {
     // --------------- Trader Zone ---------------
-    function openPosition(
+    function openLongPosition(
         address _token0,
         address _token1,
         uint24 _fee,
-        bool _isShort,
+        uint8 _leverage,
+        uint128 _amount,
+        uint160 _limitPrice,
+        uint256 _stopLossPrice
+    ) external;
+
+    function openShortPosition(
+        address _token0,
+        address _token1,
+        uint24 _fee,
         uint8 _leverage,
         uint128 _amount,
         uint160 _limitPrice,
@@ -47,7 +56,7 @@ interface IMarket {
 
     // --------------- Liquidator/Keeper Zone ---------------
 
-    function liquidatePositions(uint256[] memory _posIds) external;
+    function liquidatePositions(uint256[] calldata _posIds) external;
 
     function liquidatePosition(uint256 _posId) external;
 

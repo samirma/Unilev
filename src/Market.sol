@@ -30,25 +30,20 @@ contract Market is IMarket, Ownable, Pausable {
     }
 
     // --------------- Trader Zone ---------------
-    function openPosition(
+    function openLongPosition(
         address _token0,
         address _token1,
         uint24 _fee,
-        bool _isShort,
         uint8 _leverage,
         uint128 _amount,
         uint160 _limitPrice,
         uint256 _stopLossPrice
     ) external whenNotPaused {
-
-        SafeERC20.forceApprove(IERC20(_token0), address(POSITIONS), _amount);
-
-        uint256 posId = POSITIONS.openPosition(
+        uint256 posId = POSITIONS.openLongPosition(
             msg.sender,
             _token0,
             _token1,
             _fee,
-            _isShort,
             _leverage,
             _amount,
             _limitPrice,
@@ -60,7 +55,39 @@ contract Market is IMarket, Ownable, Pausable {
             _token0,
             _token1,
             _amount,
-            _isShort,
+            false,
+            _leverage,
+            _limitPrice,
+            _stopLossPrice
+        );
+    }
+
+    function openShortPosition(
+        address _token0,
+        address _token1,
+        uint24 _fee,
+        uint8 _leverage,
+        uint128 _amount,
+        uint160 _limitPrice,
+        uint256 _stopLossPrice
+    ) external whenNotPaused {
+        uint256 posId = POSITIONS.openShortPosition(
+            msg.sender,
+            _token0,
+            _token1,
+            _fee,
+            _leverage,
+            _amount,
+            _limitPrice,
+            _stopLossPrice
+        );
+        emit PositionOpened(
+            posId,
+            msg.sender,
+            _token0,
+            _token1,
+            _amount,
+            true,
             _leverage,
             _limitPrice,
             _stopLossPrice
@@ -104,7 +131,7 @@ contract Market is IMarket, Ownable, Pausable {
     }
 
     // --------------- Liquidator/Keeper Zone ----------------
-    function liquidatePositions(uint256[] memory _posIds) external whenNotPaused {
+    function liquidatePositions(uint256[] calldata _posIds) external whenNotPaused {
         uint256 len = _posIds.length;
 
         for (uint256 i; i < len; ++i) {
@@ -125,10 +152,8 @@ contract Market is IMarket, Ownable, Pausable {
     }
 
     // --------------- Admin Zone ---------------
-    function createLiquidityPool(
-        address _token
-    ) external onlyOwner whenNotPaused returns (address) {
-        address lpAdd = LIQUIDITY_POOL_FACTORY.createLiquidityPool(_token);
+    function createLiquidityPool(address _token) public onlyOwner whenNotPaused returns (address) {
+        address lpAdd = LIQUIDITY_POOL_FACTORY.createLiquidityPool(_token, address(POSITIONS));
         emit LiquidityPoolCreated(_token, msg.sender);
         return lpAdd;
     }
@@ -137,25 +162,26 @@ contract Market is IMarket, Ownable, Pausable {
         return LIQUIDITY_POOL_FACTORY.getTokenToLiquidityPools(_token);
     }
 
-    function addPriceFeed(address _token, address _priceFeed) external onlyOwner whenNotPaused {
+    function addPriceFeed(address _token, address _priceFeed) public onlyOwner whenNotPaused {
         PRICE_FEED.addPriceFeed(_token, _priceFeed);
         emit PriceFeedAdded(_token, _priceFeed);
     }
 
-    function addPriceFeeds(address[] calldata _tokens, address[] calldata _priceFeeds) external onlyOwner whenNotPaused {
-        uint256 len = _tokens.length;
-        for (uint256 i; i < len; ++i) {
-            PRICE_FEED.addPriceFeed(_tokens[i], _priceFeeds[i]);
-            emit PriceFeedAdded(_tokens[i], _priceFeeds[i]);
-        }
+    function setStalenessThreshold(uint256 _newThreshold) external onlyOwner {
+        PRICE_FEED.setStalenessThreshold(_newThreshold);
     }
 
-    function createLiquidityPools(address[] calldata _tokens) external onlyOwner whenNotPaused returns (address[] memory) {
+    function initializeTokens(
+        address[] calldata _tokens,
+        address[] calldata _priceFeeds
+    ) external onlyOwner whenNotPaused returns (address[] memory) {
         uint256 len = _tokens.length;
+        require(len == _priceFeeds.length, "Token and PriceFeed arrays must have same length");
+
         address[] memory pools = new address[](len);
         for (uint256 i; i < len; ++i) {
-            pools[i] = LIQUIDITY_POOL_FACTORY.createLiquidityPool(_tokens[i]);
-            emit LiquidityPoolCreated(_tokens[i], msg.sender);
+            pools[i] = createLiquidityPool(_tokens[i]);
+            addPriceFeed(_tokens[i], _priceFeeds[i]);
         }
         return pools;
     }
@@ -167,5 +193,4 @@ contract Market is IMarket, Ownable, Pausable {
     function unpause() external onlyOwner {
         _unpause();
     }
-
 }
