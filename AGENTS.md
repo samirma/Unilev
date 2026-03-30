@@ -530,6 +530,7 @@ node javascript/network-info.js
 make deploy-polygon
 
 # 3. Update frontend
+node javascript/update-env.js
 node javascript/update-dashboard.js
 
 # 4. Test deployment
