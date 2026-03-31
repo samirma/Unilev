@@ -250,12 +250,21 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
     function _openPosition(OpenPositionParams memory params) private returns (uint256) {
         uint256 currentPosId = posId;
 
+        // CACHE: Create IERC20 and other interface instances once to avoid repeated instantiations
+        IERC20 token0 = IERC20(params.token0);
+        IERC20 baseToken = IERC20(params.baseToken);
+        IERC20 quoteToken = IERC20(params.quoteToken);
+        IUniswapV3Pool v3Pool = IUniswapV3Pool(params.v3Pool);
+
+        // Cache pool fee to avoid redundant external calls
+        uint24 poolFee = v3Pool.fee();
+
         uint8 baseDecimals = IERC20Metadata(params.baseToken).decimals();
         uint256 baseDecimalsPow = 10 ** baseDecimals;
         uint8 quoteDecimals = IERC20Metadata(params.quoteToken).decimals();
         uint256 quoteDecimalsPow = 10 ** quoteDecimals;
 
-        IERC20(params.token0).safeTransferFrom(params.trader, address(this), params.amount);
+        token0.safeTransferFrom(params.trader, address(this), params.amount);
 
         (uint128 treasureFee, uint128 liquidationRewardRate) = feeManager.getFees(params.trader);
 
@@ -263,13 +272,17 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         params.amount = params.amount - liquidationReward;
 
         uint256 treasureAmount = (params.amount * treasureFee) / 10000;
-        IERC20(params.token0).safeTransfer(treasure, treasureAmount);
+        token0.safeTransfer(treasure, treasureAmount);
         params.amount = params.amount - uint128(treasureAmount);
 
         address collateralToken = params.isShort ? params.quoteToken : params.baseToken;
         uint128 baseCollateralAmount;
         if (params.token0 != collateralToken) {
-            SafeERC20.forceApprove(IERC20(params.token0), address(UNISWAP_V3_HELPER), params.amount);
+            // OPTIMIZED: Only approve if current allowance is insufficient
+            uint256 currentAllowance = token0.allowance(address(this), address(UNISWAP_V3_HELPER));
+            if (currentAllowance < params.amount) {
+                SafeERC20.forceApprove(token0, address(UNISWAP_V3_HELPER), params.amount);
+            }
 
             uint256 priceToCollateral = PRICE_FEED.getPairLatestPrice(params.token0, collateralToken);
             uint256 minOut = (params.amount * priceToCollateral) / (params.isShort ? baseDecimalsPow : quoteDecimalsPow);
@@ -277,51 +290,57 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
             baseCollateralAmount = uint128(
                 UNISWAP_V3_HELPER.swapExactInputSingle(
-                    params.token0,
-                    collateralToken,
-                    IUniswapV3Pool(params.v3Pool).fee(),
-                    params.amount,
-                    minOut
+                    params.token0, collateralToken, poolFee, params.amount, minOut
                 )
             );
         } else {
             baseCollateralAmount = params.amount;
         }
 
-        (uint256 breakEvenLimit, uint256 totalBorrow, address borrowToken, address liquidityPoolToken) = params.isShort
-            ? (
-                params.price + (params.price * 10000) / (uint256(params.leverage) * 10000),
-                (uint256(baseCollateralAmount) * baseDecimalsPow * params.leverage) / params.price,
-                params.baseToken,
-                params.baseToken
-            )
-            : (
-                params.price - (params.price * 10000) / (uint256(params.leverage) * 10000),
-                (uint256(baseCollateralAmount) * (params.leverage - 1) * params.price) / baseDecimalsPow,
-                params.quoteToken,
-                params.quoteToken
-            );
+        // Use library function for position calculations
+        PositionLogic.PositionOpeningCalcParams memory calcParams = PositionLogic
+            .PositionOpeningCalcParams({
+                price: params.price,
+                leverage: params.leverage,
+                baseCollateralAmount: baseCollateralAmount,
+                baseDecimals: baseDecimals,
+                baseDecimalsPow: baseDecimalsPow,
+                isShort: params.isShort,
+                baseToken: params.baseToken,
+                quoteToken: params.quoteToken
+            });
+
+        PositionLogic.PositionOpeningCalcResult memory calcResult = PositionLogic
+            .calculatePositionOpening(calcParams);
 
         address cacheLiquidityPoolToUse = LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY)
-            .getTokenToLiquidityPools(liquidityPoolToken);
+            .getTokenToLiquidityPools(calcResult.liquidityPoolToken);
 
-        LiquidityPool(cacheLiquidityPoolToUse).borrow(totalBorrow);
+        LiquidityPool(cacheLiquidityPoolToUse).borrow(calcResult.totalBorrow);
 
-        SafeERC20.forceApprove(IERC20(borrowToken), address(UNISWAP_V3_HELPER), totalBorrow);
+        // Use cached token instance for borrowToken (quoteToken for long, baseToken for short)
+        IERC20 borrowToken = params.isShort ? baseToken : quoteToken;
+        
+        // OPTIMIZED: Only approve if current allowance is insufficient
+        uint256 borrowAllowance = borrowToken.allowance(address(this), address(UNISWAP_V3_HELPER));
+        if (borrowAllowance < calcResult.totalBorrow) {
+            SafeERC20.forceApprove(borrowToken, address(UNISWAP_V3_HELPER), calcResult.totalBorrow);
+        }
 
         (address swapFrom, address swapTo) = params.isShort
             ? (params.baseToken, params.quoteToken)
             : (params.quoteToken, params.baseToken);
 
         uint256 priceBorrow = PRICE_FEED.getPairLatestPrice(swapFrom, swapTo);
-        uint256 minOutBorrow = (totalBorrow * priceBorrow) / (params.isShort ? baseDecimalsPow : quoteDecimalsPow);
+        uint256 minOutBorrow = (calcResult.totalBorrow * priceBorrow) /
+            (params.isShort ? baseDecimalsPow : quoteDecimalsPow);
         minOutBorrow = (minOutBorrow * SLIPPAGE_TOLERANCE) / 10000;
 
         uint256 amountBorrow = UNISWAP_V3_HELPER.swapExactInputSingle(
             swapFrom,
             swapTo,
-            IUniswapV3Pool(params.v3Pool).fee(),
-            totalBorrow,
+            poolFee,
+            calcResult.totalBorrow,
             minOutBorrow
         );
 
@@ -331,13 +350,13 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
         openPositions[currentPosId] = PositionParams({
             initialPrice: params.price,
-            totalBorrow: totalBorrow,
-            breakEvenLimit: breakEvenLimit,
+            totalBorrow: calcResult.totalBorrow,
+            breakEvenLimit: calcResult.breakEvenLimit,
             stopLossPrice: params.stopLossPrice,
             v3Pool: params.v3Pool,
             limitPrice: params.limitPrice,
-            baseToken: IERC20(params.baseToken),
-            quoteToken: IERC20(params.quoteToken),
+            baseToken: baseToken,
+            quoteToken: quoteToken,
             collateralSize: baseCollateralAmount,
             positionSize: positionSize,
             liquidationReward: liquidationReward,
@@ -346,7 +365,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             isShort: params.isShort,
             isBaseToken0: params.isBaseToken0,
             leverage: params.leverage,
-            initialToken: IERC20(params.token0)
+            initialToken: token0
         });
 
         unchecked {
@@ -397,9 +416,21 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         PositionParams memory posParms = openPositions[_posId];
         bool isMargin = posParms.leverage != 1 || posParms.isShort;
         PositionState state = getPositionState(_posId);
+
+        // CACHE: Create IERC20 instances once to avoid repeated instantiations
+        IERC20 baseToken = posParms.baseToken;
+        IERC20 quoteToken = posParms.quoteToken;
+        IERC20 initialToken = posParms.initialToken;
+        address baseTokenAddr = address(baseToken);
+        address quoteTokenAddr = address(quoteToken);
+        address initialTokenAddr = address(initialToken);
+
+        // Cache pool fee to avoid redundant external calls
+        uint24 poolFee = IUniswapV3Pool(posParms.v3Pool).fee();
+
         LiquidityPool liquidityPoolToUse = LiquidityPool(
             LiquidityPoolFactory(LIQUIDITY_POOL_FACTORY).getTokenToLiquidityPools(
-                posParms.isShort ? address(posParms.baseToken) : address(posParms.quoteToken)
+                posParms.isShort ? baseTokenAddr : quoteTokenAddr
             )
         );
 
@@ -424,23 +455,26 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         // prettier-ignore
         addTokenReceived = (amount0 != 0)
             ? posParms.isBaseToken0
-                ? address(posParms.baseToken)
-                : address(posParms.quoteToken)
+                ? baseTokenAddr
+                : quoteTokenAddr
             : posParms.isBaseToken0
-                ? address(posParms.quoteToken)
-                : address(posParms.baseToken);
+                ? quoteTokenAddr
+                : baseTokenAddr;
 
-        addTokenInitiallySupplied = address(posParms.initialToken);
+        addTokenInitiallySupplied = initialTokenAddr;
         // will be used if margin position
         addTokenBorrowed = posParms.isShort
-            ? address(posParms.baseToken)
-            : address(posParms.quoteToken);
+            ? baseTokenAddr
+            : quoteTokenAddr;
 
         uint256 amountTokenReceived = amount0 != 0 ? amount0 : amount1;
 
-        address tokenToTrader = addTokenReceived == address(posParms.baseToken)
-            ? address(posParms.quoteToken)
-            : address(posParms.baseToken);
+        address tokenToTrader = addTokenReceived == baseTokenAddr
+            ? quoteTokenAddr
+            : baseTokenAddr;
+
+        // CACHE: Create IERC20 for received token (used multiple times)
+        IERC20 addTokenReceivedErc20 = IERC20(addTokenReceived);
 
         // These state assume that the oracle price and the uniswap price are CONCISTENT
         // state 1+classic
@@ -452,7 +486,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                     1
                 );
             }
-            IERC20(addTokenBorrowed).safeTransfer(trader, amountTokenReceived);
+            addTokenReceivedErc20.safeTransfer(trader, amountTokenReceived);
         }
         // state 1+margin, 2, 3, 4 and 5
         else {
@@ -474,34 +508,46 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                 (uint256 inAmount, uint256 outAmount) = swapMaxTokenPossible(
                     addTokenReceived,
                     tokenToTrader,
-                    IUniswapV3Pool(posParms.v3Pool).fee(),
+                    poolFee,
                     posParms.totalBorrow,
                     amountTokenReceived
                 );
                 // loss should not occur here but in case of, we refund the pool
                 int256 remaining = int256(int(outAmount) - int(posParms.totalBorrow));
                 uint256 loss = remaining < 0 ? uint256(-remaining) : uint256(0);
-                SafeERC20.forceApprove(
-                    IERC20(addTokenBorrowed),
-                    address(liquidityPoolToUse),
-                    posParms.totalBorrow - loss
-                );
+
+                // OPTIMIZED: Cache IERC20 for borrowed token and check allowance before approve
+                IERC20 addTokenBorrowedErc20 = IERC20(addTokenBorrowed);
+                uint256 currentAllowance = addTokenBorrowedErc20.allowance(address(this), address(liquidityPoolToUse));
+                if (currentAllowance < posParms.totalBorrow - loss) {
+                    SafeERC20.forceApprove(
+                        addTokenBorrowedErc20,
+                        address(liquidityPoolToUse),
+                        posParms.totalBorrow - loss
+                    );
+                }
+
                 liquidityPoolToUse.refund(posParms.totalBorrow, 0, loss);
                 if (loss == 0) {
                     uint256 treasureAmount = ((amountTokenReceived - inAmount) * treasureFee) /
                         10000;
-                    IERC20(addTokenReceived).safeTransfer(treasure, treasureAmount);
+                    addTokenReceivedErc20.safeTransfer(treasure, treasureAmount);
 
                     uint256 netReceived = amountTokenReceived - inAmount - treasureAmount;
-                    if (address(posParms.initialToken) != addTokenReceived) {
-                        SafeERC20.forceApprove(
-                            IERC20(addTokenReceived),
-                            address(UNISWAP_V3_HELPER),
-                            netReceived
-                        );
+                    if (initialTokenAddr != addTokenReceived) {
+                        // OPTIMIZED: Check allowance before approve
+                        uint256 helperAllowance = addTokenReceivedErc20.allowance(address(this), address(UNISWAP_V3_HELPER));
+                        if (helperAllowance < netReceived) {
+                            SafeERC20.forceApprove(
+                                addTokenReceivedErc20,
+                                address(UNISWAP_V3_HELPER),
+                                netReceived
+                            );
+                        }
+
                         uint256 priceBaseToQuote = PRICE_FEED.getPairLatestPrice(
                             addTokenReceived,
-                            address(posParms.initialToken)
+                            initialTokenAddr
                         );
                         uint256 minOut = (netReceived * priceBaseToQuote) /
                             (10 ** IERC20Metadata(addTokenReceived).decimals());
@@ -509,27 +555,31 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
                         uint256 finalOut = UNISWAP_V3_HELPER.swapExactInputSingle(
                             addTokenReceived,
-                            address(posParms.initialToken),
-                            IUniswapV3Pool(posParms.v3Pool).fee(),
+                            initialTokenAddr,
+                            poolFee,
                             netReceived,
                             minOut
                         );
-                        IERC20(posParms.initialToken).safeTransfer(trader, finalOut);
+                        initialToken.safeTransfer(trader, finalOut);
                     } else {
-                        IERC20(addTokenReceived).safeTransfer(trader, netReceived);
+                        addTokenReceivedErc20.safeTransfer(trader, netReceived);
                     }
                 }
             } else if (state == PositionState.ACTIVE) {
                 uint256 treasureAmount = (amountTokenReceived * treasureFee) / 10000;
-                IERC20(addTokenReceived).safeTransfer(treasure, treasureAmount);
-                IERC20(addTokenReceived).safeTransfer(trader, amountTokenReceived - treasureAmount);
+                addTokenReceivedErc20.safeTransfer(treasure, treasureAmount);
+                addTokenReceivedErc20.safeTransfer(trader, amountTokenReceived - treasureAmount);
             } else {
                 // when not margin, we need to swap to the other token
-                SafeERC20.forceApprove(
-                    IERC20(addTokenReceived),
-                    address(UNISWAP_V3_HELPER),
-                    amountTokenReceived
-                );
+                // OPTIMIZED: Check allowance before approve
+                uint256 helperAllowance = addTokenReceivedErc20.allowance(address(this), address(UNISWAP_V3_HELPER));
+                if (helperAllowance < amountTokenReceived) {
+                    SafeERC20.forceApprove(
+                        addTokenReceivedErc20,
+                        address(UNISWAP_V3_HELPER),
+                        amountTokenReceived
+                    );
+                }
 
                 uint256 price = PRICE_FEED.getPairLatestPrice(addTokenReceived, tokenToTrader);
                 uint256 minOut = (amountTokenReceived * price) /
@@ -539,23 +589,31 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
                 uint256 outAmount = UNISWAP_V3_HELPER.swapExactInputSingle(
                     addTokenReceived,
                     tokenToTrader,
-                    IUniswapV3Pool(posParms.v3Pool).fee(),
+                    poolFee,
                     amountTokenReceived,
                     minOut
                 );
                 uint256 treasureAmount = (outAmount * treasureFee) / 10000;
-                IERC20(tokenToTrader).safeTransfer(treasure, treasureAmount);
+
+                // CACHE: Create IERC20 for tokenToTrader
+                IERC20 tokenToTraderErc20 = IERC20(tokenToTrader);
+                tokenToTraderErc20.safeTransfer(treasure, treasureAmount);
                 uint256 netReceived = outAmount - treasureAmount;
 
-                if (address(posParms.initialToken) != tokenToTrader) {
-                    SafeERC20.forceApprove(
-                        IERC20(tokenToTrader),
-                        address(UNISWAP_V3_HELPER),
-                        netReceived
-                    );
+                if (initialTokenAddr != tokenToTrader) {
+                    // OPTIMIZED: Check allowance before approve
+                    uint256 traderAllowance = tokenToTraderErc20.allowance(address(this), address(UNISWAP_V3_HELPER));
+                    if (traderAllowance < netReceived) {
+                        SafeERC20.forceApprove(
+                            tokenToTraderErc20,
+                            address(UNISWAP_V3_HELPER),
+                            netReceived
+                        );
+                    }
+
                     uint256 priceQuoteToBase = PRICE_FEED.getPairLatestPrice(
                         tokenToTrader,
-                        address(posParms.initialToken)
+                        initialTokenAddr
                     );
                     uint256 minOut2 = (netReceived * priceQuoteToBase) /
                         (10 ** IERC20Metadata(tokenToTrader).decimals());
@@ -563,14 +621,14 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
 
                     uint256 finalOut = UNISWAP_V3_HELPER.swapExactInputSingle(
                         tokenToTrader,
-                        address(posParms.initialToken),
-                        IUniswapV3Pool(posParms.v3Pool).fee(),
+                        initialTokenAddr,
+                        poolFee,
                         netReceived,
                         minOut2
                     );
-                    IERC20(posParms.initialToken).safeTransfer(trader, finalOut);
+                    initialToken.safeTransfer(trader, finalOut);
                 } else {
-                    IERC20(tokenToTrader).safeTransfer(trader, netReceived);
+                    tokenToTraderErc20.safeTransfer(trader, netReceived);
                 }
             }
         }
@@ -696,6 +754,9 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         uint256 initialPrice = pos.initialPrice;
         uint256 currentPrice = PRICE_FEED.getPairLatestPrice(baseToken_, quoteToken_);
 
+        // Cache pool fee to avoid redundant external calls
+        uint24 poolFee = IUniswapV3Pool(pos.v3Pool).fee();
+
         // Use PositionLogic library to calculate PnL
         PositionLogic.PnLCalculationParams memory pnlParams = PositionLogic.PnLCalculationParams({
             initialPrice: initialPrice,
@@ -706,7 +767,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             isShort: isShort_,
             initialToken: address(pos.initialToken),
             priceFeed: address(PRICE_FEED),
-            poolFee: IUniswapV3Pool(pos.v3Pool).fee(),
+            poolFee: poolFee,
             feeManager: address(feeManager),
             trader: ownerOf(_posId)
         });
@@ -724,7 +785,14 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         uint256 amountInMaximum
     ) private returns (uint256, uint256) {
         uint256 token0DecimalsPow = 10 ** IERC20Metadata(_token0).decimals();
-        SafeERC20.forceApprove(IERC20(_token0), address(UNISWAP_V3_HELPER), amountInMaximum);
+        
+        // OPTIMIZED: Only approve if current allowance is insufficient
+        IERC20 token0Erc20 = IERC20(_token0);
+        uint256 currentAllowance = token0Erc20.allowance(address(this), address(UNISWAP_V3_HELPER));
+        if (currentAllowance < amountInMaximum) {
+            SafeERC20.forceApprove(token0Erc20, address(UNISWAP_V3_HELPER), amountInMaximum);
+        }
+        
         uint256 swapCost = UNISWAP_V3_HELPER.swapExactOutputSingle(
             _token0,
             _token1,
