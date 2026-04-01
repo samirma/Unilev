@@ -73,7 +73,7 @@ library PositionLogic {
 
     // Output struct for position opening calculations
     struct PositionOpeningCalcResult {
-        uint256 breakEvenLimit; // Price at which position is undercollateralized
+        uint256 liquidationFloor; // Price at which position becomes undercollateralized (collateral depleted)
         uint256 totalBorrow; // Amount to borrow from liquidity pool
         address borrowToken; // Token to borrow (base for short, quote for long)
         address liquidityPoolToken; // Token for liquidity pool lookup
@@ -254,11 +254,11 @@ library PositionLogic {
     function calculatePositionOpening(
         PositionOpeningCalcParams memory params
     ) internal pure returns (PositionOpeningCalcResult memory result) {
-        // Break-even calculation
-        // For short: break even when price increases by 100%/leverage
-        // For long: break even when price decreases by 100%/leverage
+        // Liquidation floor calculation (price where collateral is fully depleted)
+        // For short: liquidation floor = price + price/leverage (price goes UP = loss)
+        // For long: liquidation floor = price - price/leverage (price goes DOWN = loss)
         if (params.isShort) {
-            result.breakEvenLimit =
+            result.liquidationFloor =
                 params.price +
                 (params.price * 10000) /
                 (uint256(params.leverage) * 10000);
@@ -270,7 +270,7 @@ library PositionLogic {
             result.borrowToken = params.baseToken;
             result.liquidityPoolToken = params.baseToken;
         } else {
-            result.breakEvenLimit =
+            result.liquidationFloor =
                 params.price -
                 (params.price * 10000) /
                 (uint256(params.leverage) * 10000);

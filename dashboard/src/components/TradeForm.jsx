@@ -41,7 +41,7 @@ export function TradeForm() {
     const [borrowCapacity, setBorrowCapacity] = useState(null)
     const [requiredBorrow, setRequiredBorrow] = useState(null)
     const [requiredBorrowUsd, setRequiredBorrowUsd] = useState("0.00")
-    const [breakEvenPrice, setBreakEvenPrice] = useState(null)
+    const [liquidationFloor, setLiquidationFloor] = useState(null)
     const [isLiquiditySufficient, setIsLiquiditySufficient] = useState(true)
 
     const isCorrectNetwork = chainId === polygon.id
@@ -136,7 +136,7 @@ export function TradeForm() {
             if (!isConnected || !isCorrectNetwork || !borrowCapacity || !balanceData) {
                 setRequiredBorrow(null)
                 setRequiredBorrowUsd("0.00")
-                setBreakEvenPrice(null)
+                setLiquidationFloor(null)
                 setIsLiquiditySufficient(true)
                 return
             }
@@ -144,7 +144,7 @@ export function TradeForm() {
             if (!amount || isNaN(amount) || !leverage || isNaN(leverage)) {
                 setRequiredBorrow(null)
                 setRequiredBorrowUsd("0.00")
-                setBreakEvenPrice(null)
+                setLiquidationFloor(null)
                 setIsLiquiditySufficient(true)
                 return
             }
@@ -155,7 +155,7 @@ export function TradeForm() {
                 if (marginAmount === 0n) {
                     setRequiredBorrow(null)
                     setRequiredBorrowUsd("0.00")
-                    setBreakEvenPrice(null)
+                    setLiquidationFloor(null)
                     return
                 }
 
@@ -180,7 +180,7 @@ export function TradeForm() {
                         tokenAddress: borrowData.borrowTokenAddress,
                     })
                     setRequiredBorrowUsd(borrowData.borrowUsdFormatted)
-                    setBreakEvenPrice(borrowData.breakEvenPrice)
+                    setLiquidationFloor(borrowData.liquidationFloor)
 
                     // Check liquidity sufficiency
                     if (borrowCapacity.rawCapacity) {
@@ -193,13 +193,13 @@ export function TradeForm() {
                 } else {
                     setRequiredBorrow(null)
                     setRequiredBorrowUsd("0.00")
-                    setBreakEvenPrice(null)
+                    setLiquidationFloor(null)
                 }
             } catch (err) {
                 console.error("Error calculating required borrow:", err)
                 setRequiredBorrow(null)
                 setRequiredBorrowUsd("0.00")
-                setBreakEvenPrice(null)
+                setLiquidationFloor(null)
             }
         }
 
@@ -410,6 +410,8 @@ export function TradeForm() {
 
     const amountBig = balanceData ? ethers.parseUnits(amount || "0", balanceData.decimals) : 0n
     const needsApproval = isConnected && isCorrectNetwork && amountBig > 0n && allowance < amountBig
+    const hasZeroAmount = !amount || isNaN(amount) || parseFloat(amount) === 0
+    const hasInsufficientBalance = balanceData && amountBig > balanceData.rawBalance
 
     return (
         <div className="glass-panel p-6 w-full max-w-md">
@@ -595,14 +597,18 @@ export function TradeForm() {
                         !isConnected ||
                         !isCorrectNetwork ||
                         !isLiquiditySufficient ||
-                        !isMetaMaskInstalled
+                        !isMetaMaskInstalled ||
+                        hasZeroAmount ||
+                        hasInsufficientBalance
                     }
                     className={clsx(
                         "w-full primary-button mt-4",
                         (loading ||
                             !isCorrectNetwork ||
                             !isLiquiditySufficient ||
-                            !isMetaMaskInstalled) &&
+                            !isMetaMaskInstalled ||
+                            hasZeroAmount ||
+                            hasInsufficientBalance) &&
                             "opacity-50 cursor-not-allowed"
                     )}
                 >
@@ -612,6 +618,10 @@ export function TradeForm() {
                         ? "Wrong Network"
                         : !isLiquiditySufficient
                         ? "Insufficient Liquidity"
+                        : hasZeroAmount
+                        ? "Enter Amount"
+                        : hasInsufficientBalance
+                        ? "Insufficient Balance"
                         : loading
                         ? "Processing..."
                         : needsApproval
@@ -628,7 +638,8 @@ export function TradeForm() {
                         !isConnected ||
                         !isCorrectNetwork ||
                         !isLiquiditySufficient ||
-                        !isMetaMaskInstalled
+                        !isMetaMaskInstalled ||
+                        hasZeroAmount
                     }
                     className={clsx(
                         "w-full secondary-button mt-2",
@@ -636,7 +647,8 @@ export function TradeForm() {
                             simulating ||
                             !isCorrectNetwork ||
                             !isLiquiditySufficient ||
-                            !isMetaMaskInstalled) &&
+                            !isMetaMaskInstalled ||
+                            hasZeroAmount) &&
                             "opacity-50 cursor-not-allowed"
                     )}
                 >

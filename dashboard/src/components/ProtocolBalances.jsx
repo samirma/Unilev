@@ -1,24 +1,23 @@
-
-import { useEffect, useState } from 'react';
-import { useDeFi } from '../hooks/useDeFi';
+import { useEffect, useState } from "react"
+import { useDeFi } from "../hooks/useDeFi"
 
 export function ProtocolBalances({ onSelectToken, selectedToken }) {
-    const { getProtocolBalances, SUPPORTED_TOKENS_LIST } = useDeFi();
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const { getProtocolBalances, SUPPORTED_TOKENS_LIST } = useDeFi()
+    const [data, setData] = useState(null)
+    const [loading, setLoading] = useState(false)
 
     const fetchData = async () => {
-        setLoading(true);
-        const res = await getProtocolBalances();
-        if (res) setData(res);
-        setLoading(false);
-    };
+        setLoading(true)
+        const res = await getProtocolBalances()
+        if (res) setData(res)
+        setLoading(false)
+    }
 
     useEffect(() => {
-        fetchData();
-        const interval = setInterval(fetchData, 30000);
-        return () => clearInterval(interval);
-    }, [getProtocolBalances]);
+        fetchData()
+        const interval = setInterval(fetchData, 30000)
+        return () => clearInterval(interval)
+    }, [getProtocolBalances])
 
     return (
         <div className="glass-panel p-4 w-full h-full flex flex-col">
@@ -30,49 +29,78 @@ export function ProtocolBalances({ onSelectToken, selectedToken }) {
                     onClick={fetchData}
                     className="text-xs text-gray-500 hover:text-white transition-colors"
                 >
-                    {loading ? '...' : 'Refresh'}
+                    {loading ? "..." : "Refresh"}
                 </button>
             </div>
 
             <div className="grid grid-cols-1 gap-3 flex-1 overflow-y-auto">
-                {SUPPORTED_TOKENS_LIST.map(t => {
-                    const posBal = data?.positionsBalances?.[t.key];
-                    const pool = data?.poolBalances?.[t.key];
-                    const isSelected = selectedToken === t.key;
+                {SUPPORTED_TOKENS_LIST.map((t) => {
+                    const posBal = data?.positionsBalances?.[t.key]
+                    const pool = data?.poolBalances?.[t.key]
+                    const isSelected = selectedToken === t.key
 
                     return (
                         <div
                             key={t.key}
                             onClick={() => onSelectToken(t.key)}
-                            className={`rounded-lg p-3 border cursor-pointer transition-all hover:bg-white/10 ${isSelected
-                                ? 'bg-white/10 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]'
-                                : 'bg-white/5 border-white/5'
-                                }`}
+                            className={`rounded-lg p-3 border cursor-pointer transition-all hover:bg-white/10 ${
+                                isSelected
+                                    ? "bg-white/10 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
+                                    : "bg-white/5 border-white/5"
+                            }`}
                         >
                             <div className="flex justify-between items-center border-b border-white/5 pb-1 mb-2">
-                                <span className={`font-bold ${isSelected ? 'text-yellow-400' : 'text-gray-300'}`}>{t.name}</span>
-                                {isSelected && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">SELECTED</span>}
+                                <span
+                                    className={`font-bold ${
+                                        isSelected ? "text-yellow-400" : "text-gray-300"
+                                    }`}
+                                >
+                                    {t.name}
+                                </span>
+                                {isSelected && (
+                                    <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded">
+                                        SELECTED
+                                    </span>
+                                )}
                             </div>
 
-                            {/* Position Contract */}
+                            {/* Position Contract - Shows tokens held by Positions contract (collateral, etc.) */}
                             <div className="flex justify-between text-xs mb-1">
-                                <span className="text-gray-500">Positions:</span>
-                                <span className="font-mono text-gray-300">
-                                    {posBal ? `${Number(posBal.balance).toFixed(2)}` : '-'}
-                                </span>
+                                <span className="text-gray-500">Positions Contract:</span>
+                                <div className="text-right">
+                                    <span className="font-mono text-gray-300">
+                                        {posBal
+                                            ? `${Number(posBal.balance).toFixed(4)} ${t.name}`
+                                            : "-"}
+                                    </span>
+                                    {posBal && (
+                                        <span className="font-mono text-gray-500 ml-2">
+                                            (${posBal.usdValue})
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Pool TVL */}
+                            {/* Pool TVL - Shows available liquidity in the pool */}
                             <div className="flex justify-between text-xs">
-                                <span className="text-gray-500">Pool TVL:</span>
-                                <span className="font-mono text-gray-300">
-                                    {pool ? `${Number(pool.totalAssets).toFixed(2)}` : '-'}
-                                </span>
+                                <span className="text-gray-500">Pool Liquidity:</span>
+                                <div className="text-right">
+                                    <span className="font-mono text-gray-300">
+                                        {pool
+                                            ? `${Number(pool.totalAssets).toFixed(4)} ${t.name}`
+                                            : "-"}
+                                    </span>
+                                    {pool && (
+                                        <span className="font-mono text-gray-500 ml-2">
+                                            (${pool.totalAssetsUsd})
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )
                 })}
             </div>
         </div>
-    );
+    )
 }

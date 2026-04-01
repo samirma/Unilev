@@ -176,9 +176,40 @@ function PositionCard({ position, isOwner, onClose }) {
                                 (~${position.sizeUsd})
                             </span>
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                            {position.baseSymbol} / {position.quoteSymbol}
+                        {/* PnL Display */}
+                        <div
+                            className={clsx(
+                                "text-sm mt-1 font-mono",
+                                position.pnlIsPositive ? "text-green-400" : "text-red-400"
+                            )}
+                        >
+                            {position.pnlIsPositive ? "+" : "-"}
+                            {parseFloat(position.pnl).toFixed(4)} {position.baseSymbol}
+                            <span
+                                className={clsx(
+                                    "text-xs ml-1",
+                                    position.pnlIsPositive ? "text-green-500" : "text-red-500"
+                                )}
+                            >
+                                ({position.pnlIsPositive ? "+" : "-"}${position.pnlUsd})
+                            </span>
                         </div>
+                        {/* Price Info - Compact inline format */}
+                        {(() => {
+                            const current = parseFloat(position.currentPrice)
+                            const entry = parseFloat(position.entryPrice)
+                            const isProfitable = position.isShort
+                                ? current < entry
+                                : current > entry
+                            return (
+                                <div className="text-xs text-gray-500 mt-1">
+                                    {position.baseSymbol}: {current.toFixed(0)}{" "}
+                                    {position.quoteSymbol} | {position.isShort ? "BELOW" : "ABOVE"}{" "}
+                                    {entry.toFixed(0)} {position.quoteSymbol}{" "}
+                                    {isProfitable ? "✅" : "⏳"}
+                                </div>
+                            )
+                        })()}
                     </div>
                 </div>
 

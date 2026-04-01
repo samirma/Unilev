@@ -351,7 +351,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         openPositions[currentPosId] = PositionParams({
             initialPrice: params.price,
             totalBorrow: calcResult.totalBorrow,
-            breakEvenLimit: calcResult.breakEvenLimit,
+            liquidationFloor: calcResult.liquidationFloor,
             stopLossPrice: params.stopLossPrice,
             v3Pool: params.v3Pool,
             limitPrice: params.limitPrice,
@@ -685,7 +685,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         }
         PositionParams storage pos = openPositions[_posId];
         bool isShort = pos.isShort;
-        uint256 breakEvenLimit = pos.breakEvenLimit;
+        uint256 liquidationFloor = pos.liquidationFloor;
         uint160 limitPrice = pos.limitPrice;
         uint256 stopLossPrice = pos.stopLossPrice;
         uint256 price = PRICE_FEED.getPairLatestPrice(
@@ -693,17 +693,17 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             address(pos.quoteToken)
         );
         uint256 lidTresh = isShort
-            ? (breakEvenLimit * (10000 - LIQUIDATION_THRESHOLD)) / 10000
-            : (breakEvenLimit * (LIQUIDATION_THRESHOLD + 10000)) / 10000;
+            ? (liquidationFloor * (10000 - LIQUIDATION_THRESHOLD)) / 10000
+            : (liquidationFloor * (LIQUIDATION_THRESHOLD + 10000)) / 10000;
 
         if (isShort) {
             if (limitPrice != 0 && price < limitPrice) return PositionState.TAKE_PROFIT;
-            if (breakEvenLimit != 0 && price >= breakEvenLimit) return PositionState.BAD_DEBT;
+            if (liquidationFloor != 0 && price >= liquidationFloor) return PositionState.BAD_DEBT;
             if (lidTresh != 0 && price >= lidTresh) return PositionState.LIQUIDATABLE;
             if (stopLossPrice != 0 && price >= stopLossPrice) return PositionState.STOP_LOSS;
         } else {
             if (limitPrice != 0 && price > limitPrice) return PositionState.TAKE_PROFIT;
-            if (breakEvenLimit != 0 && price <= breakEvenLimit) return PositionState.BAD_DEBT;
+            if (liquidationFloor != 0 && price <= liquidationFloor) return PositionState.BAD_DEBT;
             if (lidTresh != 0 && price <= lidTresh) return PositionState.LIQUIDATABLE;
             if (stopLossPrice != 0 && price <= stopLossPrice) return PositionState.STOP_LOSS;
         }
@@ -733,7 +733,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             uint64 timestamp_,
             bool isShort_,
             uint8 leverage_,
-            uint256 breakEvenLimit_,
+            uint256 liquidationFloor_,
             uint160 limitPrice_,
             uint256 stopLossPrice_,
             int128 currentPnL_,
@@ -747,7 +747,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
         timestamp_ = pos.timestamp;
         isShort_ = pos.isShort;
         leverage_ = pos.leverage;
-        breakEvenLimit_ = pos.breakEvenLimit;
+        liquidationFloor_ = pos.liquidationFloor;
         limitPrice_ = pos.limitPrice;
         stopLossPrice_ = pos.stopLossPrice;
 

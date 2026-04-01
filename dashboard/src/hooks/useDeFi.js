@@ -387,21 +387,62 @@ export function useDeFi() {
                 }
 
                 const params = await market.getPositionParams(posId)
-                // params: baseToken, quoteToken, positionSize, timestamp, isShort, leverage...
+                // params: baseToken, quoteToken, positionSize, timestamp, isShort, leverage, liquidationFloor (ignored), limitPrice, stopLossPrice, currentPnL, collateralLeft
 
-                const [baseToken, quoteToken, positionSize, , isShort, leverage] = params
+                const [
+                    baseToken,
+                    quoteToken,
+                    positionSize,
+                    ,
+                    isShort,
+                    leverage,
+                    ,
+                    ,
+                    ,
+                    currentPnL,
+                    collateralLeft,
+                ] = params
 
                 const baseContract = new ethers.Contract(baseToken, ERC20ABI.abi, readProvider)
                 const quoteContract = new ethers.Contract(quoteToken, ERC20ABI.abi, readProvider)
 
-                const [baseSymbol, baseDecimals, quoteSymbol] = await Promise.all([
+                const [baseSymbol, baseDecimals, quoteSymbol, quoteDecimals] = await Promise.all([
                     baseContract.symbol(),
                     baseContract.decimals(),
                     quoteContract.symbol(),
+                    quoteContract.decimals(),
                 ])
+
+                // Get initialPrice from Positions contract
+                const posParams = await positions.openPositions(posId)
+                const initialPrice = posParams.initialPrice
 
                 const usdValueBigInt = await priceFeed.getAmountInUsd(baseToken, positionSize)
                 const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2)
+
+                // Calculate PnL - currentPnL is in base token units, can be negative
+                const pnlInBase = Number(currentPnL)
+                const formattedPnl = ethers.formatUnits(
+                    pnlInBase < 0 ? -currentPnL : currentPnL,
+                    baseDecimals
+                )
+                const pnlUsdBigInt = await priceFeed.getAmountInUsd(
+                    baseToken,
+                    pnlInBase < 0 ? -currentPnL : currentPnL
+                )
+                const pnlUsd = parseFloat(ethers.formatUnits(pnlUsdBigInt, 18)).toFixed(2)
+
+                // Get current price
+                let currentPrice = 0n
+                try {
+                    currentPrice = await priceFeed.getPairLatestPrice(baseToken, quoteToken)
+                } catch (e) {
+                    // Price feed might not exist for this pair
+                }
+
+                // Format prices with quote token decimals
+                const formattedCurrentPrice = ethers.formatUnits(currentPrice, quoteDecimals)
+                const formattedEntryPrice = ethers.formatUnits(initialPrice, quoteDecimals)
 
                 const stateInt = await positions.getPositionState(posId)
                 const states = [
@@ -427,6 +468,15 @@ export function useDeFi() {
                     quoteSymbol,
                     size: ethers.formatUnits(positionSize, baseDecimals),
                     sizeUsd: usdValue,
+                    pnl: formattedPnl,
+                    pnlUsd: pnlUsd,
+                    pnlIsPositive: pnlInBase >= 0,
+                    collateralLeft: ethers.formatUnits(
+                        collateralLeft < 0 ? -collateralLeft : collateralLeft,
+                        baseDecimals
+                    ),
+                    entryPrice: formattedEntryPrice,
+                    currentPrice: formattedCurrentPrice,
                 }
             } catch (error) {
                 console.error(`Error fetching pos ${posId}:`, error)
@@ -444,7 +494,7 @@ export function useDeFi() {
      * @param {boolean} isShort - True for short position
      * @param {string} baseToken - Base token address
      * @param {string} quoteToken - Quote token address
-     * @returns {Promise<{breakEvenLimit: string, totalBorrow: string, borrowToken: string, liquidityPoolToken: string}|null>}
+     * @returns {Promise<{liquidationFloor: string, totalBorrow: string, borrowToken: string, liquidityPoolToken: string}|null>}
      */
     const calculatePositionOpening = useCallback(
         async (price, leverage, baseCollateralAmount, isShort, baseToken, quoteToken) => {
@@ -468,10 +518,10 @@ export function useDeFi() {
                 )
 
                 // Destructure the result tuple
-                const [breakEvenLimit, totalBorrow, borrowToken, liquidityPoolToken] = result
+                const [liquidationFloor, totalBorrow, borrowToken, liquidityPoolToken] = result
 
                 return {
-                    breakEvenLimit: breakEvenLimit.toString(),
+                    liquidationFloor: liquidationFloor.toString(),
                     totalBorrow: totalBorrow.toString(),
                     borrowToken,
                     liquidityPoolToken,
@@ -631,7 +681,7 @@ export function useDeFi() {
                     quoteToken
                 )
 
-                const [breakEvenLimit, totalBorrow, borrowToken, liquidityPoolToken] = result
+                const [liquidationFloor, totalBorrow, borrowToken, liquidityPoolToken] = result
 
                 // Get decimals for borrow token
                 const isBorrowBase = borrowToken.toLowerCase() === baseToken.toLowerCase()
@@ -649,7 +699,7 @@ export function useDeFi() {
                     borrowUsdFormatted: parseFloat(ethers.formatUnits(borrowUsdValue, 18)).toFixed(
                         2
                     ),
-                    breakEvenPrice: breakEvenLimit,
+                    liquidationFloor: liquidationFloor,
                     price,
                     isBaseMargin: !isMarginStable,
                 }
@@ -698,10 +748,10 @@ export function useDeFi() {
                         LiquidityPoolABI.abi,
                         readProvider
                     )
-                    const totalAssets = await poolContract.totalAssets()
+                    const rawTotalAsset = await poolContract.rawTotalAsset()
                     const totalAssetsUsdBig = await priceFeed.getAmountInUsd(
                         token.address,
-                        totalAssets
+                        rawTotalAsset
                     )
 
                     // User Shares (if connected)
@@ -716,7 +766,7 @@ export function useDeFi() {
 
                     poolBalances[token.key] = {
                         address: poolAddress,
-                        totalAssets: ethers.formatUnits(totalAssets, posDecimals),
+                        totalAssets: ethers.formatUnits(rawTotalAsset, posDecimals),
                         totalAssetsUsd: parseFloat(
                             ethers.formatUnits(totalAssetsUsdBig, 18)
                         ).toFixed(2),

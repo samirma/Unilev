@@ -53,9 +53,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
             .calculatePositionOpening(params);
 
-        // Expected breakEven = price - price/leverage = 100,000 - 50,000 = 50,000
-        uint256 expectedBreakEven = price - (price * 10000) / (uint256(leverage) * 10000);
-        assertEq(result.breakEvenLimit, expectedBreakEven, "Break-even calculation incorrect");
+        // Expected liquidationFloor = price - price/leverage = 100,000 - 50,000 = 50,000
+        uint256 expectedLiquidationFloor = price - (price * 10000) / (uint256(leverage) * 10000);
+        assertEq(result.liquidationFloor, expectedLiquidationFloor, "Liquidation floor calculation incorrect");
 
         // Expected totalBorrow = collateral * (leverage-1) * price / baseDecimalsPow
         // = 100e6 * 1 * 100,000e8 / 1e6 = 100e6 * 100,000e8 / 1e6
@@ -87,9 +87,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
             .calculatePositionOpening(params);
 
-        // Expected breakEven = price - price/3 = 100,000 - 33,333.33 = 66,666.67
-        uint256 expectedBreakEven = price - (price * 10000) / (uint256(leverage) * 10000);
-        assertEq(result.breakEvenLimit, expectedBreakEven, "Break-even calculation incorrect for 3x");
+        // Expected liquidationFloor = price - price/3 = 100,000 - 33,333.33 = 66,666.67
+        uint256 expectedLiquidationFloor = price - (price * 10000) / (uint256(leverage) * 10000);
+        assertEq(result.liquidationFloor, expectedLiquidationFloor, "Liquidation floor calculation incorrect for 3x");
 
         // Expected totalBorrow = collateral * (3-1) * price / baseDecimalsPow
         uint256 expectedBorrow = (uint256(collateral) * (leverage - 1) * price) / DECIMALS_POW_6;
@@ -119,9 +119,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
             .calculatePositionOpening(params);
 
-        // Expected breakEven = price - price/5 = 100,000 - 20,000 = 80,000
-        uint256 expectedBreakEven = price - (price * 10000) / (uint256(leverage) * 10000);
-        assertEq(result.breakEvenLimit, expectedBreakEven, "Break-even calculation incorrect for 5x");
+        // Expected liquidationFloor = price - price/5 = 100,000 - 20,000 = 80,000
+        uint256 expectedLiquidationFloor = price - (price * 10000) / (uint256(leverage) * 10000);
+        assertEq(result.liquidationFloor, expectedLiquidationFloor, "Liquidation floor calculation incorrect for 5x");
 
         // Expected totalBorrow = collateral * (5-1) * price / baseDecimalsPow
         uint256 expectedBorrow = (uint256(collateral) * (leverage - 1) * price) / DECIMALS_POW_6;
@@ -148,8 +148,8 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
             .calculatePositionOpening(params);
 
-        uint256 expectedBreakEven = price - (price * 10000) / (uint256(leverage) * 10000);
-        assertEq(result.breakEvenLimit, expectedBreakEven, "Break-even incorrect for 18 decimals");
+        uint256 expectedLiquidationFloor = price - (price * 10000) / (uint256(leverage) * 10000);
+        assertEq(result.liquidationFloor, expectedLiquidationFloor, "Liquidation floor incorrect for 18 decimals");
 
         uint256 expectedBorrow = (uint256(collateral) * (leverage - 1) * price) / DECIMALS_POW_18;
         assertEq(result.totalBorrow, expectedBorrow, "Borrow incorrect for 18 decimals");
@@ -180,9 +180,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
             .calculatePositionOpening(params);
 
-        // Expected breakEven = price + price/leverage = 100,000 + 50,000 = 150,000
-        uint256 expectedBreakEven = price + (price * 10000) / (uint256(leverage) * 10000);
-        assertEq(result.breakEvenLimit, expectedBreakEven, "Break-even calculation incorrect for short 2x");
+        // Expected liquidationFloor = price + price/leverage = 100,000 + 50,000 = 150,000
+        uint256 expectedLiquidationFloor = price + (price * 10000) / (uint256(leverage) * 10000);
+        assertEq(result.liquidationFloor, expectedLiquidationFloor, "Liquidation floor calculation incorrect for short 2x");
 
         // Expected totalBorrow = collateral * leverage * baseDecimalsPow / price
         // = 100e6 * 2 * 1e6 / 100,000e8
@@ -214,9 +214,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
             .calculatePositionOpening(params);
 
-        // Expected breakEven = price + price/3 = 100,000 + 33,333.33 = 133,333.33
-        uint256 expectedBreakEven = price + (price * 10000) / (uint256(leverage) * 10000);
-        assertEq(result.breakEvenLimit, expectedBreakEven, "Break-even calculation incorrect for short 3x");
+        // Expected liquidationFloor = price + price/3 = 100,000 + 33,333.33 = 133,333.33
+        uint256 expectedLiquidationFloor = price + (price * 10000) / (uint256(leverage) * 10000);
+        assertEq(result.liquidationFloor, expectedLiquidationFloor, "Liquidation floor calculation incorrect for short 3x");
 
         // Expected totalBorrow = collateral * leverage * baseDecimalsPow / price
         uint256 expectedBorrow = (uint256(collateral) * DECIMALS_POW_6 * leverage) / price;
@@ -246,9 +246,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
             .calculatePositionOpening(params);
 
-        // Expected breakEven = price + price/5 = 100,000 + 20,000 = 120,000
-        uint256 expectedBreakEven = price + (price * 10000) / (uint256(leverage) * 10000);
-        assertEq(result.breakEvenLimit, expectedBreakEven, "Break-even calculation incorrect for short 5x");
+        // Expected liquidationFloor = price + price/5 = 100,000 + 20,000 = 120,000
+        uint256 expectedLiquidationFloor = price + (price * 10000) / (uint256(leverage) * 10000);
+        assertEq(result.liquidationFloor, expectedLiquidationFloor, "Liquidation floor calculation incorrect for short 5x");
 
         uint256 expectedBorrow = (uint256(collateral) * DECIMALS_POW_6 * leverage) / price;
         assertEq(result.totalBorrow, expectedBorrow, "Total borrow calculation incorrect for short 5x");
@@ -274,8 +274,8 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
             .calculatePositionOpening(params);
 
-        uint256 expectedBreakEven = price + (price * 10000) / (uint256(leverage) * 10000);
-        assertEq(result.breakEvenLimit, expectedBreakEven, "Break-even incorrect for short 18 decimals");
+        uint256 expectedLiquidationFloor = price + (price * 10000) / (uint256(leverage) * 10000);
+        assertEq(result.liquidationFloor, expectedLiquidationFloor, "Liquidation floor incorrect for short 18 decimals");
 
         uint256 expectedBorrow = (uint256(collateral) * DECIMALS_POW_18 * leverage) / price;
         assertEq(result.totalBorrow, expectedBorrow, "Borrow incorrect for short 18 decimals");
@@ -306,9 +306,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
             .calculatePositionOpening(params);
 
-        // Break-even should still be calculated correctly
-        uint256 expectedBreakEven = price - (price * 10000) / (uint256(leverage) * 10000);
-        assertEq(result.breakEvenLimit, expectedBreakEven, "Break-even incorrect for small collateral");
+        // Liquidation floor should still be calculated correctly
+        uint256 expectedLiquidationFloor = price - (price * 10000) / (uint256(leverage) * 10000);
+        assertEq(result.liquidationFloor, expectedLiquidationFloor, "Liquidation floor incorrect for small collateral");
 
         // Borrow should scale proportionally
         uint256 expectedBorrow = (uint256(collateral) * (leverage - 1) * price) / DECIMALS_POW_6;
@@ -368,7 +368,7 @@ contract PositionLogicOpeningTest is Test {
                 .calculatePositionOpening(longParams);
 
             uint256 expectedLongBreakEven = price - (price * 10000) / 20000;
-            assertEq(longResult.breakEvenLimit, expectedLongBreakEven, "Long break-even incorrect for different price");
+            assertEq(longResult.liquidationFloor, expectedLongBreakEven, "Long break-even incorrect for different price");
 
             // Short test
             PositionLogic.PositionOpeningCalcParams memory shortParams = PositionLogic
@@ -387,7 +387,7 @@ contract PositionLogicOpeningTest is Test {
                 .calculatePositionOpening(shortParams);
 
             uint256 expectedShortBreakEven = price + (price * 10000) / 20000;
-            assertEq(shortResult.breakEvenLimit, expectedShortBreakEven, "Short break-even incorrect for different price");
+            assertEq(shortResult.liquidationFloor, expectedShortBreakEven, "Short break-even incorrect for different price");
         }
     }
 
@@ -453,7 +453,7 @@ contract PositionLogicOpeningTest is Test {
                 .calculatePositionOpening(longParams);
 
             uint256 expectedLongBreakEven = PRICE_1e8 - (PRICE_1e8 * 10000) / (uint256(leverage) * 10000);
-            assertEq(longResult.breakEvenLimit, expectedLongBreakEven, "Long break-even incorrect");
+            assertEq(longResult.liquidationFloor, expectedLongBreakEven, "Long break-even incorrect");
 
             // Short
             PositionLogic.PositionOpeningCalcParams memory shortParams = PositionLogic
@@ -472,7 +472,7 @@ contract PositionLogicOpeningTest is Test {
                 .calculatePositionOpening(shortParams);
 
             uint256 expectedShortBreakEven = PRICE_1e8 + (PRICE_1e8 * 10000) / (uint256(leverage) * 10000);
-            assertEq(shortResult.breakEvenLimit, expectedShortBreakEven, "Short break-even incorrect");
+            assertEq(shortResult.liquidationFloor, expectedShortBreakEven, "Short break-even incorrect");
         }
     }
 
@@ -480,10 +480,10 @@ contract PositionLogicOpeningTest is Test {
     // MATHEMATICAL CORRECTNESS TESTS
     // ===================================================================
 
-    function test_Long_BreakEven_Math() public pure {
+    function test_Long_LiquidationFloor_Math() public pure {
         // For a long position with leverage L:
-        // Break-even price = initial_price - initial_price/L
-        // If price drops by 100/L %, the position is at break-even (PnL = 0)
+        // Liquidation floor price = initial_price - initial_price/L
+        // If price drops by 100/L %, the position reaches liquidation floor
 
         uint256 price = 100_000e8;
         uint128 collateral = 100e6;
@@ -504,9 +504,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result2x = PositionLogic
             .calculatePositionOpening(params2x);
 
-        // 2x leverage: 50% price drop = break-even
-        // Break-even = 100,000 - 50,000 = 50,000
-        assertEq(result2x.breakEvenLimit, 50_000e8, "2x long break-even should be 50% of price");
+        // 2x leverage: 50% price drop = liquidation floor
+        // Liquidation floor = 100,000 - 50,000 = 50,000
+        assertEq(result2x.liquidationFloor, 50_000e8, "2x long liquidation floor should be 50% of price");
 
         // Test 4x leverage
         PositionLogic.PositionOpeningCalcParams memory params4x = PositionLogic
@@ -524,15 +524,15 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result4x = PositionLogic
             .calculatePositionOpening(params4x);
 
-        // 4x leverage: 25% price drop = break-even
-        // Break-even = 100,000 - 25,000 = 75,000
-        assertEq(result4x.breakEvenLimit, 75_000e8, "4x long break-even should be 75% of price");
+        // 4x leverage: 25% price drop = liquidation floor
+        // Liquidation floor = 100,000 - 25,000 = 75,000
+        assertEq(result4x.liquidationFloor, 75_000e8, "4x long liquidation floor should be 75% of price");
     }
 
-    function test_Short_BreakEven_Math() public pure {
+    function test_Short_LiquidationFloor_Math() public pure {
         // For a short position with leverage L:
-        // Break-even price = initial_price + initial_price/L
-        // If price increases by 100/L %, the position is at break-even (PnL = 0)
+        // Liquidation floor price = initial_price + initial_price/L
+        // If price increases by 100/L %, the position reaches liquidation floor
 
         uint256 price = 100_000e8;
         uint128 collateral = 100e6;
@@ -553,9 +553,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result2x = PositionLogic
             .calculatePositionOpening(params2x);
 
-        // 2x leverage: 50% price increase = break-even
-        // Break-even = 100,000 + 50,000 = 150,000
-        assertEq(result2x.breakEvenLimit, 150_000e8, "2x short break-even should be 150% of price");
+        // 2x leverage: 50% price increase = liquidation floor
+        // Liquidation floor = 100,000 + 50,000 = 150,000
+        assertEq(result2x.liquidationFloor, 150_000e8, "2x short liquidation floor should be 150% of price");
 
         // Test 4x leverage
         PositionLogic.PositionOpeningCalcParams memory params4x = PositionLogic
@@ -573,9 +573,9 @@ contract PositionLogicOpeningTest is Test {
         PositionLogic.PositionOpeningCalcResult memory result4x = PositionLogic
             .calculatePositionOpening(params4x);
 
-        // 4x leverage: 25% price increase = break-even
-        // Break-even = 100,000 + 25,000 = 125,000
-        assertEq(result4x.breakEvenLimit, 125_000e8, "4x short break-even should be 125% of price");
+        // 4x leverage: 25% price increase = liquidation floor
+        // Liquidation floor = 100,000 + 25,000 = 125,000
+        assertEq(result4x.liquidationFloor, 125_000e8, "4x short liquidation floor should be 125% of price");
     }
 
     function test_Long_BorrowAmount_Math() public pure {
