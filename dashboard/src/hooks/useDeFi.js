@@ -44,7 +44,7 @@ export function useDeFi() {
             if (process.env.RPC_URL) {
                 const provider = new ethers.JsonRpcProvider(process.env.RPC_URL)
                 setReadProvider(provider)
-            } 
+            }
             // Fallback: window.ethereum (MetaMask)
             else if (hasMetaMask) {
                 const provider = new ethers.BrowserProvider(window.ethereum)
@@ -220,12 +220,12 @@ export function useDeFi() {
 
             // Validate leverage before simulation
             if (leverage < 2) {
-                return { 
-                    success: false, 
-                    error: { 
+                return {
+                    success: false,
+                    error: {
                         message: "Positions__LEVERAGE_NOT_IN_RANGE",
-                        reason: "Leverage must be at least 2x"
-                    } 
+                        reason: "Leverage must be at least 2x",
+                    },
                 }
             }
 
@@ -315,7 +315,7 @@ export function useDeFi() {
             }
 
             // Open Position
-            let tx;
+            let tx
             if (isShort) {
                 tx = await marketContract.openShortPosition(
                     token0,
@@ -358,7 +358,8 @@ export function useDeFi() {
 
     const getPositionDetails = useCallback(
         async (posId) => {
-            if (!readProvider || !ADDRESSES.POSITIONS || ADDRESSES.POSITIONS === ethers.ZeroAddress) return null
+            if (!readProvider || !ADDRESSES.POSITIONS || ADDRESSES.POSITIONS === ethers.ZeroAddress)
+                return null
             try {
                 // Verify code exists at address to avoid BAD_DATA errors on wrong networks
                 const code = await readProvider.getCode(ADDRESSES.POSITIONS)
@@ -386,21 +387,62 @@ export function useDeFi() {
                 }
 
                 const params = await market.getPositionParams(posId)
-                // params: baseToken, quoteToken, positionSize, timestamp, isShort, leverage...
+                // params: baseToken, quoteToken, positionSize, timestamp, isShort, leverage, liquidationFloor (ignored), limitPrice, stopLossPrice, currentPnL, collateralLeft
 
-                const [baseToken, quoteToken, positionSize, , isShort, leverage] = params
+                const [
+                    baseToken,
+                    quoteToken,
+                    positionSize,
+                    ,
+                    isShort,
+                    leverage,
+                    ,
+                    ,
+                    ,
+                    currentPnL,
+                    collateralLeft,
+                ] = params
 
                 const baseContract = new ethers.Contract(baseToken, ERC20ABI.abi, readProvider)
                 const quoteContract = new ethers.Contract(quoteToken, ERC20ABI.abi, readProvider)
 
-                const [baseSymbol, baseDecimals, quoteSymbol] = await Promise.all([
+                const [baseSymbol, baseDecimals, quoteSymbol, quoteDecimals] = await Promise.all([
                     baseContract.symbol(),
                     baseContract.decimals(),
                     quoteContract.symbol(),
+                    quoteContract.decimals(),
                 ])
+
+                // Get initialPrice from Positions contract
+                const posParams = await positions.openPositions(posId)
+                const initialPrice = posParams.initialPrice
 
                 const usdValueBigInt = await priceFeed.getAmountInUsd(baseToken, positionSize)
                 const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2)
+
+                // Calculate PnL - currentPnL is in base token units, can be negative
+                const pnlInBase = Number(currentPnL)
+                const formattedPnl = ethers.formatUnits(
+                    pnlInBase < 0 ? -currentPnL : currentPnL,
+                    baseDecimals
+                )
+                const pnlUsdBigInt = await priceFeed.getAmountInUsd(
+                    baseToken,
+                    pnlInBase < 0 ? -currentPnL : currentPnL
+                )
+                const pnlUsd = parseFloat(ethers.formatUnits(pnlUsdBigInt, 18)).toFixed(2)
+
+                // Get current price
+                let currentPrice = 0n
+                try {
+                    currentPrice = await priceFeed.getPairLatestPrice(baseToken, quoteToken)
+                } catch (e) {
+                    // Price feed might not exist for this pair
+                }
+
+                // Format prices with quote token decimals
+                const formattedCurrentPrice = ethers.formatUnits(currentPrice, quoteDecimals)
+                const formattedEntryPrice = ethers.formatUnits(initialPrice, quoteDecimals)
 
                 const stateInt = await positions.getPositionState(posId)
                 const states = [
@@ -426,6 +468,15 @@ export function useDeFi() {
                     quoteSymbol,
                     size: ethers.formatUnits(positionSize, baseDecimals),
                     sizeUsd: usdValue,
+                    pnl: formattedPnl,
+                    pnlUsd: pnlUsd,
+                    pnlIsPositive: pnlInBase >= 0,
+                    collateralLeft: ethers.formatUnits(
+                        collateralLeft < 0 ? -collateralLeft : collateralLeft,
+                        baseDecimals
+                    ),
+                    entryPrice: formattedEntryPrice,
+                    currentPrice: formattedCurrentPrice,
                 }
             } catch (error) {
                 console.error(`Error fetching pos ${posId}:`, error)
@@ -435,8 +486,57 @@ export function useDeFi() {
         [readProvider]
     )
 
+    /**
+     * Calculate position opening parameters using Market contract
+     * @param {string} price - Current price from oracle
+     * @param {number} leverage - Leverage multiplier (2-5)
+     * @param {bigint} baseCollateralAmount - Collateral amount after fees (in base token decimals)
+     * @param {boolean} isShort - True for short position
+     * @param {string} baseToken - Base token address
+     * @param {string} quoteToken - Quote token address
+     * @returns {Promise<{liquidationFloor: string, totalBorrow: string, borrowToken: string, liquidityPoolToken: string}|null>}
+     */
+    const calculatePositionOpening = useCallback(
+        async (price, leverage, baseCollateralAmount, isShort, baseToken, quoteToken) => {
+            if (!readProvider || !ADDRESSES.MARKET || ADDRESSES.MARKET === ethers.ZeroAddress)
+                return null
+            try {
+                // Verify code exists at address
+                const code = await readProvider.getCode(ADDRESSES.MARKET)
+                if (code === "0x") return null
+
+                const market = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, readProvider)
+
+                // Call the calculatePositionOpening method
+                const result = await market.calculatePositionOpening(
+                    price,
+                    leverage,
+                    baseCollateralAmount,
+                    isShort,
+                    baseToken,
+                    quoteToken
+                )
+
+                // Destructure the result tuple
+                const [liquidationFloor, totalBorrow, borrowToken, liquidityPoolToken] = result
+
+                return {
+                    liquidationFloor: liquidationFloor.toString(),
+                    totalBorrow: totalBorrow.toString(),
+                    borrowToken,
+                    liquidityPoolToken,
+                }
+            } catch (error) {
+                console.error("Error calculating position opening:", error)
+                return null
+            }
+        },
+        [readProvider]
+    )
+
     const getPositionsCount = useCallback(async () => {
-        if (!readProvider || !ADDRESSES.POSITIONS || ADDRESSES.POSITIONS === ethers.ZeroAddress) return 0n
+        if (!readProvider || !ADDRESSES.POSITIONS || ADDRESSES.POSITIONS === ethers.ZeroAddress)
+            return 0n
         try {
             // Verify code exists at address to avoid BAD_DATA errors on wrong networks
             const code = await readProvider.getCode(ADDRESSES.POSITIONS)
@@ -478,6 +578,7 @@ export function useDeFi() {
                 return {
                     rawCapacity: capacityBigInt,
                     capacityFormatted: ethers.formatUnits(capacityBigInt, decimals),
+                    decimals: decimals,
                 }
             } catch (error) {
                 console.error("Error fetching borrow capacity:", error)
@@ -485,6 +586,129 @@ export function useDeFi() {
             }
         },
         [readProvider]
+    )
+
+    // Calculate required borrow amount using the Market contract's calculatePositionOpening method
+    const calculateRequiredBorrow = useCallback(
+        async (marginTokenAddress, tradingTokenAddress, isShort, marginAmount, leverage) => {
+            if (
+                !readProvider ||
+                !marginTokenAddress ||
+                !tradingTokenAddress ||
+                !marginAmount ||
+                leverage < 2
+            ) {
+                return null
+            }
+            try {
+                const priceFeed = new ethers.Contract(
+                    ADDRESSES.PRICEFEEDL1,
+                    PriceFeedL1ABI.abi,
+                    readProvider
+                )
+                const feeManager = new ethers.Contract(
+                    ADDRESSES.FEEMANAGER_ADDRESS,
+                    FeeManagerABI.abi,
+                    readProvider
+                )
+
+                // Get token decimals
+                const marginContract = new ethers.Contract(
+                    marginTokenAddress,
+                    ERC20ABI.abi,
+                    readProvider
+                )
+                const tradingContract = new ethers.Contract(
+                    tradingTokenAddress,
+                    ERC20ABI.abi,
+                    readProvider
+                )
+                const [marginDecimals, tradingDecimals] = await Promise.all([
+                    marginContract.decimals(),
+                    tradingContract.decimals(),
+                ])
+
+                // Determine base and quote tokens based on price stability
+                const marginPriceUsd = await priceFeed.getTokenLatestPriceInUsd(marginTokenAddress)
+                const isMarginStable =
+                    marginPriceUsd >= 9n * 10n ** 17n && marginPriceUsd <= 11n * 10n ** 17n
+
+                const baseToken = isMarginStable ? tradingTokenAddress : marginTokenAddress
+                const quoteToken = isMarginStable ? marginTokenAddress : tradingTokenAddress
+                const baseDecimals = isMarginStable ? tradingDecimals : marginDecimals
+                const quoteDecimals = isMarginStable ? marginDecimals : tradingDecimals
+                const baseDecimalsPow = 10n ** BigInt(baseDecimals)
+                const quoteDecimalsPow = 10n ** BigInt(quoteDecimals)
+
+                // Get the pair price (base/quote)
+                const price = await priceFeed.getPairLatestPrice(baseToken, quoteToken)
+
+                // Estimate baseCollateralAmount by applying fees and potential swap
+                // This mirrors the logic in Positions._openPosition
+                const collateralToken = isShort ? quoteToken : baseToken
+                let baseCollateralAmount = marginAmount
+
+                // Deduct fees if user is connected
+                if (address) {
+                    const [treasureFee, liquidationRewardRate] = await feeManager.getFees(address)
+                    const liquidationReward =
+                        (marginAmount * BigInt(liquidationRewardRate)) / 10000n
+                    baseCollateralAmount = baseCollateralAmount - liquidationReward
+                    const treasureAmount = (baseCollateralAmount * BigInt(treasureFee)) / 10000n
+                    baseCollateralAmount = baseCollateralAmount - treasureAmount
+                }
+
+                // If margin token is not the collateral token, estimate swap output
+                if (marginTokenAddress.toLowerCase() !== collateralToken.toLowerCase()) {
+                    const priceToCollateral = await priceFeed.getPairLatestPrice(
+                        marginTokenAddress,
+                        collateralToken
+                    )
+                    const divisor = isShort ? baseDecimalsPow : quoteDecimalsPow
+                    const estimatedOut = (baseCollateralAmount * priceToCollateral) / divisor
+                    baseCollateralAmount = estimatedOut
+                }
+
+                // Call Market contract's calculatePositionOpening method with the estimated collateral
+                const market = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, readProvider)
+
+                const result = await market.calculatePositionOpening(
+                    price,
+                    leverage,
+                    baseCollateralAmount,
+                    isShort,
+                    baseToken,
+                    quoteToken
+                )
+
+                const [liquidationFloor, totalBorrow, borrowToken, liquidityPoolToken] = result
+
+                // Get decimals for borrow token
+                const isBorrowBase = borrowToken.toLowerCase() === baseToken.toLowerCase()
+                const borrowTokenDecimals = isBorrowBase ? baseDecimals : marginDecimals
+
+                // Calculate USD value of the borrow
+                const borrowUsdValue = await priceFeed.getAmountInUsd(borrowToken, totalBorrow)
+
+                return {
+                    totalBorrow,
+                    borrowTokenAddress: borrowToken,
+                    borrowTokenDecimals,
+                    totalBorrowFormatted: ethers.formatUnits(totalBorrow, borrowTokenDecimals),
+                    borrowUsdValue,
+                    borrowUsdFormatted: parseFloat(ethers.formatUnits(borrowUsdValue, 18)).toFixed(
+                        2
+                    ),
+                    liquidationFloor: liquidationFloor,
+                    price,
+                    isBaseMargin: !isMarginStable,
+                }
+            } catch (error) {
+                console.error("Error calculating required borrow:", error)
+                return null
+            }
+        },
+        [readProvider, address]
     )
 
     // --- Pool & Protocol Logic ---
@@ -497,11 +721,7 @@ export function useDeFi() {
                 PriceFeedL1ABI.abi,
                 readProvider
             )
-            const market = new ethers.Contract(
-                ADDRESSES.MARKET,
-                MarketABI.abi,
-                readProvider
-            )
+            const market = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, readProvider)
 
             const positionsBalances = {}
             const poolBalances = {}
@@ -528,10 +748,10 @@ export function useDeFi() {
                         LiquidityPoolABI.abi,
                         readProvider
                     )
-                    const totalAssets = await poolContract.totalAssets()
+                    const rawTotalAsset = await poolContract.rawTotalAsset()
                     const totalAssetsUsdBig = await priceFeed.getAmountInUsd(
                         token.address,
-                        totalAssets
+                        rawTotalAsset
                     )
 
                     // User Shares (if connected)
@@ -546,7 +766,7 @@ export function useDeFi() {
 
                     poolBalances[token.key] = {
                         address: poolAddress,
-                        totalAssets: ethers.formatUnits(totalAssets, posDecimals),
+                        totalAssets: ethers.formatUnits(rawTotalAsset, posDecimals),
                         totalAssetsUsd: parseFloat(
                             ethers.formatUnits(totalAssetsUsdBig, 18)
                         ).toFixed(2),
@@ -572,11 +792,7 @@ export function useDeFi() {
             if (!tokenAddress) throw new Error("Invalid Token")
 
             // Get Pool Address
-            const market = new ethers.Contract(
-                ADDRESSES.MARKET,
-                MarketABI.abi,
-                readProvider
-            )
+            const market = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, readProvider)
             const poolAddress = await market.getTokenToLiquidityPools(tokenAddress)
 
             if (!poolAddress || poolAddress === ethers.ZeroAddress)
@@ -605,11 +821,7 @@ export function useDeFi() {
             if (!signer) throw new Error("Wallet not connected")
 
             const tokenAddress = ADDRESSES[tokenKey]
-            const market = new ethers.Contract(
-                ADDRESSES.MARKET,
-                MarketABI.abi,
-                readProvider
-            )
+            const market = new ethers.Contract(ADDRESSES.MARKET, MarketABI.abi, readProvider)
             const poolAddress = await market.getTokenToLiquidityPools(tokenAddress)
 
             const poolContract = new ethers.Contract(poolAddress, LiquidityPoolABI.abi, signer)
@@ -667,6 +879,8 @@ export function useDeFi() {
         getTokenBalance,
         getAmountInUsd,
         calculateTokenAmountFromUsd,
+        calculateRequiredBorrow,
+        calculatePositionOpening,
         openPosition,
         simulateOpenPosition,
         closePosition,

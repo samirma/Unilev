@@ -65,16 +65,19 @@ async function getTokenBalance(contract, address, priceFeedL1Contract) {
         contract.name(),
         contract.symbol(),
         contract.decimals(),
-        contract.balanceOf(address)
-    ]);
+        contract.balanceOf(address),
+    ])
 
-    const formattedBalance = ethers.formatUnits(balance, decimals);
+    const formattedBalance = ethers.formatUnits(balance, decimals)
 
     // Fetch the USD value from the PriceFeedL1 contract
-    const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(await contract.getAddress(), balance);
-    const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2); // PriceFeedL1 returns USD with 18 decimals
+    const usdValueBigInt = await priceFeedL1Contract.getAmountInUsd(
+        await contract.getAddress(),
+        balance
+    )
+    const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2) // PriceFeedL1 returns USD with 18 decimals
 
-    console.log(`  ${symbol.padEnd(6)} : ${formattedBalance.padEnd(20)} (~$ ${usdValue} USD)`);
+    console.log(`  ${symbol.padEnd(6)} : ${formattedBalance.padEnd(20)} (~$ ${usdValue} USD)`)
 }
 
 /**
@@ -194,7 +197,7 @@ async function calculateTokenAmountFromUsd(tokenContract, priceFeedL1Contract, u
 async function logPositionDetails(posId, marketContract, priceFeedL1Contract, provider) {
     try {
         const params = await marketContract.getPositionParams(posId)
-        // params: baseToken, quoteToken, positionSize, timestamp, isShort, leverage, ...
+        // params: baseToken, quoteToken, positionSize, timestamp, isShort, leverage, liquidationFloor, limitPrice, stopLossPrice, currentPnL, collateralLeft
 
         const [
             baseToken,
@@ -210,32 +213,26 @@ async function logPositionDetails(posId, marketContract, priceFeedL1Contract, pr
             collateralLeft,
         ] = params
 
-        // Fetch symbols
+        // Fetch symbols and decimals
         const erc20Abi = getErc20Abi()
         const baseTokenContract = new ethers.Contract(baseToken, erc20Abi, provider)
         const quoteTokenContract = new ethers.Contract(quoteToken, erc20Abi, provider)
 
-        const [baseSymbol, baseDecimals, quoteSymbol] = await Promise.all([
+        const [baseSymbol, baseDecimals, quoteSymbol, quoteDecimals] = await Promise.all([
             baseTokenContract.symbol(),
             baseTokenContract.decimals(),
             quoteTokenContract.symbol(),
+            quoteTokenContract.decimals(),
         ])
 
-        const token0 = isShort ? baseToken : quoteToken
-        const token1 = isShort ? quoteToken : baseToken
-        const symbol0 = isShort ? baseSymbol : quoteSymbol
-        const symbol1 = isShort ? quoteSymbol : baseSymbol
-
-        // Calculate USD for the Position Size
-        const usdAmountBigInt = await priceFeedL1Contract.getAmountInUsd(baseToken, positionSize)
-        const usdAmount = parseFloat(ethers.formatUnits(usdAmountBigInt, 18)).toFixed(2)
-
-        // Fetch Position State
-        // Enum: 0=NONE, 1=TAKE_PROFIT, 2=ACTIVE, 3=STOP_LOSS, 4=LIQUIDATABLE, 5=BAD_DEBT, 6=EXPIRED
-        // We need to call Positions contract for this
+        // Fetch Position State and openPositions to get initialPrice
         const env = getEnvVars()
         const positionsAbi = getAbi("Positions")
         const positionsContract = new ethers.Contract(env.POSITIONS_ADDRESS, positionsAbi, provider)
+
+        // Get initialPrice directly from contract storage
+        const posParams = await positionsContract.openPositions(posId)
+        const initialPrice = posParams.initialPrice
 
         const stateInt = await positionsContract.getPositionState(posId)
         const states = [
@@ -250,19 +247,80 @@ async function logPositionDetails(posId, marketContract, priceFeedL1Contract, pr
         const stateStr = states[Number(stateInt)] || "UNKNOWN"
         const isLiquidable = stateStr === "LIQUIDATABLE" || stateStr === "BAD_DEBT"
 
-        console.log("\n--- Position Details ---")
-        console.log(`Position ID: ${posId}`)
-        console.log(`State: ${stateStr}`)
-        console.log(`Liquidable: ${isLiquidable ? "Yes" : "No"}`)
-        console.log(`Type: ${isShort ? "SHORT" : "LONG"} ${leverage}x`)
-        console.log(`Token0 (Collateral): ${token0} (${symbol0})`)
-        console.log(`Token1 (Target): ${token1} (${symbol1})`)
-        console.log(
-            `Size: ${ethers.formatUnits(positionSize, baseDecimals)} ${baseSymbol} (~$${usdAmount})`
+        // Calculate USD for the Position Size
+        const usdAmountBigInt = await priceFeedL1Contract.getAmountInUsd(baseToken, positionSize)
+        const usdAmount = parseFloat(ethers.formatUnits(usdAmountBigInt, 18)).toFixed(2)
+
+        // Calculate PnL in base token and USD
+        const pnlInBase = Number(currentPnL)
+        const pnlFormatted = ethers.formatUnits(
+            pnlInBase < 0 ? -currentPnL : currentPnL,
+            baseDecimals
         )
-        console.log(`PnL: ${currentPnL}`)
-        console.log(`Collateral Left: ${collateralLeft}`)
-        console.log("------------------------\n")
+        const pnlUsdBigInt = await priceFeedL1Contract.getAmountInUsd(
+            baseToken,
+            pnlInBase < 0 ? -currentPnL : currentPnL
+        )
+        const pnlUsd = parseFloat(ethers.formatUnits(pnlUsdBigInt, 18)).toFixed(2)
+        const pnlSign = pnlInBase >= 0 ? "+" : "-"
+
+        // Get current price
+        let currentPrice = 0n
+        try {
+            currentPrice = await priceFeedL1Contract.getPairLatestPrice(baseToken, quoteToken)
+        } catch (e) {
+            // Price feed might not exist
+        }
+
+        // Format prices with quote token decimals (pair price uses quote decimals)
+        const currentPriceFormatted = ethers.formatUnits(currentPrice, quoteDecimals)
+        const initialPriceFormatted = ethers.formatUnits(initialPrice, quoteDecimals)
+
+        const currentPriceNum = parseFloat(currentPriceFormatted)
+        const initialPriceNum = parseFloat(initialPriceFormatted)
+
+        // Calculate profitable price threshold (entry price)
+        // For LONG: need price > initialPrice to be profitable
+        // For SHORT: need price < initialPrice to be profitable
+        const profitableThreshold = initialPriceNum
+        const isProfitable = isShort
+            ? currentPriceNum < profitableThreshold
+            : currentPriceNum > profitableThreshold
+
+        // Verify PnL aligns with price comparison
+        // PnL from contract should match our isProfitable calculation
+        const pnlAligned = pnlInBase >= 0 === isProfitable
+
+        console.log("\n═══════════════════════════════════════════════════")
+        console.log(`  POSITION #${posId} - ${stateStr}${isLiquidable ? " ⚠️" : ""}`)
+        console.log("═══════════════════════════════════════════════════")
+        console.log(`  Type:       ${isShort ? "SHORT 📉" : "LONG 📈"} ${leverage}x`)
+        console.log(`  Pair:       ${baseSymbol}/${quoteSymbol}`)
+        console.log(`  Size:       ${ethers.formatUnits(positionSize, baseDecimals)} ${baseSymbol}`)
+        console.log(`  Value:      ~$${usdAmount} USD`)
+        console.log("───────────────────────────────────────────────────")
+        console.log(
+            `  PnL:        ${pnlSign}${parseFloat(pnlFormatted).toFixed(
+                6
+            )} ${baseSymbol} (${pnlSign}$${pnlUsd})`
+        )
+        console.log(
+            `  Collateral: ${ethers.formatUnits(
+                collateralLeft < 0 ? -collateralLeft : collateralLeft,
+                baseDecimals
+            )} ${baseSymbol}`
+        )
+        console.log("───────────────────────────────────────────────────")
+        console.log(`  ${baseSymbol}: ${currentPriceNum.toFixed(0)} ${quoteSymbol}`)
+        console.log(
+            `  ${isProfitable ? "✅ In Profit" : "⏳ Waiting"} | ${
+                isShort ? "BELOW" : "ABOVE"
+            } ${profitableThreshold.toFixed(0)} ${quoteSymbol}`
+        )
+        if (!pnlAligned) {
+            console.log(`  ⚠️  PnL may include fees/slippage`)
+        }
+        console.log("═══════════════════════════════════════════════════\n")
     } catch (error) {
         console.error(`Failed to fetch details for Position ${posId}:`, error.message)
     }
@@ -270,14 +328,14 @@ async function logPositionDetails(posId, marketContract, priceFeedL1Contract, pr
 
 /**
  * Generates and logs a pre-flight table and checks capacity.
- * @param {ethers.Provider} provider 
- * @param {ethers.Contract} marketContract 
- * @param {ethers.Contract} priceFeedL1Contract 
+ * @param {ethers.Provider} provider
+ * @param {ethers.Contract} marketContract
+ * @param {ethers.Contract} priceFeedL1Contract
  * @param {string} token0Address Collateral token address
  * @param {string} token1Address Target token address
- * @param {bigint} positionAmount 
- * @param {number} leverage 
- * @param {boolean} isShort 
+ * @param {bigint} positionAmount
+ * @param {number} leverage
+ * @param {boolean} isShort
  * @returns {Promise<boolean>} True if capacity left >= borrow amount, false otherwise.
  */
 async function checkAndLogPreflightTable(
@@ -290,95 +348,112 @@ async function checkAndLogPreflightTable(
     leverage,
     isShort
 ) {
-    const erc20Abi = getErc20Abi();
-    const lpAbi = getLiquidityPoolAbi();
+    const erc20Abi = getErc20Abi()
+    const lpAbi = getLiquidityPoolAbi()
 
-    const token0Contract = new ethers.Contract(token0Address, erc20Abi, provider);
-    const token1Contract = new ethers.Contract(token1Address, erc20Abi, provider);
+    const token0Contract = new ethers.Contract(token0Address, erc20Abi, provider)
+    const token1Contract = new ethers.Contract(token1Address, erc20Abi, provider)
 
     const [decimals, symbol0, symbol1] = await Promise.all([
         token0Contract.decimals(),
         token0Contract.symbol(),
-        token1Contract.symbol()
-    ]);
+        token1Contract.symbol(),
+    ])
 
     // Determine which token is base and which is quote (logic similar to PositionLogic.sol)
-    const token0UsdPrice = await priceFeedL1Contract.getTokenLatestPriceInUsd(token0Address);
-    const isToken0Stable = (token0UsdPrice >= 0.9e18 && token0UsdPrice <= 1.1e18);
-    
-    let baseTokenAddress, quoteTokenAddress, baseSymbol, quoteSymbol;
+    const token0UsdPrice = await priceFeedL1Contract.getTokenLatestPriceInUsd(token0Address)
+    const isToken0Stable = token0UsdPrice >= 0.9e18 && token0UsdPrice <= 1.1e18
+
+    let baseTokenAddress, quoteTokenAddress, baseSymbol, quoteSymbol
     if (isToken0Stable) {
-        quoteTokenAddress = token0Address;
-        quoteSymbol = symbol0;
-        baseTokenAddress = token1Address;
-        baseSymbol = symbol1;
+        quoteTokenAddress = token0Address
+        quoteSymbol = symbol0
+        baseTokenAddress = token1Address
+        baseSymbol = symbol1
     } else {
-        baseTokenAddress = token0Address;
-        baseSymbol = symbol0;
-        quoteTokenAddress = token1Address;
-        quoteSymbol = symbol1;
+        baseTokenAddress = token0Address
+        baseSymbol = symbol0
+        quoteTokenAddress = token1Address
+        quoteSymbol = symbol1
     }
 
-    const poolTokenAddress = isShort ? baseTokenAddress : quoteTokenAddress;
-    const poolSymbol = isShort ? baseSymbol : quoteSymbol;
-    
-    const poolAddress = await marketContract.getTokenToLiquidityPools(poolTokenAddress);
+    const poolTokenAddress = isShort ? baseTokenAddress : quoteTokenAddress
+    const poolSymbol = isShort ? baseSymbol : quoteSymbol
+
+    const poolAddress = await marketContract.getTokenToLiquidityPools(poolTokenAddress)
     if (!poolAddress || poolAddress === ethers.ZeroAddress) {
-        console.error(`❌ No liquidity pool found for ${poolSymbol}`);
-        return false;
+        console.error(`❌ No liquidity pool found for ${poolSymbol}`)
+        return false
     }
 
-    const poolTokenContract = new ethers.Contract(poolTokenAddress, erc20Abi, provider);
-    const poolDecimals = await poolTokenContract.decimals();
-    const poolBalanceRaw = await poolTokenContract.balanceOf(poolAddress);
+    const poolTokenContract = new ethers.Contract(poolTokenAddress, erc20Abi, provider)
+    const poolDecimals = await poolTokenContract.decimals()
+    const poolBalanceRaw = await poolTokenContract.balanceOf(poolAddress)
 
-    const liquidityPoolContract = new ethers.Contract(poolAddress, lpAbi, provider);
-    const capacityLeftRaw = await liquidityPoolContract.borrowCapacityLeft();
+    const liquidityPoolContract = new ethers.Contract(poolAddress, lpAbi, provider)
+    const capacityLeftRaw = await liquidityPoolContract.borrowCapacityLeft()
 
     // Uniswap V3 Factory address from Positions.sol or HelperConfig.sol
-    const UNISWAP_V3_FACTORY = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
-    const v3FactoryAbi = ["function getPool(address,address,uint24) view returns (address)"];
-    const v3Factory = new ethers.Contract(UNISWAP_V3_FACTORY, v3FactoryAbi, provider);
-    const v3Pool = await v3Factory.getPool(token0Address, token1Address, 3000);
+    const UNISWAP_V3_FACTORY = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+    const v3FactoryAbi = ["function getPool(address,address,uint24) view returns (address)"]
+    const v3Factory = new ethers.Contract(UNISWAP_V3_FACTORY, v3FactoryAbi, provider)
+    const v3Pool = await v3Factory.getPool(token0Address, token1Address, 3000)
 
-    let expectedBorrowAmountRaw;
+    let expectedBorrowAmountRaw
     if (isShort) {
         // Short: Borrow baseToken
         // For simulation, we simplify: positionAmount is in token0.
         // If token0 is base, it's easy.
         if (!isToken0Stable) {
-            expectedBorrowAmountRaw = positionAmount * BigInt(leverage);
+            expectedBorrowAmountRaw = positionAmount * BigInt(leverage)
         } else {
-            const priceRaw = await priceFeedL1Contract.getPairLatestPrice(baseTokenAddress, quoteTokenAddress);
-            expectedBorrowAmountRaw = (positionAmount * BigInt(10 ** poolDecimals) * BigInt(leverage)) / priceRaw;
+            const priceRaw = await priceFeedL1Contract.getPairLatestPrice(
+                baseTokenAddress,
+                quoteTokenAddress
+            )
+            expectedBorrowAmountRaw =
+                (positionAmount * BigInt(10 ** poolDecimals) * BigInt(leverage)) / priceRaw
         }
     } else {
         // Long: Borrow quoteToken
         if (isToken0Stable) {
             // positionAmount is in USDC, we borrow USDC
-            expectedBorrowAmountRaw = positionAmount * BigInt(leverage - 1);
+            expectedBorrowAmountRaw = positionAmount * BigInt(leverage - 1)
         } else {
             // positionAmount is in WBTC, we borrow USDC
-            const priceRaw = await priceFeedL1Contract.getPairLatestPrice(baseTokenAddress, quoteTokenAddress);
-            expectedBorrowAmountRaw = (positionAmount * BigInt(leverage - 1) * priceRaw) / (10n ** BigInt(poolDecimals));
+            const priceRaw = await priceFeedL1Contract.getPairLatestPrice(
+                baseTokenAddress,
+                quoteTokenAddress
+            )
+            expectedBorrowAmountRaw =
+                (positionAmount * BigInt(leverage - 1) * priceRaw) / 10n ** BigInt(poolDecimals)
         }
     }
 
-    const willPass = capacityLeftRaw >= expectedBorrowAmountRaw;
+    const willPass = capacityLeftRaw >= expectedBorrowAmountRaw
 
-    console.log("\n====== Pre-flight Check ======");
-    console.log(`Operation:       ${isShort ? "Short" : "Long"}`);
-    console.log(`Collateral:      ${symbol0}`);
-    console.log(`Target:          ${symbol1}`);
-    console.log(`V3 Pool:         ${v3Pool}`);
-    console.log(`Borrow Amount:   ${ethers.formatUnits(expectedBorrowAmountRaw, poolDecimals)} ${poolSymbol}`);
-    console.log(`Borrow Pool:     ${poolAddress}`);
-    console.log(`Pool Balance:    ${ethers.formatUnits(poolBalanceRaw, poolDecimals)} ${poolSymbol}`);
-    console.log(`Capacity Left:   ${ethers.formatUnits(capacityLeftRaw, poolDecimals)} ${poolSymbol}`);
-    console.log(`Would Pass:      ${willPass ? "✅ Yes" : "❌ No"}`);
-    console.log("==============================\n");
+    console.log("\n====== Pre-flight Check ======")
+    console.log(`Operation:       ${isShort ? "Short" : "Long"}`)
+    console.log(`Collateral:      ${symbol0}`)
+    console.log(`Target:          ${symbol1}`)
+    console.log(`V3 Pool:         ${v3Pool}`)
+    console.log(
+        `Borrow Amount:   ${ethers.formatUnits(
+            expectedBorrowAmountRaw,
+            poolDecimals
+        )} ${poolSymbol}`
+    )
+    console.log(`Borrow Pool:     ${poolAddress}`)
+    console.log(
+        `Pool Balance:    ${ethers.formatUnits(poolBalanceRaw, poolDecimals)} ${poolSymbol}`
+    )
+    console.log(
+        `Capacity Left:   ${ethers.formatUnits(capacityLeftRaw, poolDecimals)} ${poolSymbol}`
+    )
+    console.log(`Would Pass:      ${willPass ? "✅ Yes" : "❌ No"}`)
+    console.log("==============================\n")
 
-    return willPass;
+    return willPass
 }
 
 module.exports = {

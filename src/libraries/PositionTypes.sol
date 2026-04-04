@@ -24,7 +24,7 @@ struct PositionParams {
     uint256 totalBorrow;       // Total borrow in baseToken if long or quoteToken if short
     
     // Slot 2: 32 bytes
-    uint256 breakEvenLimit;    // After this limit the position is undercollateralize => 0 if no leverage or short
+    uint256 liquidationFloor;    // Price at which position becomes undercollateralized (total loss threshold)
     
     // Slot 3: 32 bytes
     uint256 stopLossPrice;     // Stop loss price => 0 if no stop loss

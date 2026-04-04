@@ -8,8 +8,10 @@ import {IMarket} from "./interfaces/IMarket.sol";
 import {Positions} from "./Positions.sol";
 import {LiquidityPoolFactory} from "./LiquidityPoolFactory.sol";
 import {PriceFeedL1} from "./PriceFeedL1.sol";
+import {PositionLogic} from "./libraries/PositionLogic.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract Market is IMarket, Ownable, Pausable {
     using SafeERC20 for IERC20;
@@ -120,7 +122,7 @@ contract Market is IMarket, Ownable, Pausable {
             uint64 timestamp_,
             bool isShort_,
             uint8 leverage_,
-            uint256 breakEvenLimit_,
+            uint256 liquidationFloor_,
             uint160 limitPrice_,
             uint256 stopLossPrice_,
             int128 currentPnL_,
@@ -128,6 +130,65 @@ contract Market is IMarket, Ownable, Pausable {
         )
     {
         return POSITIONS.getPositionParams(_posId);
+    }
+
+    /**
+     * @notice Calculate position opening parameters (borrow amount, liquidation floor, etc.)
+     * @param _price Current price from oracle (base/quote)
+     * @param _leverage Leverage multiplier (2-5)
+     * @param _baseCollateralAmount Collateral amount after fees/swap (in base token decimals)
+     * @param _isShort True for short position
+     * @param _baseToken Base token address
+     * @param _quoteToken Quote token address
+     * @return liquidationFloor Price at which position is undercollateralized (collateral depleted)
+     * @return totalBorrow Amount to borrow from liquidity pool
+     * @return borrowToken Token to borrow (base for short, quote for long)
+     * @return liquidityPoolToken Token for liquidity pool lookup
+     */
+    function calculatePositionOpening(
+        uint256 _price,
+        uint8 _leverage,
+        uint128 _baseCollateralAmount,
+        bool _isShort,
+        address _baseToken,
+        address _quoteToken
+    )
+        external
+        view
+        returns (
+            uint256 liquidationFloor,
+            uint256 totalBorrow,
+            address borrowToken,
+            address liquidityPoolToken
+        )
+    {
+        // Get base token decimals
+        uint8 baseDecimals = IERC20Metadata(_baseToken).decimals();
+        uint256 baseDecimalsPow = 10 ** baseDecimals;
+
+        // Build calculation params
+        PositionLogic.PositionOpeningCalcParams memory params = PositionLogic
+            .PositionOpeningCalcParams({
+                price: _price,
+                leverage: _leverage,
+                baseCollateralAmount: _baseCollateralAmount,
+                baseDecimals: baseDecimals,
+                baseDecimalsPow: baseDecimalsPow,
+                isShort: _isShort,
+                baseToken: _baseToken,
+                quoteToken: _quoteToken
+            });
+
+        // Calculate position opening parameters
+        PositionLogic.PositionOpeningCalcResult memory result = PositionLogic
+            .calculatePositionOpening(params);
+
+        return (
+            result.liquidationFloor,
+            result.totalBorrow,
+            result.borrowToken,
+            result.liquidityPoolToken
+        );
     }
 
     // --------------- Liquidator/Keeper Zone ----------------

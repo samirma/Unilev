@@ -47,11 +47,41 @@ interface IMarket {
             uint64 timestamp_,
             bool isShort_,
             uint8 leverage_,
-            uint256 breakEvenLimit_,
+            uint256 liquidationFloor_,
             uint160 limitPrice_,
             uint256 stopLossPrice_,
             int128 currentPnL_,
             int128 collateralLeft_
+        );
+
+    /**
+     * @notice Calculate position opening parameters (borrow amount, break-even, etc.)
+     * @param _price Current price from oracle (base/quote)
+     * @param _leverage Leverage multiplier (2-5)
+     * @param _baseCollateralAmount Collateral amount after fees/swap (in base token decimals)
+     * @param _isShort True for short position
+     * @param _baseToken Base token address
+     * @param _quoteToken Quote token address
+     * @return liquidationFloor Price at which position is undercollateralized (collateral depleted)
+     * @return totalBorrow Amount to borrow from liquidity pool
+     * @return borrowToken Token to borrow (base for short, quote for long)
+     * @return liquidityPoolToken Token for liquidity pool lookup
+     */
+    function calculatePositionOpening(
+        uint256 _price,
+        uint8 _leverage,
+        uint128 _baseCollateralAmount,
+        bool _isShort,
+        address _baseToken,
+        address _quoteToken
+    )
+        external
+        view
+        returns (
+            uint256 liquidationFloor,
+            uint256 totalBorrow,
+            address borrowToken,
+            address liquidityPoolToken
         );
 
     // --------------- Liquidator/Keeper Zone ---------------

@@ -59,6 +59,26 @@ library PositionLogic {
         int128 collateralLeft;
     }
 
+    // Input struct for position opening calculations
+    struct PositionOpeningCalcParams {
+        uint256 price; // Current price from oracle
+        uint8 leverage; // Leverage multiplier (2-5)
+        uint128 baseCollateralAmount; // Collateral after swaps/fees
+        uint8 baseDecimals; // Decimals of base token
+        uint256 baseDecimalsPow; // 10^baseDecimals
+        bool isShort; // True for short position
+        address baseToken; // Base token address
+        address quoteToken; // Quote token address
+    }
+
+    // Output struct for position opening calculations
+    struct PositionOpeningCalcResult {
+        uint256 liquidationFloor; // Price at which position becomes undercollateralized (collateral depleted)
+        uint256 totalBorrow; // Amount to borrow from liquidity pool
+        address borrowToken; // Token to borrow (base for short, quote for long)
+        address liquidityPoolToken; // Token for liquidity pool lookup
+    }
+
     /**
      * @notice Calculate the PnL and collateral left for a position
      * @param params PnL calculation parameters
@@ -218,6 +238,49 @@ library PositionLogic {
         }
         if (params.stopLossPrice < result.price && params.stopLossPrice != 0) {
             revert Positions__STOP_LOSS_ORDER_PRICE_NOT_CONCISTENT(params.stopLossPrice);
+        }
+    }
+
+    /**
+     * @notice Calculate position opening parameters (breakEven, borrow amounts)
+     * @param params Calculation input parameters
+     * @return result Calculated outputs for position opening
+     * @dev Logic:
+     * - Short: breakEven = price + price/leverage (price goes UP = loss)
+     * - Long: breakEven = price - price/leverage (price goes DOWN = loss)
+     * - Short totalBorrow: collateral * leverage * baseDecimalsPow / price
+     * - Long totalBorrow: collateral * (leverage-1) * price / baseDecimalsPow
+     */
+    function calculatePositionOpening(
+        PositionOpeningCalcParams memory params
+    ) internal pure returns (PositionOpeningCalcResult memory result) {
+        // Liquidation floor calculation (price where collateral is fully depleted)
+        // For short: liquidation floor = price + price/leverage (price goes UP = loss)
+        // For long: liquidation floor = price - price/leverage (price goes DOWN = loss)
+        if (params.isShort) {
+            result.liquidationFloor =
+                params.price +
+                (params.price * 10000) /
+                (uint256(params.leverage) * 10000);
+            result.totalBorrow =
+                (uint256(params.baseCollateralAmount) *
+                    params.baseDecimalsPow *
+                    params.leverage) /
+                params.price;
+            result.borrowToken = params.baseToken;
+            result.liquidityPoolToken = params.baseToken;
+        } else {
+            result.liquidationFloor =
+                params.price -
+                (params.price * 10000) /
+                (uint256(params.leverage) * 10000);
+            result.totalBorrow =
+                (uint256(params.baseCollateralAmount) *
+                    (params.leverage - 1) *
+                    params.price) /
+                params.baseDecimalsPow;
+            result.borrowToken = params.quoteToken;
+            result.liquidityPoolToken = params.quoteToken;
         }
     }
 }
