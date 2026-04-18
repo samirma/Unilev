@@ -774,6 +774,7 @@ contract Positions is ERC721, Ownable, ReentrancyGuard, Pausable {
             initialPrice: initialPrice,
             currentPrice: currentPrice,
             totalBorrow: pos.totalBorrow,
+            positionSize: pos.positionSize,
             collateralSize: pos.collateralSize,
             leverage: pos.leverage,
             isShort: isShort_,

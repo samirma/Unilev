@@ -44,6 +44,7 @@ library PositionLogic {
         uint256 initialPrice;
         uint256 currentPrice;
         uint256 totalBorrow;
+        uint128 positionSize;
         uint128 collateralSize;
         uint8 leverage;
         bool isShort;
@@ -91,26 +92,31 @@ library PositionLogic {
     function calculatePnL(
         PnLCalculationParams memory params
     ) internal view returns (PnLCalculationResult memory result) {
-        // Calculate price change percentage
-        int256 priceChangePercent;
-        if (params.currentPrice > params.initialPrice) {
-            priceChangePercent = int256((params.currentPrice - params.initialPrice) * 10000) / int256(params.initialPrice);
-        } else {
-            priceChangePercent = -int256((params.initialPrice - params.currentPrice) * 10000) / int256(params.initialPrice);
-        }
+        int256 finalValue;
+        uint256 collat = uint256(params.collateralSize);
+        uint256 positionSize = uint256(params.positionSize);
+        uint256 swapInputAmount;
 
-        uint256 positionSize = uint256(params.collateralSize) * params.leverage;
-        int256 rawPnl;
         if (params.isShort) {
-            rawPnl = -int256(positionSize) * priceChangePercent / 10000;
+            // Short: Total Quote Held = positionSize + collateral
+            uint256 totalQuoteHeld = positionSize + collat;
+            // Debt is taken in Base. Current Quote required to buy back Base = positionSize * (current/initial)
+            uint256 debtQuoteCurrent = (positionSize * params.currentPrice) / params.initialPrice;
+            
+            finalValue = int256(totalQuoteHeld) - int256(debtQuoteCurrent);
+            swapInputAmount = debtQuoteCurrent;
         } else {
-            rawPnl = int256(positionSize) * priceChangePercent / 10000;
-        }
+            // Long: Total Base Held = positionSize
+            uint256 initialBaseSwapped = positionSize > collat ? positionSize - collat : 0;
+            // Debt is taken in Quote. Current Base required to buy back Quote = initial ratio * (initial/current)
+            uint256 debtBaseCurrent = (initialBaseSwapped * params.initialPrice) / params.currentPrice;
 
-        int256 finalValue = int256(uint256(params.collateralSize)) + rawPnl;
+            finalValue = int256(positionSize) - int256(debtBaseCurrent);
+            swapInputAmount = debtBaseCurrent;
+        }
 
         if (finalValue > 0 && params.poolFee > 0) {
-            int256 swapFee = (finalValue * int256(uint256(params.poolFee))) / 1_000_000;
+            int256 swapFee = (int256(swapInputAmount) * int256(uint256(params.poolFee))) / 1_000_000;
             finalValue -= swapFee;
         }
 
