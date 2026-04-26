@@ -3,15 +3,24 @@ import { useDeFi } from "../hooks/useDeFi"
 import { useAccount } from "wagmi"
 import clsx from "clsx"
 import { formatContractError, isUserCancellation } from "../utils/formatContractError"
+import { useAdmin } from "../contexts/AdminContext"
 
 export function PositionsList() {
     const { isConnected, address } = useAccount()
     const { getPositionsCount, getPositionDetails, closePosition } = useDeFi()
+    const { isAdmin } = useAdmin()
 
     const [activeTab, setActiveTab] = useState("my") // 'my' | 'global'
     const [positions, setPositions] = useState([])
     const [loading, setLoading] = useState(false)
     const [lastUpdated, setLastUpdated] = useState(null)
+
+    // Force tab back to 'my' if admin mode is toggled off
+    useEffect(() => {
+        if (!isAdmin && activeTab === "global") {
+            setActiveTab("my");
+        }
+    }, [isAdmin, activeTab]);
 
     const fetchPositions = useCallback(async () => {
         setLoading(true)
@@ -72,17 +81,19 @@ export function PositionsList() {
                     >
                         My Positions
                     </button>
-                    <button
-                        onClick={() => setActiveTab("global")}
-                        className={clsx(
-                            "px-4 py-1 rounded text-sm font-bold transition-all",
-                            activeTab === "global"
-                                ? "bg-white/10 text-white"
-                                : "text-gray-500 hover:text-white"
-                        )}
-                    >
-                        Global
-                    </button>
+                    {isAdmin && (
+                        <button
+                            onClick={() => setActiveTab("global")}
+                            className={clsx(
+                                "px-4 py-1 rounded text-sm font-bold transition-all",
+                                activeTab === "global"
+                                    ? "bg-white/10 text-white"
+                                    : "text-gray-500 hover:text-white"
+                            )}
+                        >
+                            Global
+                        </button>
+                    )}
                 </div>
             </div>
 

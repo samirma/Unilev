@@ -52,7 +52,7 @@ export function useDeFi() {
             }
             // Ultimate Fallback: Polygon Public RPC
             else {
-                const provider = new ethers.JsonRpcProvider("https://polygon-rpc.com")
+                const provider = new ethers.JsonRpcProvider("https://polygon.drpc.org")
                 setReadProvider(provider)
             }
         }
