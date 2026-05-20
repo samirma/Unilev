@@ -9,9 +9,11 @@ import { AdminToggle } from '@/components/AdminToggle';
 import { LiveChart } from '@/components/LiveChart';
 import { useAdmin } from '@/contexts/AdminContext';
 import Link from 'next/link';
+import { useState } from 'react';
 
 export default function Home() {
     const { isAdmin } = useAdmin();
+    const [activeChartToken, setActiveChartToken] = useState("WBTC");
 
     return (
         <main className="min-h-screen p-6 text-white max-w-[1600px] mx-auto">
@@ -34,6 +36,12 @@ export default function Home() {
                             Admin Panel
                         </Link>
                     )}
+                    <Link
+                        href="/pools"
+                        className="text-xs bg-green-500/10 hover:bg-green-500/20 px-3 py-1.5 rounded border border-green-500/20 text-green-400 transition-all uppercase tracking-widest font-bold"
+                    >
+                        Earn (Pools)
+                    </Link>
                     <ConnectButton />
                 </div>
             </header>
@@ -41,16 +49,16 @@ export default function Home() {
             {/* Dashboard Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-                {/* Left Column: Balances & Trade */}
-                <div className="space-y-6 w-full">
-                    <Balances />
-                    <TradeForm />
+                {/* Left Column (Main Focus): Chart & Positions */}
+                <div className="lg:col-span-2 w-full space-y-6">
+                    <LiveChart tokenKey={activeChartToken} />
+                    <PositionsList />
                 </div>
 
-                {/* Right Column: Positions List & Chart */}
-                <div className="lg:col-span-2 w-full space-y-6">
-                    <LiveChart />
-                    <PositionsList />
+                {/* Right Column: Trade Execution & Balances */}
+                <div className="space-y-6 w-full">
+                    <TradeForm onTradingTokenChange={setActiveChartToken} />
+                    <Balances />
                 </div>
             </div>
 

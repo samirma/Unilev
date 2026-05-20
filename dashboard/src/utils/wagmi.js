@@ -6,9 +6,7 @@ export const config = createConfig({
     chains: [polygon],
     connectors: [injected()],
     transports: {
-        // Explicitly override the viem default (polygon-rpc.com requires API key as of 2025)
-        // Using polygon.drpc.org - a free and reliable public Polygon RPC
-        [polygon.id]: http("https://polygon.drpc.org"),
+        [polygon.id]: http("https://polygon-mainnet.g.alchemy.com/v2/oT1vfY4yefQFB7Czqenvb"),
     },
     ssr: true,
 })
