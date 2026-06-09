@@ -6,7 +6,7 @@ import { polygon } from "wagmi/chains"
 import { ethers } from "ethers"
 import { formatContractError, isUserCancellation } from "../utils/formatContractError"
 
-export function TradeForm() {
+export function TradeForm({ onTradingTokenChange }) {
     const { isConnected, chainId, address } = useAccount()
     const {
         openPosition,
@@ -114,9 +114,9 @@ export function TradeForm() {
                 setMarginToken(SUPPORTED_TOKENS_LIST[0].key)
             }
             if (!SUPPORTED_TOKENS_LIST.find((t) => t.key === tradingToken)) {
-                setTradingToken(
-                    SUPPORTED_TOKENS_LIST[Math.min(1, SUPPORTED_TOKENS_LIST.length - 1)].key
-                )
+                const initialAsset = SUPPORTED_TOKENS_LIST[Math.min(1, SUPPORTED_TOKENS_LIST.length - 1)].key;
+                setTradingToken(initialAsset)
+                if (onTradingTokenChange) onTradingTokenChange(initialAsset);
             }
         }
     }, [
@@ -493,7 +493,10 @@ export function TradeForm() {
                         </label>
                         <select
                             value={tradingToken}
-                            onChange={(e) => setTradingToken(e.target.value)}
+                            onChange={(e) => {
+                                setTradingToken(e.target.value);
+                                if (onTradingTokenChange) onTradingTokenChange(e.target.value);
+                            }}
                             className="input-field bg-black/40"
                         >
                             {SUPPORTED_TOKENS_LIST.map((t) => (
