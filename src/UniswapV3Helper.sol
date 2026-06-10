@@ -15,12 +15,16 @@ contract UniswapV3Helper {
 
     receive() external payable {}
 
+    // [FIX LOW-2] Added _deadline parameter — callers must supply a real deadline
+    // (e.g. block.timestamp + N minutes) instead of block.timestamp, which provides
+    // zero protection because a validator can include the tx at any future block.
     function swapExactInputSingle(
         address _tokenIn,
         address _tokenOut,
         uint24 _fee,
         uint256 _amountIn,
-        uint256 _amountOutMinimum
+        uint256 _amountOutMinimum,
+        uint256 _deadline
     ) public returns (uint256 amountOut) {
         // Transfer the tokens from Positions.sol to this contract
         SafeERC20.safeTransferFrom(IERC20(_tokenIn), msg.sender, address(this), _amountIn);
@@ -34,7 +38,7 @@ contract UniswapV3Helper {
                 tokenOut: _tokenOut,
                 fee: _fee,
                 recipient: msg.sender,
-                deadline: block.timestamp,
+                deadline: _deadline,
                 amountIn: _amountIn,
                 amountOutMinimum: _amountOutMinimum,
                 sqrtPriceLimitX96: 0
@@ -43,12 +47,14 @@ contract UniswapV3Helper {
         amountOut = SWAP_ROUTER.exactInputSingle(params);
     }
 
+    // [FIX LOW-2] Added _deadline parameter — same reasoning as above.
     function swapExactOutputSingle(
         address _tokenIn,
         address _tokenOut,
         uint24 _fee,
         uint256 _amountOut,
-        uint256 _amountInMaximum
+        uint256 _amountInMaximum,
+        uint256 _deadline
     ) public returns (uint256 amountIn) {
         // Transfer the tokens from Positions.sol to this contract
         SafeERC20.safeTransferFrom(IERC20(_tokenIn), msg.sender, address(this), _amountInMaximum);
@@ -62,7 +68,7 @@ contract UniswapV3Helper {
                 tokenOut: _tokenOut,
                 fee: _fee,
                 recipient: msg.sender,
-                deadline: block.timestamp,
+                deadline: _deadline,
                 amountOut: _amountOut,
                 amountInMaximum: _amountInMaximum,
                 sqrtPriceLimitX96: 0

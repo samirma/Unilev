@@ -48,12 +48,8 @@ contract Deployments is Script, HelperConfig {
             msg.sender
         );
 
-        // transfer ownership
-        positions.transferOwnership(address(market));
-        liquidityPoolFactory.transferOwnership(address(market));
-        priceFeedL1.transferOwnership(address(market));
-
-        // initialize tokens (create pools + add price feeds)
+        // configure TWAP circuit breakers (must be done BEFORE transferring ownership)
+        priceFeedL1.setMaxDeviationBps(500); // 5% deviation threshold
         uint256 numTokens = conf.supportedTokens.length;
         address[] memory tokens = new address[](numTokens);
         address[] memory priceFeeds = new address[](numTokens);
@@ -61,8 +57,25 @@ contract Deployments is Script, HelperConfig {
         for (uint256 i = 0; i < numTokens; i++) {
             tokens[i] = conf.supportedTokens[i].token;
             priceFeeds[i] = conf.supportedTokens[i].priceFeed;
+            
+            HelperConfig.TokenInfo memory tInfo = conf.supportedTokens[i];
+            if (tInfo.twapPool != address(0)) {
+                priceFeedL1.setTwapConfig(
+                    tInfo.token,
+                    tInfo.twapPool,
+                    tInfo.twapIntermediateToken,
+                    tInfo.twapIntermediateIsUsd,
+                    1800 // 30-minute TWAP window
+                );
+            }
         }
 
+        // transfer ownership
+        positions.transferOwnership(address(market));
+        liquidityPoolFactory.transferOwnership(address(market));
+        priceFeedL1.transferOwnership(address(market));
+
+        // initialize tokens (create pools + add price feeds)
         market.initializeTokens(tokens, priceFeeds);
 
         vm.stopBroadcast();

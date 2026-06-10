@@ -85,7 +85,8 @@ contract MockUniswapV3Helper is Utils {
         address _tokenOut,
         uint24 _fee,
         uint256 _amountIn,
-        uint256 _amountOutMinimum
+        uint256 _amountOutMinimum,
+        uint256 _deadline
     ) public returns (uint256 amountOut) {
         // --- 1. Calculate amountOut (Net Effect of Swap) ---
 
@@ -149,7 +150,8 @@ contract MockUniswapV3Helper is Utils {
         address _tokenOut,
         uint24 _fee,
         uint256 _amountOut,
-        uint256 _amountInMaximum
+        uint256 _amountInMaximum,
+        uint256 _deadline
     ) public returns (uint256 amountIn) {
         // --- 1. Calculate amountIn (Net Cost of Swap) ---
 

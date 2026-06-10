@@ -146,6 +146,13 @@ library PositionLogic {
             )
         );
 
+        // [FIX LOW-5] Guard against address(0): getPool() returns address(0) for
+        // non-existent pools. Calling .factory() on address(0) would revert with an
+        // opaque low-level error instead of the informative custom error below.
+        if (result.v3Pool == address(0)) {
+            revert Positions__POOL_NOT_OFFICIAL(result.v3Pool);
+        }
+
         // Cache pool contract to avoid repeated external calls
         IUniswapV3Pool pool = IUniswapV3Pool(result.v3Pool);
 

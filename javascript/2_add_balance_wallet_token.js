@@ -79,12 +79,14 @@ async function main() {
 
     for (const p of swapParams) {
       console.log(`Swapping Wrapper Token for ${p.name}...`);
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
       const tx = await uniswapV3Helper.swapExactInputSingle(
         wrapperAddress,
         p.token,
         swapFee,
         wrapperAmountFor10USD,
         0n,
+        deadline,
         { nonce: nonce++ }
       );
       await tx.wait();

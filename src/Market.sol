@@ -16,6 +16,11 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 contract Market is IMarket, Ownable, Pausable {
     using SafeERC20 for IERC20;
 
+    // [FIX INFO-3] Emitted when a batch liquidation attempt fails for a specific position.
+    // Previously the empty catch {} silently swallowed failures, making them invisible
+    // to off-chain keepers and indexers. Now bots can react and retry appropriately.
+    event LiquidationFailed(uint256 indexed posId, address indexed liquidator, bytes reason);
+
     Positions private immutable POSITIONS;
     LiquidityPoolFactory private immutable LIQUIDITY_POOL_FACTORY;
     PriceFeedL1 private immutable PRICE_FEED;
@@ -196,10 +201,13 @@ contract Market is IMarket, Ownable, Pausable {
         uint256 len = _posIds.length;
 
         for (uint256 i; i < len; ++i) {
-            // Is that safe ?
+            // [FIX INFO-3] Capture revert reason and emit LiquidationFailed so
+            // off-chain keepers can identify and react to problematic positions.
             try POSITIONS.liquidatePosition(msg.sender, _posIds[i]) {
                 emit PositionLiquidated(_posIds[i], msg.sender);
-            } catch {}
+            } catch (bytes memory reason) {
+                emit LiquidationFailed(_posIds[i], msg.sender, reason);
+            }
         }
     }
 
