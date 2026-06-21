@@ -3,12 +3,12 @@ import { ethers } from "ethers";
 import { useAccount, useWalletClient } from "wagmi";
 
 // Mock environment variables MUST be set before requiring useDeFi
-process.env.PRICEFEEDL1_ADDRESS = "0xPriceFeed";
-process.env.POSITIONS_ADDRESS = "0xPositions";
-process.env.MARKET_ADDRESS = "0xMarket";
-process.env.LIQUIDITYPOOLFACTORY_ADDRESS = "0xPoolFactory";
-process.env.FEEMANAGER_ADDRESS = "0xFeeManager";
-process.env.RPC_URL = "http://localhost:8545";
+process.env.NEXT_PUBLIC_PRICEFEEDL1_ADDRESS = "0xPriceFeed";
+process.env.NEXT_PUBLIC_POSITIONS_ADDRESS = "0xPositions";
+process.env.NEXT_PUBLIC_MARKET_ADDRESS = "0xMarket";
+process.env.NEXT_PUBLIC_LIQUIDITYPOOLFACTORY_ADDRESS = "0xPoolFactory";
+process.env.NEXT_PUBLIC_FEEMANAGER_ADDRESS = "0xFeeManager";
+process.env.NEXT_PUBLIC_RPC_URL = "http://localhost:8545";
 
 // Mock wagmi
 jest.mock("wagmi", () => ({

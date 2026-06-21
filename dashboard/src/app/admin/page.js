@@ -45,6 +45,12 @@ export default function AdminPage() {
                     <Link href="/" className="text-sm text-gray-400 hover:text-white transition-colors">
                         ← Back to Trading
                     </Link>
+                    <Link
+                        href="/swap"
+                        className="text-xs bg-purple-500/10 hover:bg-purple-500/20 px-3 py-1.5 rounded border border-purple-500/20 text-purple-400 transition-all uppercase tracking-widest font-bold"
+                    >
+                        Swap
+                    </Link>
                     <ConnectButton />
                 </div>
             </header>

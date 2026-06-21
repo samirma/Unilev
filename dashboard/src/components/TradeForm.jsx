@@ -5,6 +5,7 @@ import { useAccount } from "wagmi"
 import { polygon } from "wagmi/chains"
 import { ethers } from "ethers"
 import { formatContractError, isUserCancellation } from "../utils/formatContractError"
+import { formatTokenAmount } from "../utils/format"
 
 export function TradeForm({ onTradingTokenChange }) {
     const { isConnected, chainId, address } = useAccount()
@@ -285,8 +286,11 @@ export function TradeForm({ onTradingTokenChange }) {
             }
 
             // Validation 2: Minimum USD amount ($1)
+            // Only enforce when price feed returns a valid value —
+            // if getAmountInUsd returns 0n due to a feed error, skip this check
+            // and let the contract validate instead.
             const usdBig = await getAmountInUsd(marginAddr, amountBig)
-            if (usdBig < 1000000000000000000n) {
+            if (usdBig > 0n && usdBig < 1000000000000000000n) {
                 // 1e18
                 throw new Error("Minimum position size is $1 USD.")
             }
@@ -521,7 +525,7 @@ export function TradeForm({ onTradingTokenChange }) {
                                     onClick={() => setAmount(balanceData.balance)}
                                     className="text-xs text-blue-400 cursor-pointer hover:text-blue-300"
                                 >
-                                    Max: {parseFloat(balanceData.balance).toFixed(4)}
+                                    Max: {formatTokenAmount(balanceData.balance, marginToken)}
                                 </span>
                             )}
                         </div>
@@ -570,7 +574,7 @@ export function TradeForm({ onTradingTokenChange }) {
                             <span>Required Borrow:</span>
                             <div className="text-right">
                                 <span className="font-mono">
-                                    {parseFloat(requiredBorrow.formatted).toFixed(6)}{" "}
+                                    {formatTokenAmount(requiredBorrow.formatted, isShort ? tradingToken : marginToken)}{" "}
                                     {isShort ? tradingToken : marginToken}
                                 </span>
                                 <span className="text-[10px] text-gray-500 ml-2">
@@ -581,7 +585,7 @@ export function TradeForm({ onTradingTokenChange }) {
                         <div className="flex justify-between mb-1">
                             <span>Pool Capacity:</span>
                             <span className="font-mono">
-                                {borrowCapacity.capacityFormatted}{" "}
+                                {formatTokenAmount(borrowCapacity.capacityFormatted, isShort ? tradingToken : marginToken)}{" "}
                                 {isShort ? tradingToken : marginToken}
                             </span>
                         </div>

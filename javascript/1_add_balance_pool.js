@@ -38,7 +38,7 @@ async function main() {
         process.exit(1)
     }
 
-    const wrapperAddress = env.WRAPPER_ADDRESS || supportedTokens.WETH
+    const wrapperAddress = env.WRAPPER_ADDRESS || supportedTokens.wrapper
     const wrapperContract = new ethers.Contract(wrapperAddress, erc20Abi, wallet)
 
     const priceFeedL1Contract = new ethers.Contract(

@@ -4,6 +4,7 @@ import { useAccount } from "wagmi"
 import clsx from "clsx"
 import { formatContractError, isUserCancellation } from "../utils/formatContractError"
 import { useAdmin } from "../contexts/AdminContext"
+import { formatTokenAmount } from "../utils/format"
 
 export function PositionsList() {
     const { isConnected, address } = useAccount()
@@ -195,7 +196,7 @@ function PositionCard({ position, isOwner, onClose }) {
                             )}
                         >
                             {position.pnlIsPositive ? "+" : "-"}
-                            {parseFloat(position.pnl).toFixed(4)} {position.baseSymbol}
+                            {formatTokenAmount(position.pnl, position.baseSymbol)} {position.baseSymbol}
                             <span
                                 className={clsx(
                                     "text-xs ml-1",
@@ -214,9 +215,9 @@ function PositionCard({ position, isOwner, onClose }) {
                                 : current > entry
                             return (
                                 <div className="text-xs text-gray-500 mt-1">
-                                    {position.baseSymbol}: {current.toFixed(0)}{" "}
+                                    {position.baseSymbol}: {formatTokenAmount(position.currentPrice, position.quoteSymbol)}{" "}
                                     {position.quoteSymbol} | {position.isShort ? "BELOW" : "ABOVE"}{" "}
-                                    {entry.toFixed(0)} {position.quoteSymbol}{" "}
+                                    {formatTokenAmount(position.entryPrice, position.quoteSymbol)} {position.quoteSymbol}{" "}
                                     {isProfitable ? "✅" : "⏳"}
                                 </div>
                             )

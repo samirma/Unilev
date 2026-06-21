@@ -37,6 +37,12 @@ export default function Home() {
                         </Link>
                     )}
                     <Link
+                        href="/swap"
+                        className="text-xs bg-purple-500/10 hover:bg-purple-500/20 px-3 py-1.5 rounded border border-purple-500/20 text-purple-400 transition-all uppercase tracking-widest font-bold"
+                    >
+                        Swap
+                    </Link>
+                    <Link
                         href="/pools"
                         className="text-xs bg-green-500/10 hover:bg-green-500/20 px-3 py-1.5 rounded border border-green-500/20 text-green-400 transition-all uppercase tracking-widest font-bold"
                     >

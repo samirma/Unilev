@@ -6,6 +6,7 @@ import { polygon } from 'wagmi/chains';
 import clsx from 'clsx';
 import { ethers } from 'ethers';
 import { formatContractError, isUserCancellation } from '../utils/formatContractError';
+import { formatTokenAmount } from '../utils/format';
 
 export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
     const { isConnected, address, chainId } = useAccount();
@@ -110,11 +111,11 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
                 <div className="flex justify-between items-end">
                     <div>
                         <div className="text-sm text-gray-400">Your Assets</div>
-                        <div className="text-2xl font-mono text-green-400">{userAssets}</div>
+                        <div className="text-2xl font-mono text-green-400">{formatTokenAmount(userAssets, selectedTokenKey)}</div>
                     </div>
                     <div className="text-right">
                         <div className="text-sm text-gray-400">Your Shares</div>
-                        <div className="font-mono text-gray-300">{userShares}</div>
+                        <div className="font-mono text-gray-300">{formatTokenAmount(userShares, selectedTokenKey)}</div>
                     </div>
                 </div>
             </div>
@@ -153,14 +154,14 @@ export function LiquidityPoolManager({ selectedTokenKey = 'USDC' }) {
                                 onClick={() => setAmount(userShares)}
                                 className="text-xs text-blue-400 cursor-pointer hover:text-blue-300"
                             >
-                                Max: {parseFloat(userShares).toFixed(4)}
+                                Max: {formatTokenAmount(userShares, selectedTokenKey)}
                             </span>
                         ) : (
                             <span
                                 onClick={() => setAmount(walletBalance)}
                                 className="text-xs text-blue-400 cursor-pointer hover:text-blue-300"
                             >
-                                Max: {parseFloat(walletBalance).toFixed(4)}
+                                Max: {formatTokenAmount(walletBalance, selectedTokenKey)}
                             </span>
                         )}
                     </div>
