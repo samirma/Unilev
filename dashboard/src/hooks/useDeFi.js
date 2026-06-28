@@ -20,11 +20,11 @@ export const SUPPORTED_TOKENS_LIST = Object.entries(supportedTokens)
 // Constants
 const ADDRESSES = {
     ...supportedTokens,
-    PRICEFEEDL1: process.env.PRICEFEEDL1_ADDRESS,
-    POSITIONS: process.env.POSITIONS_ADDRESS,
-    MARKET: process.env.MARKET_ADDRESS,
-    POOL_FACTORY: process.env.LIQUIDITYPOOLFACTORY_ADDRESS,
-    FEEMANAGER_ADDRESS: process.env.FEEMANAGER_ADDRESS,
+    PRICEFEEDL1: process.env.NEXT_PUBLIC_PRICEFEEDL1_ADDRESS,
+    POSITIONS: process.env.NEXT_PUBLIC_POSITIONS_ADDRESS,
+    MARKET: process.env.NEXT_PUBLIC_MARKET_ADDRESS,
+    POOL_FACTORY: process.env.NEXT_PUBLIC_LIQUIDITYPOOLFACTORY_ADDRESS,
+    FEEMANAGER_ADDRESS: process.env.NEXT_PUBLIC_FEEMANAGER_ADDRESS,
 }
 
 export function useDeFi() {
@@ -41,8 +41,8 @@ export function useDeFi() {
             setIsMetaMaskInstalled(hasMetaMask)
 
             // Priority: Local RPC_URL if configured
-            if (process.env.RPC_URL) {
-                const provider = new ethers.JsonRpcProvider(process.env.RPC_URL)
+            if (process.env.NEXT_PUBLIC_RPC_URL) {
+                const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL)
                 setReadProvider(provider)
             }
             // Fallback: window.ethereum (MetaMask)
@@ -72,11 +72,6 @@ export function useDeFi() {
             if (!readProvider || !tokenAddress || !userAddress) return null
             try {
                 const contract = new ethers.Contract(tokenAddress, ERC20ABI.abi, readProvider)
-                const priceFeed = new ethers.Contract(
-                    ADDRESSES.PRICEFEEDL1,
-                    PriceFeedL1ABI.abi,
-                    readProvider
-                )
 
                 const [symbol, decimals, balance] = await Promise.all([
                     contract.symbol(),
@@ -86,9 +81,20 @@ export function useDeFi() {
 
                 const formattedBalance = ethers.formatUnits(balance, decimals)
 
-                // Calculate USD Value
-                const usdValueBigInt = await priceFeed.getAmountInUsd(tokenAddress, balance)
-                const usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2)
+                // Calculate USD Value — wrapped separately so balances still load
+                // even when a token has no registered Chainlink price feed
+                let usdValue = "N/A"
+                try {
+                    const priceFeed = new ethers.Contract(
+                        ADDRESSES.PRICEFEEDL1,
+                        PriceFeedL1ABI.abi,
+                        readProvider
+                    )
+                    const usdValueBigInt = await priceFeed.getAmountInUsd(tokenAddress, balance)
+                    usdValue = parseFloat(ethers.formatUnits(usdValueBigInt, 18)).toFixed(2)
+                } catch {
+                    // Price feed not available for this token — show balance without USD value
+                }
 
                 return {
                     symbol,
@@ -182,7 +188,7 @@ export function useDeFi() {
                 )
                 return await priceFeed.getAmountInUsd(tokenAddress, amount)
             } catch (error) {
-                console.error("Error calculating USD amount:", error)
+                console.warn(`getAmountInUsd failed for token=${tokenAddress} amount=${amount}:`, error.shortMessage || error.message)
                 return 0n
             }
         },
@@ -728,51 +734,76 @@ export function useDeFi() {
 
             for (const token of SUPPORTED_TOKENS_LIST) {
                 if (!token.address) continue
-                const tokenContract = new ethers.Contract(token.address, ERC20ABI.abi, readProvider)
+                try {
+                    const tokenContract = new ethers.Contract(token.address, ERC20ABI.abi, readProvider)
 
-                // 1. POSITIONS Contract Balance
-                const posBal = await tokenContract.balanceOf(ADDRESSES.POSITIONS)
-                const posDecimals = await tokenContract.decimals()
-                const posUsdBig = await priceFeed.getAmountInUsd(token.address, posBal)
+                    // 1. POSITIONS Contract Balance
+                    const posBal = await tokenContract.balanceOf(ADDRESSES.POSITIONS)
+                    const posDecimals = await tokenContract.decimals()
 
-                positionsBalances[token.key] = {
-                    balance: ethers.formatUnits(posBal, posDecimals),
-                    usdValue: parseFloat(ethers.formatUnits(posUsdBig, 18)).toFixed(2),
-                }
+                    // USD price call — may fail if token has no Chainlink feed
+                    let posUsdValue = "N/A"
+                    try {
+                        const posUsdBig = await priceFeed.getAmountInUsd(token.address, posBal)
+                        posUsdValue = parseFloat(ethers.formatUnits(posUsdBig, 18)).toFixed(2)
+                    } catch {
+                        // Price feed not registered for this token
+                    }
 
-                // 2. Liquidity Pool Info
-                const poolAddress = await market.getTokenToLiquidityPools(token.address)
-                if (poolAddress && poolAddress !== ethers.ZeroAddress) {
-                    const poolContract = new ethers.Contract(
-                        poolAddress,
-                        LiquidityPoolABI.abi,
-                        readProvider
-                    )
-                    const rawTotalAsset = await poolContract.rawTotalAsset()
-                    const totalAssetsUsdBig = await priceFeed.getAmountInUsd(
-                        token.address,
-                        rawTotalAsset
-                    )
+                    positionsBalances[token.key] = {
+                        balance: ethers.formatUnits(posBal, posDecimals),
+                        usdValue: posUsdValue,
+                    }
 
-                    // User Shares (if connected)
-                    let userShares = 0n
-                    let userAssets = 0n
-                    if (address) {
-                        userShares = await poolContract.balanceOf(address)
-                        if (userShares > 0n) {
-                            userAssets = await poolContract.convertToAssets(userShares)
+                    // 2. Liquidity Pool Info
+                    let poolAddress
+                    try {
+                        poolAddress = await market.getTokenToLiquidityPools(token.address)
+                    } catch {
+                        // Token may not have a pool registered
+                    }
+                    if (poolAddress && poolAddress !== ethers.ZeroAddress) {
+                        const poolContract = new ethers.Contract(
+                            poolAddress,
+                            LiquidityPoolABI.abi,
+                            readProvider
+                        )
+                        const rawTotalAsset = await poolContract.rawTotalAsset()
+
+                        let totalAssetsUsd = "N/A"
+                        try {
+                            const totalAssetsUsdBig = await priceFeed.getAmountInUsd(
+                                token.address,
+                                rawTotalAsset
+                            )
+                            totalAssetsUsd = parseFloat(
+                                ethers.formatUnits(totalAssetsUsdBig, 18)
+                            ).toFixed(2)
+                        } catch {
+                            // Price feed not registered for this token
+                        }
+
+                        // User Shares (if connected)
+                        let userShares = 0n
+                        let userAssets = 0n
+                        if (address) {
+                            userShares = await poolContract.balanceOf(address)
+                            if (userShares > 0n) {
+                                userAssets = await poolContract.convertToAssets(userShares)
+                            }
+                        }
+
+                        poolBalances[token.key] = {
+                            address: poolAddress,
+                            totalAssets: ethers.formatUnits(rawTotalAsset, posDecimals),
+                            totalAssetsUsd,
+                            userShares: ethers.formatUnits(userShares, posDecimals),
+                            userAssets: ethers.formatUnits(userAssets, posDecimals),
                         }
                     }
-
-                    poolBalances[token.key] = {
-                        address: poolAddress,
-                        totalAssets: ethers.formatUnits(rawTotalAsset, posDecimals),
-                        totalAssetsUsd: parseFloat(
-                            ethers.formatUnits(totalAssetsUsdBig, 18)
-                        ).toFixed(2),
-                        userShares: ethers.formatUnits(userShares, posDecimals),
-                        userAssets: ethers.formatUnits(userAssets, posDecimals),
-                    }
+                } catch (tokenError) {
+                    // Skip tokens that fail entirely (e.g. contract not deployed)
+                    console.warn(`Skipping token ${token.key}:`, tokenError.message)
                 }
             }
 

@@ -38,7 +38,7 @@ async function main() {
         process.exit(1)
     }
 
-    const wrapperAddress = env.WRAPPER_ADDRESS || supportedTokens.WETH
+    const wrapperAddress = env.WRAPPER_ADDRESS || supportedTokens.wrapper
     const wrapperContract = new ethers.Contract(wrapperAddress, erc20Abi, wallet)
 
     const priceFeedL1Contract = new ethers.Contract(
@@ -128,12 +128,14 @@ async function main() {
 
             if (token.needsSwap) {
                 console.log(`- Swapping Wrapper Token for ${token.name}...`)
+                const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
                 const txSwap = await uniswapV3Helper.swapExactInputSingle(
                     wrapperAddress,
                     token.address,
                     swapFee,
                     nativeAmountFor100USD,
                     0n,
+                    deadline,
                     { nonce: nonce++ }
                 )
                 await txSwap.wait()

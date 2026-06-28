@@ -52,13 +52,19 @@ contract LiquidityPool is ERC4626, Ownable {
         uint256 _interests,
         uint256 _losses
     ) external onlyOwner {
-        // Losses are taken by the pool
-        borrowedFunds = uint256(int256(borrowedFunds) - int256(_amountBorrowed));
-        IERC20(asset()).safeTransferFrom(
-            msg.sender,
-            address(this),
-            _amountBorrowed + _interests - _losses
-        );
+        // [FIX C-4] Safe subtraction: if _amountBorrowed > borrowedFunds (bad-debt edge case),
+        // clamp to 0 instead of wrapping to a huge uint256 which would brick the pool.
+        borrowedFunds = _amountBorrowed >= borrowedFunds ? 0 : borrowedFunds - _amountBorrowed;
+
+        // [FIX INFO-4] Guard against arithmetic underflow: if losses exceed the total
+        // repayment amount (amountBorrowed + interests), clamp to zero rather than reverting.
+        // This prevents a scenario where bad-debt exceeds the principal from permanently
+        // locking the refund path and bricking the pool.
+        uint256 grossRepayment = _amountBorrowed + _interests;
+        uint256 toTransfer = grossRepayment > _losses ? grossRepayment - _losses : 0;
+        if (toTransfer > 0) {
+            IERC20(asset()).safeTransferFrom(msg.sender, address(this), toTransfer);
+        }
     }
 
     // --------------- View Zone ---------------
@@ -75,7 +81,11 @@ contract LiquidityPool is ERC4626, Ownable {
         return borrowedFunds;
     }
 
+    // [FIX LOW-3] Safe subtraction: after a loss writedown, borrowedFunds can momentarily
+    // exceed the borrow-ratio cap, causing the old arithmetic to revert (underflow).
+    // Clamp to 0 so the view function always returns a valid value.
     function borrowCapacityLeft() public view returns (uint256) {
-        return ((totalAssets() * maxBorrowRatio) / 10000) - borrowedFunds;
+        uint256 cap = (totalAssets() * maxBorrowRatio) / 10000;
+        return cap > borrowedFunds ? cap - borrowedFunds : 0;
     }
 }

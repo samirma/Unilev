@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useDeFi } from '../hooks/useDeFi';
 import { useAccount } from 'wagmi';
+import { formatTokenAmount } from '../utils/format';
 
 export function Balances() {
     const { isConnected, address } = useAccount();
@@ -59,7 +60,7 @@ export function Balances() {
                         <span className="font-bold text-gray-300">{t.name}</span>
                         <div className="text-right">
                             <div className="font-mono text-white">
-                                {balances[t.key] ? parseFloat(balances[t.key].balance).toFixed(4) : '...'}
+                                {balances[t.key] ? formatTokenAmount(balances[t.key].balance, t.name) : '...'}
                             </div>
                             <div className="text-xs text-gray-500 font-mono">
                                 {balances[t.key] ? `(~$${balances[t.key].usdValue})` : ''}

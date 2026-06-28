@@ -21,12 +21,13 @@ function copyFile(src, dest) {
 console.log("🔄 Syncing Environment Variables...");
 
 const envVars = [
-    { key: 'WRAPPER_ADDRESS', target: 'WRAPPER_ADDRESS' },
-    { key: 'PRICEFEEDL1_ADDRESS', target: 'PRICEFEEDL1_ADDRESS' },
-    { key: 'POSITIONS_ADDRESS', target: 'POSITIONS_ADDRESS' },
-    { key: 'MARKET_ADDRESS', target: 'MARKET_ADDRESS' },
-    { key: 'LIQUIDITYPOOLFACTORY_ADDRESS', target: 'LIQUIDITYPOOLFACTORY_ADDRESS' },
-    { key: 'FEEMANAGER_ADDRESS', target: 'FEEMANAGER_ADDRESS' }
+    { key: 'WRAPPER_ADDRESS', target: 'NEXT_PUBLIC_WRAPPER_ADDRESS' },
+    { key: 'PRICEFEEDL1_ADDRESS', target: 'NEXT_PUBLIC_PRICEFEEDL1_ADDRESS' },
+    { key: 'POSITIONS_ADDRESS', target: 'NEXT_PUBLIC_POSITIONS_ADDRESS' },
+    { key: 'MARKET_ADDRESS', target: 'NEXT_PUBLIC_MARKET_ADDRESS' },
+    { key: 'LIQUIDITYPOOLFACTORY_ADDRESS', target: 'NEXT_PUBLIC_LIQUIDITYPOOLFACTORY_ADDRESS' },
+    { key: 'FEEMANAGER_ADDRESS', target: 'NEXT_PUBLIC_FEEMANAGER_ADDRESS' },
+    { key: 'POLYGON_RPC_URL', target: 'NEXT_PUBLIC_RPC_URL' },
 ];
 
 let envContent = '';

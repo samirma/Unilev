@@ -7,6 +7,9 @@ contract HelperConfig {
     struct TokenInfo {
         address token;
         address priceFeed;
+        address twapPool;
+        address twapIntermediateToken;
+        bool twapIntermediateIsUsd;
     }
 
     struct NetworkConfig {
@@ -41,25 +44,37 @@ contract HelperConfig {
         // WBTC
         tokens[0] = TokenInfo({
             token: 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
-            priceFeed: 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c
+            priceFeed: 0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c,
+            twapPool: address(0),
+            twapIntermediateToken: address(0),
+            twapIntermediateIsUsd: false
         });
 
         // USDC
         tokens[1] = TokenInfo({
             token: 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48,
-            priceFeed: 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6
+            priceFeed: 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6,
+            twapPool: address(0),
+            twapIntermediateToken: address(0),
+            twapIntermediateIsUsd: false
         });
 
         // DAI
         tokens[2] = TokenInfo({
             token: 0x6B175474E89094C44Da98b954EedeAC495271d0F,
-            priceFeed: 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9
+            priceFeed: 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9,
+            twapPool: address(0),
+            twapIntermediateToken: address(0),
+            twapIntermediateIsUsd: false
         });
 
         // WETH
         tokens[3] = TokenInfo({
             token: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
-            priceFeed: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
+            priceFeed: 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419,
+            twapPool: address(0),
+            twapIntermediateToken: address(0),
+            twapIntermediateIsUsd: false
         });
 
         mainnetNetworkConfig = NetworkConfig({
@@ -82,31 +97,46 @@ contract HelperConfig {
         // WBTC
         tokens[0] = TokenInfo({
             token: 0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6,
-            priceFeed: 0xDE31F8bFBD8c84b5360CFACCa3539B938dd78ae6
+            priceFeed: 0xDE31F8bFBD8c84b5360CFACCa3539B938dd78ae6,
+            twapPool: 0xfe343675878100b344802A6763fd373fDeed07A4, // WBTC/WETH 0.3%
+            twapIntermediateToken: 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619, // WETH
+            twapIntermediateIsUsd: false
         });
 
         // WETH
         tokens[1] = TokenInfo({
             token: 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619,
-            priceFeed: 0xF9680D99D6C9589e2a93a78A04A279e509205945
+            priceFeed: 0xF9680D99D6C9589e2a93a78A04A279e509205945,
+            twapPool: 0xA4D8c89f0c20efbe54cBa9e7e7a7E509056228D9, // WETH/USDC 0.05%
+            twapIntermediateToken: address(0), // Direct to USD
+            twapIntermediateIsUsd: true
         });
 
         // USDC
         tokens[2] = TokenInfo({
             token: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359,
-            priceFeed: 0xfE4A8cc5b5B2366C1B58Bea3858e81843581b2F7
+            priceFeed: 0xfE4A8cc5b5B2366C1B58Bea3858e81843581b2F7,
+            twapPool: address(0), // Stablecoin, disable TWAP
+            twapIntermediateToken: address(0),
+            twapIntermediateIsUsd: false
         });
 
         // DAI
         tokens[3] = TokenInfo({
             token: 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063,
-            priceFeed: 0x4746DeC9e833A82EC7C2C1356372CcF2cfcD2F3D
+            priceFeed: 0x4746DeC9e833A82EC7C2C1356372CcF2cfcD2F3D,
+            twapPool: address(0), // Stablecoin, disable TWAP
+            twapIntermediateToken: address(0),
+            twapIntermediateIsUsd: false
         });
 
         // WPOL
         tokens[4] = TokenInfo({
             token: 0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270,
-            priceFeed: 0xAB594600376Ec9fD91F8e885dADF0CE036862dE0
+            priceFeed: 0xAB594600376Ec9fD91F8e885dADF0CE036862dE0,
+            twapPool: address(0), // Update later if WMATIC TWAP is needed
+            twapIntermediateToken: address(0),
+            twapIntermediateIsUsd: false
         });
 
         mainnetNetworkConfig = NetworkConfig({

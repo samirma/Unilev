@@ -27,9 +27,9 @@ async function main() {
     const priceFeedL1Contract = new ethers.Contract(env.PRICEFEEDL1_ADDRESS, priceFeedL1Abi, provider);
 
     try {
-        // --- 1. Calculate Amount of WBTC for $8 ---
-        console.log("Calculating WBTC amount for $8...");
-        const positionAmount = await calculateTokenAmountFromUsd(token0Contract, priceFeedL1Contract, "8");
+        // --- 1. Calculate Amount of WBTC for $2 ---
+        console.log("Calculating WBTC amount for $2...");
+        const positionAmount = await calculateTokenAmountFromUsd(token0Contract, priceFeedL1Contract, "2");
         const decimals = await token0Contract.decimals();
 
         console.log(`Amount: ${ethers.formatUnits(positionAmount, decimals)} WBTC`);
@@ -65,7 +65,7 @@ async function main() {
 
         const fee = 3000;
         const isShort = true;
-        const leverage = 1;
+        const leverage = 2;
         const limitPrice = 0;
         const stopLossPrice = 0;
 
@@ -84,16 +84,40 @@ async function main() {
             console.warn("⚠️ Warning: Transaction might fail due to lack of borrow capacity.");
         }
 
-        const txOpen = await marketContract.openPosition(
+        try {
+            console.log("Simulating transaction...");
+            await marketContract.openShortPosition.staticCall(
+                token0Address,
+                token1Address,
+                fee,
+                leverage,
+                positionAmount,
+                limitPrice,
+                stopLossPrice,
+                { from: wallet.address }
+            );
+            console.log("✅ Simulation successful.");
+        } catch (simError) {
+            console.error("❌ Simulation failed.");
+            if (simError.revert) {
+                console.error("Revert reason:", simError.revert.name, simError.revert.args);
+            } else if (simError.data) {
+                console.error("Error Data:", simError.data);
+            } else {
+                console.error("Error:", simError);
+            }
+            process.exit(1);
+        }
+
+        const txOpen = await marketContract.openShortPosition(
             token0Address,
             token1Address,
             fee,
-            isShort,
             leverage,
             positionAmount,
             limitPrice,
             stopLossPrice,
-            { gasLimit: 5000000, nonce: txApprove.nonce + 1 }
+            { gasLimit: 5000000 }
         );
 
         console.log(`Transaction sent: ${txOpen.hash}`);

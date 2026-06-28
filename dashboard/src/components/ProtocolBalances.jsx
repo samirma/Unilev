@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { useDeFi } from "../hooks/useDeFi"
+import { formatTokenAmount } from "../utils/format"
 
 export function ProtocolBalances({ onSelectToken, selectedToken }) {
     const { getProtocolBalances, SUPPORTED_TOKENS_LIST } = useDeFi()
@@ -70,7 +71,7 @@ export function ProtocolBalances({ onSelectToken, selectedToken }) {
                                 <div className="text-right">
                                     <span className="font-mono text-gray-300">
                                         {posBal
-                                            ? `${Number(posBal.balance).toFixed(4)} ${t.name}`
+                                            ? `${formatTokenAmount(posBal.balance, t.name)} ${t.name}`
                                             : "-"}
                                     </span>
                                     {posBal && (
@@ -87,7 +88,7 @@ export function ProtocolBalances({ onSelectToken, selectedToken }) {
                                 <div className="text-right">
                                     <span className="font-mono text-gray-300">
                                         {pool
-                                            ? `${Number(pool.totalAssets).toFixed(4)} ${t.name}`
+                                            ? `${formatTokenAmount(pool.totalAssets, t.name)} ${t.name}`
                                             : "-"}
                                     </span>
                                     {pool && (
